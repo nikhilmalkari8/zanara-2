@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Home from './components/Home';
 import RegisterModel from './components/RegisterModel';
+import RegisterCompany from './components/RegisterCompany';
 import Login from './components/Login';
 import ProfileSetup from './components/ProfileSetup';
+import CompanyProfileSetup from './components/CompanyProfileSetup';
 import Dashboard from './components/Dashboard';
+import CompanyDashboard from './components/CompanyDashboard';
 import './App.css';
 
 function App() {
@@ -17,32 +20,58 @@ function App() {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          // Check if profile exists
-          const response = await fetch('http://localhost:8001/api/profile/me', {
+          // First, get user data to determine user type
+          const userResponse = await fetch('http://localhost:8001/api/auth/me', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
 
-          if (response.ok) {
-            // Profile exists, go to dashboard
-            const profileData = await response.json();
-            setUser(profileData.userId); // User data is populated in userId field
-            setCurrentPage('dashboard');
-          } else if (response.status === 404) {
-            // No profile, but token is valid - check user data
-            const userResponse = await fetch('http://localhost:8001/api/auth/me', {
-              headers: {
-                'Authorization': `Bearer ${token}`
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            setUser(userData);
+
+            // Check profile completion based on user type
+            if (userData.userType === 'model') {
+              // Check if model profile exists
+              const profileResponse = await fetch('http://localhost:8001/api/profile/me', {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              if (profileResponse.ok) {
+                // Model profile exists, go to model dashboard
+                setCurrentPage('dashboard');
+              } else if (profileResponse.status === 404) {
+                // No model profile, go to model profile setup
+                setCurrentPage('profile-setup');
+              } else {
+                // Invalid token
+                localStorage.removeItem('token');
+                setCurrentPage('home');
               }
-            });
-            
-            if (userResponse.ok) {
-              const userData = await userResponse.json();
-              setUser(userData);
-              setCurrentPage('profile-setup');
+            } else if (userData.userType === 'hiring') {
+              // Check if company profile exists
+              const companyResponse = await fetch('http://localhost:8001/api/company/me/profile', {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              if (companyResponse.ok) {
+                // Company profile exists, go to company dashboard
+                setCurrentPage('company-dashboard');
+              } else if (companyResponse.status === 404) {
+                // No company profile, go to company profile setup
+                setCurrentPage('company-profile-setup');
+              } else {
+                // Invalid token
+                localStorage.removeItem('token');
+                setCurrentPage('home');
+              }
             } else {
-              // Invalid token
+              // Unknown user type, logout
               localStorage.removeItem('token');
               setCurrentPage('home');
             }
@@ -66,24 +95,44 @@ function App() {
     setUser(userData);
     localStorage.setItem('token', token);
     
-    // Check if user has completed profile
+    // Check profile completion based on user type
     try {
-      const response = await fetch('http://localhost:8001/api/profile/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      if (userData.userType === 'model') {
+        const response = await fetch('http://localhost:8001/api/profile/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
-      if (response.ok) {
-        // Profile exists, go to dashboard
-        setCurrentPage('dashboard');
-      } else {
-        // No profile, go to profile setup
-        setCurrentPage('profile-setup');
+        if (response.ok) {
+          // Model profile exists, go to model dashboard
+          setCurrentPage('dashboard');
+        } else {
+          // No model profile, go to model profile setup
+          setCurrentPage('profile-setup');
+        }
+      } else if (userData.userType === 'hiring') {
+        const response = await fetch('http://localhost:8001/api/company/me/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          // Company profile exists, go to company dashboard
+          setCurrentPage('company-dashboard');
+        } else {
+          // No company profile, go to company profile setup
+          setCurrentPage('company-profile-setup');
+        }
       }
     } catch (error) {
-      // If error checking profile, default to profile setup
-      setCurrentPage('profile-setup');
+      // If error checking profile, default to appropriate profile setup
+      if (userData.userType === 'model') {
+        setCurrentPage('profile-setup');
+      } else if (userData.userType === 'hiring') {
+        setCurrentPage('company-profile-setup');
+      }
     }
   };
 
@@ -94,7 +143,11 @@ function App() {
   };
 
   const handleProfileComplete = () => {
-    setCurrentPage('dashboard');
+    if (user?.userType === 'model') {
+      setCurrentPage('dashboard');
+    } else if (user?.userType === 'hiring') {
+      setCurrentPage('company-dashboard');
+    }
   };
 
   if (isLoading) {
@@ -114,8 +167,19 @@ function App() {
   return (
     <div className="App">
       {currentPage === 'home' && <Home setCurrentPage={setCurrentPage} />}
-      {currentPage === 'register-model' && <RegisterModel setCurrentPage={setCurrentPage} />}
-      {currentPage === 'login' && <Login setCurrentPage={setCurrentPage} onLogin={handleSuccessfulLogin} />}
+      
+      {currentPage === 'register-model' && (
+        <RegisterModel setCurrentPage={setCurrentPage} />
+      )}
+      
+      {currentPage === 'register-company' && (
+        <RegisterCompany setCurrentPage={setCurrentPage} />
+      )}
+      
+      {currentPage === 'login' && (
+        <Login setCurrentPage={setCurrentPage} onLogin={handleSuccessfulLogin} />
+      )}
+      
       {currentPage === 'profile-setup' && (
         <ProfileSetup 
           user={user} 
@@ -123,7 +187,22 @@ function App() {
           onProfileComplete={handleProfileComplete}
         />
       )}
-      {currentPage === 'dashboard' && <Dashboard user={user} onLogout={handleLogout} />}
+      
+      {currentPage === 'company-profile-setup' && (
+        <CompanyProfileSetup 
+          user={user} 
+          onLogout={handleLogout} 
+          onProfileComplete={handleProfileComplete}
+        />
+      )}
+      
+      {currentPage === 'dashboard' && (
+        <Dashboard user={user} onLogout={handleLogout} />
+      )}
+      
+      {currentPage === 'company-dashboard' && (
+        <CompanyDashboard user={user} onLogout={handleLogout} />
+      )}
     </div>
   );
 }

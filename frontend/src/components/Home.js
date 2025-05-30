@@ -36,7 +36,7 @@ const Home = ({ setCurrentPage }) => {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           gap: '30px',
-          maxWidth: '600px',
+          maxWidth: '700px',
           margin: '0 auto'
         }}>
           <div 
@@ -80,7 +80,7 @@ const Home = ({ setCurrentPage }) => {
           </div>
           
           <div 
-            onClick={() => alert('Hiring registration coming soon!')}
+            onClick={() => setCurrentPage('register-company')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -116,6 +116,49 @@ const Home = ({ setCurrentPage }) => {
             <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Register for Hiring</h3>
             <p style={{ opacity: '0.8' }}>
               Find the perfect models for your brand, campaign, or project.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setCurrentPage('login')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '30px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              textAlign: 'center',
+              gridColumn: 'span 2',
+              maxWidth: '300px',
+              margin: '0 auto'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.target.style.transform = 'translateY(-5px)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              background: 'linear-gradient(45deg, #9b59b6, #8e44ad)',
+              borderRadius: '50%',
+              margin: '0 auto 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px'
+            }}>
+              🔑
+            </div>
+            <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Already have an account?</h3>
+            <p style={{ opacity: '0.8' }}>
+              Sign in to access your dashboard and manage your profile.
             </p>
           </div>
         </div>

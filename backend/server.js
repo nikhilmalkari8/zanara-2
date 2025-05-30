@@ -4,7 +4,8 @@ const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profile'); // NEW
+const profileRoutes = require('./routes/profile');
+const companyRoutes = require('./routes/Company'); // NEW
 
 const app = express();
 
@@ -19,7 +20,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/zanara')
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes); // NEW
+app.use('/api/profile', profileRoutes);
+app.use('/api/company', companyRoutes); // NEW
 
 // Health check
 app.get('/api/health', (req, res) => {
