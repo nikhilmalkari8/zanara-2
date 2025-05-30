@@ -1,0 +1,316 @@
+import React, { useState, useEffect } from 'react';
+
+const Dashboard = ({ user, onLogout }) => {
+  const [profile, setProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:8001/api/profile/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const profileData = await response.json();
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ color: 'white', fontSize: '1.5rem' }}>Loading Dashboard...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
+      {/* Header */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto 30px' }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(10px)',
+          padding: '20px',
+          borderRadius: '15px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h1 style={{ color: 'white', fontSize: '2rem', margin: 0 }}>
+              Welcome back, {user?.firstName || profile?.userId?.firstName}! 👋
+            </h1>
+            <p style={{ color: '#ccc', margin: '5px 0 0 0' }}>
+              Your modeling dashboard - manage your profile and opportunities
+            </p>
+          </div>
+          <button
+            onClick={onLogout}
+            style={{
+              padding: '10px 20px',
+              background: 'rgba(255, 0, 0, 0.2)',
+              color: '#ff6b6b',
+              border: '1px solid rgba(255, 0, 0, 0.3)',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Dashboard Content */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+          
+          {/* Profile Summary Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>👤</span>
+              Profile Summary
+            </h3>
+            {profile ? (
+              <div style={{ color: '#ccc', lineHeight: '1.6' }}>
+                <p><strong>Height:</strong> {profile.height}</p>
+                <p><strong>Body Type:</strong> {profile.bodyType}</p>
+                <p><strong>Experience:</strong> {profile.experience.slice(0, 100)}...</p>
+                <p><strong>Skills:</strong> {profile.skills.slice(0, 3).join(', ')}</p>
+                <p><strong>Availability:</strong> {profile.availability}</p>
+              </div>
+            ) : (
+              <p style={{ color: '#ccc' }}>Loading profile...</p>
+            )}
+          </div>
+
+          {/* Quick Stats Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>📊</span>
+              Quick Stats
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', color: '#4CAF50', fontWeight: 'bold' }}>127</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Profile Views</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', color: '#2196F3', fontWeight: 'bold' }}>8</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Applications</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', color: '#FF9800', fontWeight: 'bold' }}>3</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Bookings</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', color: '#E91E63', fontWeight: 'bold' }}>4.8</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Rating</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>🔔</span>
+              Recent Activity
+            </h3>
+            <div style={{ color: '#ccc', lineHeight: '1.8' }}>
+              <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontSize: '14px' }}>✅ Profile viewed by Fashion Brand Co.</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>2 hours ago</p>
+              </div>
+              <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontSize: '14px' }}>📩 New casting opportunity available</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>1 day ago</p>
+              </div>
+              <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontSize: '14px' }}>⭐ Received 5-star review from client</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>3 days ago</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>⚡</span>
+              Quick Actions
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button style={{
+                padding: '15px',
+                background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                📝 Edit Profile
+              </button>
+              <button style={{
+                padding: '15px',
+                background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                🔍 Browse Jobs
+              </button>
+              <button style={{
+                padding: '15px',
+                background: 'linear-gradient(45deg, #FF9800, #FFB74D)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                📸 Upload Photos
+              </button>
+              <button style={{
+                padding: '15px',
+                background: 'linear-gradient(45deg, #E91E63, #EC407A)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                💬 Messages
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Social Media Links */}
+        {profile?.socialMedia && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            marginTop: '20px'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px' }}>🌐 Social Media</h3>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+              {profile.socialMedia.instagram && (
+                <a 
+                  href={profile.socialMedia.instagram.startsWith('http') ? profile.socialMedia.instagram : `https://instagram.com/${profile.socialMedia.instagram.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(45deg, #E4405F, #F56040)',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  📷 Instagram
+                </a>
+              )}
+              {profile.socialMedia.tiktok && (
+                <a 
+                  href={profile.socialMedia.tiktok.startsWith('http') ? profile.socialMedia.tiktok : `https://tiktok.com/@${profile.socialMedia.tiktok.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(45deg, #000000, #333333)',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🎵 TikTok
+                </a>
+              )}
+              {profile.socialMedia.youtube && (
+                <a 
+                  href={profile.socialMedia.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(45deg, #FF0000, #FF4444)',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🎥 YouTube
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
