@@ -7,6 +7,9 @@ import ProfileSetup from './components/ProfileSetup';
 import CompanyProfileSetup from './components/CompanyProfileSetup';
 import Dashboard from './components/Dashboard';
 import CompanyDashboard from './components/CompanyDashboard';
+import Opportunities from './components/Opportunities'; // NEW
+import CreateOpportunity from './components/CreateOpportunity'; // NEW
+import OpportunityDetail from './components/OpportunityDetail'; // NEW
 import './App.css';
 
 function App() {
@@ -164,6 +167,19 @@ function App() {
     );
   }
 
+  // Handle opportunity detail pages
+  if (currentPage.startsWith('opportunity-detail-')) {
+    const opportunityId = currentPage.replace('opportunity-detail-', '');
+    return (
+      <OpportunityDetail 
+        opportunityId={opportunityId}
+        user={user} 
+        onLogout={handleLogout} 
+        setCurrentPage={setCurrentPage}
+      />
+    );
+  }
+
   return (
     <div className="App">
       {currentPage === 'home' && <Home setCurrentPage={setCurrentPage} />}
@@ -197,11 +213,19 @@ function App() {
       )}
       
       {currentPage === 'dashboard' && (
-        <Dashboard user={user} onLogout={handleLogout} />
+        <Dashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
       
       {currentPage === 'company-dashboard' && (
-        <CompanyDashboard user={user} onLogout={handleLogout} />
+        <CompanyDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+      )}
+
+      {currentPage === 'opportunities' && (
+        <Opportunities user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+      )}
+
+      {currentPage === 'create-opportunity' && (
+        <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
     </div>
   );

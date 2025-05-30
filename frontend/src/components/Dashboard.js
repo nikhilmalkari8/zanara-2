@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Dashboard = ({ user, onLogout }) => {
+const Dashboard = ({ user, onLogout, setCurrentPage }) => {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,19 +68,35 @@ const Dashboard = ({ user, onLogout }) => {
               Your modeling dashboard - manage your profile and opportunities
             </p>
           </div>
-          <button
-            onClick={onLogout}
-            style={{
-              padding: '10px 20px',
-              background: 'rgba(255, 0, 0, 0.2)',
-              color: '#ff6b6b',
-              border: '1px solid rgba(255, 0, 0, 0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setCurrentPage('opportunities')}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              🎯 Browse Opportunities
+            </button>
+            <button
+              onClick={onLogout}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(255, 0, 0, 0.2)',
+                color: '#ff6b6b',
+                border: '1px solid rgba(255, 0, 0, 0.3)',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
@@ -198,17 +214,20 @@ const Dashboard = ({ user, onLogout }) => {
               }}>
                 📝 Edit Profile
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
-                🔍 Browse Jobs
+              <button 
+                onClick={() => setCurrentPage('opportunities')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🔍 Browse Opportunities
               </button>
               <button style={{
                 padding: '15px',
@@ -237,6 +256,134 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
 
+          {/* Applications Status Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>📋</span>
+              Recent Applications
+            </h3>
+            <div style={{ color: '#ccc', lineHeight: '1.6' }}>
+              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Fashion Week Campaign</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Elite Fashion Agency</p>
+                </div>
+                <span style={{
+                  padding: '4px 8px',
+                  background: 'rgba(255, 193, 7, 0.3)',
+                  color: '#FFD54F',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}>
+                  Pending
+                </span>
+              </div>
+              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Summer Catalog Shoot</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Trendy Brands Inc.</p>
+                </div>
+                <span style={{
+                  padding: '4px 8px',
+                  background: 'rgba(76, 175, 80, 0.3)',
+                  color: '#81C784',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}>
+                  Shortlisted
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Beauty Product Ad</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Glamour Cosmetics</p>
+                </div>
+                <span style={{
+                  padding: '4px 8px',
+                  background: 'rgba(33, 150, 243, 0.3)',
+                  color: '#64B5F6',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}>
+                  Reviewing
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Opportunities Recommendation Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>💡</span>
+              Recommended For You
+            </h3>
+            <div style={{ color: '#ccc', lineHeight: '1.6' }}>
+              <div style={{ marginBottom: '15px', padding: '15px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Editorial Fashion Shoot</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>NYC • $1,500 • 2 days left</p>
+                <button 
+                  onClick={() => setCurrentPage('opportunities')}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  View Details
+                </button>
+              </div>
+              <div style={{ marginBottom: '15px', padding: '15px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Commercial Campaign</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>LA • $2,000 • 5 days left</p>
+                <button 
+                  onClick={() => setCurrentPage('opportunities')}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  View Details
+                </button>
+              </div>
+            </div>
+            <button 
+              onClick={() => setCurrentPage('opportunities')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              View All Opportunities →
+            </button>
+          </div>
         </div>
 
         {/* Social Media Links */}

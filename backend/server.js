@@ -5,7 +5,8 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
-const companyRoutes = require('./routes/Company'); // NEW
+const companyRoutes = require('./routes/Company');
+const opportunitiesRoutes = require('./routes/opportunities'); // NEW
 
 const app = express();
 
@@ -21,7 +22,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/zanara')
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/company', companyRoutes); // NEW
+app.use('/api/company', companyRoutes);
+app.use('/api/opportunities', opportunitiesRoutes); // NEW
 
 // Health check
 app.get('/api/health', (req, res) => {

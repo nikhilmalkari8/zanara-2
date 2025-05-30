@@ -1,32 +1,60 @@
 import React, { useState, useEffect } from 'react';
 
-const CompanyDashboard = ({ user, onLogout }) => {
+const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
   const [company, setCompany] = useState(null);
+  const [opportunities, setOpportunities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCompany = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:8001/api/company/me/profile', {
+        
+        // Fetch company data
+        const companyResponse = await fetch('http://localhost:8001/api/company/me/profile', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
-        if (response.ok) {
-          const companyData = await response.json();
+        if (companyResponse.ok) {
+          const companyData = await companyResponse.json();
           setCompany(companyData);
         }
+
+        // Fetch company opportunities
+        const opportunitiesResponse = await fetch('http://localhost:8001/api/opportunities/company/mine', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (opportunitiesResponse.ok) {
+          const opportunitiesData = await opportunitiesResponse.json();
+          setOpportunities(opportunitiesData);
+        }
+
       } catch (error) {
-        console.error('Error fetching company:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCompany();
+    fetchData();
   }, []);
+
+  const getRecentOpportunities = () => {
+    return opportunities.slice(0, 3);
+  };
+
+  const getTotalApplications = () => {
+    return opportunities.reduce((total, opp) => total + (opp.applicationCount || 0), 0);
+  };
+
+  const getActiveOpportunities = () => {
+    return opportunities.filter(opp => opp.status === 'published').length;
+  };
 
   if (isLoading) {
     return (
@@ -68,19 +96,49 @@ const CompanyDashboard = ({ user, onLogout }) => {
               Your company dashboard - manage your profile, opportunities, and talent
             </p>
           </div>
-          <button
-            onClick={onLogout}
-            style={{
-              padding: '10px 20px',
-              background: 'rgba(255, 0, 0, 0.2)',
-              color: '#ff6b6b',
-              border: '1px solid rgba(255, 0, 0, 0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setCurrentPage('create-opportunity')}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              + Post Opportunity
+            </button>
+            <button
+              onClick={() => setCurrentPage('opportunities')}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              🔍 Browse Talent
+            </button>
+            <button
+              onClick={onLogout}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(255, 0, 0, 0.2)',
+                color: '#ff6b6b',
+                border: '1px solid rgba(255, 0, 0, 0.3)',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
@@ -135,21 +193,21 @@ const CompanyDashboard = ({ user, onLogout }) => {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', color: '#2196F3', fontWeight: 'bold' }}>
-                  {company?.stats?.jobsPosted || 0}
+                  {getActiveOpportunities()}
                 </div>
-                <div style={{ color: '#ccc', fontSize: '14px' }}>Jobs Posted</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Active Opportunities</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', color: '#FF9800', fontWeight: 'bold' }}>
-                  {company?.stats?.hires || 0}
+                  {getTotalApplications()}
                 </div>
-                <div style={{ color: '#ccc', fontSize: '14px' }}>Total Hires</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Total Applications</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', color: '#E91E63', fontWeight: 'bold' }}>
-                  {company?.stats?.rating || 0}
+                  {company?.stats?.hires || 0}
                 </div>
-                <div style={{ color: '#ccc', fontSize: '14px' }}>Rating</div>
+                <div style={{ color: '#ccc', fontSize: '14px' }}>Total Hires</div>
               </div>
             </div>
           </div>
@@ -176,7 +234,7 @@ const CompanyDashboard = ({ user, onLogout }) => {
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>1 day ago</p>
               </div>
               <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
-                <p style={{ margin: 0, fontSize: '14px' }}>📝 Job posting "Fashion Model Needed" published</p>
+                <p style={{ margin: 0, fontSize: '14px' }}>📝 Opportunity "Fashion Model Needed" published</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>3 days ago</p>
               </div>
             </div>
@@ -195,28 +253,34 @@ const CompanyDashboard = ({ user, onLogout }) => {
               Quick Actions
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
-                📝 Post Job
+              <button 
+                onClick={() => setCurrentPage('create-opportunity')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                📝 Post Opportunity
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+              <button 
+                onClick={() => setCurrentPage('opportunities')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
                 🔍 Browse Talent
               </button>
               <button style={{
@@ -242,6 +306,182 @@ const CompanyDashboard = ({ user, onLogout }) => {
                 fontWeight: 'bold'
               }}>
                 💬 Messages
+              </button>
+            </div>
+          </div>
+
+          {/* Recent Opportunities Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>📋</span>
+              Recent Opportunities
+            </h3>
+            {opportunities.length > 0 ? (
+              <div style={{ color: '#ccc' }}>
+                {getRecentOpportunities().map((opportunity, index) => (
+                  <div key={opportunity._id} style={{
+                    marginBottom: index < 2 ? '15px' : '0',
+                    padding: '12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                      <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: 'white' }}>
+                        {opportunity.title}
+                      </p>
+                      <span style={{
+                        padding: '3px 8px',
+                        background: opportunity.status === 'published' 
+                          ? 'rgba(76, 175, 80, 0.3)' 
+                          : 'rgba(255, 193, 7, 0.3)',
+                        color: opportunity.status === 'published' ? '#81C784' : '#FFD54F',
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        textTransform: 'capitalize'
+                      }}>
+                        {opportunity.status}
+                      </span>
+                    </div>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>
+                      {opportunity.applicationCount || 0} applications • {opportunity.type.replace('-', ' ')}
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => setCurrentPage(`opportunity-detail-${opportunity._id}`)}
+                        style={{
+                          padding: '4px 8px',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px'
+                        }}
+                      >
+                        View
+                      </button>
+                      <button style={{
+                        padding: '4px 8px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '11px'
+                      }}>
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {opportunities.length > 3 && (
+                  <button style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    marginTop: '10px'
+                  }}>
+                    View All {opportunities.length} Opportunities →
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: '#ccc' }}>
+                <p style={{ marginBottom: '15px' }}>No opportunities posted yet</p>
+                <button 
+                  onClick={() => setCurrentPage('create-opportunity')}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Post Your First Opportunity
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Application Management Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '25px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '10px', fontSize: '24px' }}>👥</span>
+              Application Management
+            </h3>
+            <div style={{ color: '#ccc' }}>
+              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px' }}>Pending Review</span>
+                <span style={{ 
+                  padding: '4px 12px',
+                  background: 'rgba(255, 193, 7, 0.3)',
+                  color: '#FFD54F',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}>
+                  {Math.floor(getTotalApplications() * 0.4)}
+                </span>
+              </div>
+              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px' }}>Shortlisted</span>
+                <span style={{ 
+                  padding: '4px 12px',
+                  background: 'rgba(76, 175, 80, 0.3)',
+                  color: '#81C784',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}>
+                  {Math.floor(getTotalApplications() * 0.2)}
+                </span>
+              </div>
+              <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px' }}>Selected</span>
+                <span style={{ 
+                  padding: '4px 12px',
+                  background: 'rgba(33, 150, 243, 0.3)',
+                  color: '#64B5F6',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}>
+                  {Math.floor(getTotalApplications() * 0.1)}
+                </span>
+              </div>
+              <button style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(45deg, #4ecdc4, #44a08d)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                Review All Applications
               </button>
             </div>
           </div>
