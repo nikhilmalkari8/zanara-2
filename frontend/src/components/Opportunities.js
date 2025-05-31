@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import Opportunity from '../../../backend/models/Opportunity';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const Opportunities = ({ user, onLogout, setCurrentPage }) => {
   const [opportunities, setOpportunities] = useState([]);
@@ -44,11 +43,7 @@ const Opportunities = ({ user, onLogout, setCurrentPage }) => {
     { value: 'title', label: 'Title A-Z' }
   ];
 
-  useEffect(() => {
-    fetchOpportunities();
-  }, [filters, currentPage]);
-
-  const fetchOpportunities = async () => {
+  const fetchOpportunities = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -68,7 +63,11 @@ const Opportunities = ({ user, onLogout, setCurrentPage }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, filters]);
+
+  useEffect(() => {
+    fetchOpportunities();
+  }, [fetchOpportunities]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));

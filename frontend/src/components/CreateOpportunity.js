@@ -160,7 +160,7 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
   const updateNestedField = (path, value) => {
     const keys = path.split('.');
     setOpportunityData(prev => {
-      const newData = { ...prev };
+      const newData = JSON.parse(JSON.stringify(prev)); // Deep clone
       let current = newData;
       
       for (let i = 0; i < keys.length - 1; i++) {
@@ -176,15 +176,19 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
   const addToArray = (path, value) => {
     const keys = path.split('.');
     setOpportunityData(prev => {
-      const newData = { ...prev };
+      const newData = JSON.parse(JSON.stringify(prev)); // Deep clone
       let current = newData;
       
       for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
         current = current[keys[i]];
       }
       
-      if (!current[keys[keys.length - 1]].includes(value)) {
-        current[keys[keys.length - 1]] = [...current[keys[keys.length - 1]], value];
+      const finalKey = keys[keys.length - 1];
+      if (!current[finalKey]) current[finalKey] = [];
+      
+      if (!current[finalKey].includes(value)) {
+        current[finalKey] = [...current[finalKey], value];
       }
       
       return newData;
@@ -194,14 +198,18 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
   const removeFromArray = (path, value) => {
     const keys = path.split('.');
     setOpportunityData(prev => {
-      const newData = { ...prev };
+      const newData = JSON.parse(JSON.stringify(prev)); // Deep clone
       let current = newData;
       
       for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
         current = current[keys[i]];
       }
       
-      current[keys[keys.length - 1]] = current[keys[keys.length - 1]].filter(item => item !== value);
+      const finalKey = keys[keys.length - 1];
+      if (current[finalKey]) {
+        current[finalKey] = current[finalKey].filter(item => item !== value);
+      }
       
       return newData;
     });
@@ -222,17 +230,6 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
       default:
         return null;
     }
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    background: 'rgba(255, 255, 255, 0.1)',
-    color: 'white',
-    fontSize: '16px',
-    outline: 'none'
   };
 
   return (
@@ -942,7 +939,7 @@ const RequirementsStep = ({ data, updateField, addToArray, removeFromArray }) =>
             value={data.requirements.height.min}
             onChange={(e) => updateField('requirements.height.min', e.target.value)}
             style={inputStyle}
-            placeholder="e.g., 170cm or 5'7\"
+            placeholder="e.g., 170cm or 5'7&quot;"
           />
         </div>
         <div>
@@ -954,7 +951,7 @@ const RequirementsStep = ({ data, updateField, addToArray, removeFromArray }) =>
             value={data.requirements.height.max}
             onChange={(e) => updateField('requirements.height.max', e.target.value)}
             style={inputStyle}
-            placeholder="e.g., 180cm or 5'11\"
+            placeholder="e.g., 180cm or 5'11&quot;"
           />
         </div>
         <div>
