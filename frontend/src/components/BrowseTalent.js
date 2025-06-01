@@ -73,29 +73,33 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
   ];
 
   // Fetch models based on filters
+  // Fetch models based on filters
   const fetchModels = useCallback(async () => {
     setLoading(true);
     try {
       // Convert filters to query params
       const queryParams = new URLSearchParams();
       queryParams.append('page', currentPage);
+      queryParams.append('limit', '20');
       
-      if (filters.search) queryParams.append('search', filters.search);
+      if (filters.search.trim()) queryParams.append('search', filters.search.trim());
       if (filters.gender !== 'all') queryParams.append('gender', filters.gender);
-      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.location.trim()) queryParams.append('location', filters.location.trim());
       if (filters.bodyType !== 'all') queryParams.append('bodyType', filters.bodyType);
-      if (filters.hairColor) queryParams.append('hairColor', filters.hairColor);
-      if (filters.eyeColor) queryParams.append('eyeColor', filters.eyeColor);
+      if (filters.hairColor.trim()) queryParams.append('hairColor', filters.hairColor.trim());
+      if (filters.eyeColor.trim()) queryParams.append('eyeColor', filters.eyeColor.trim());
       if (filters.experience !== 'all') queryParams.append('experience', filters.experience);
       if (filters.availability !== 'all') queryParams.append('availability', filters.availability);
       if (filters.skills.length > 0) queryParams.append('skills', filters.skills.join(','));
-      if (filters.ageMin) queryParams.append('ageMin', filters.ageMin);
-      if (filters.ageMax) queryParams.append('ageMax', filters.ageMax);
-      if (filters.heightMin) queryParams.append('heightMin', filters.heightMin);
-      if (filters.heightMax) queryParams.append('heightMax', filters.heightMax);
+      if (filters.ageMin.trim()) queryParams.append('ageMin', filters.ageMin.trim());
+      if (filters.ageMax.trim()) queryParams.append('ageMax', filters.ageMax.trim());
+      if (filters.heightMin.trim()) queryParams.append('heightMin', filters.heightMin.trim());
+      if (filters.heightMax.trim()) queryParams.append('heightMax', filters.heightMax.trim());
       if (filters.sort) queryParams.append('sort', filters.sort);
 
       const token = localStorage.getItem('token');
+      
+      console.log('Fetching with params:', queryParams.toString()); // Debug log
       
       const response = await fetch(`http://localhost:8001/api/profile/browse?${queryParams}`, {
         headers: {
@@ -104,17 +108,19 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch models');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      setModels(data.models);
-      setTotalPages(data.totalPages);
+      console.log('Received data:', data); // Debug log
+      
+      setModels(data.models || []);
+      setTotalPages(data.totalPages || 1);
       
     } catch (error) {
       console.error('Error fetching models:', error);
       
-      // For development/testing - mock data if API fails
+      // Keep the fallback mock data for testing
       const mockData = {
         models: generateMockModels(20),
         totalPages: 5,

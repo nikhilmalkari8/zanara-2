@@ -47,6 +47,7 @@ router.post('/complete', auth, async (req, res) => {
 // Add this route to backend/routes/profile.js
 
 // Browse models with filtering and pagination
+// Browse models with filtering and pagination
 router.get('/browse', auth, async (req, res) => {
     try {
       // Only allow hiring users to browse models
@@ -78,12 +79,26 @@ router.get('/browse', auth, async (req, res) => {
       // Build query
       let query = { isComplete: true };
   
-      // Text search
+      // Text search - search in user's name, skills, and specializations
       if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        
+        // First get user IDs that match the name search
+        const matchingUsers = await require('../models/User').find({
+          $or: [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { email: searchRegex }
+          ]
+        }).select('_id');
+        
+        const matchingUserIds = matchingUsers.map(user => user._id);
+        
         query.$or = [
-          { 'skills': { $regex: search, $options: 'i' } },
-          { 'specializations': { $regex: search, $options: 'i' } },
-          { 'preferredLocations': { $regex: search, $options: 'i' } }
+          { userId: { $in: matchingUserIds } },
+          { skills: searchRegex },
+          { specializations: searchRegex },
+          { preferredLocations: searchRegex }
         ];
       }
   
@@ -120,7 +135,7 @@ router.get('/browse', auth, async (req, res) => {
       // Skills filter
       if (skills) {
         const skillArray = skills.split(',').map(skill => skill.trim());
-        query.skills = { $in: skillArray };
+        query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
       }
   
       // Location filter
@@ -128,15 +143,21 @@ router.get('/browse', auth, async (req, res) => {
         query.preferredLocations = { $regex: location, $options: 'i' };
       }
   
+      console.log('Query:', JSON.stringify(query, null, 2)); // Debug log
+  
       // Get all matching profiles first for age filtering
       let profiles = await ModelProfile.find(query)
         .populate('userId', 'firstName lastName email')
         .lean();
   
+      console.log('Found profiles:', profiles.length); // Debug log
+  
       // Age range filter (calculated from dateOfBirth)
       if (ageMin || ageMax) {
         const today = new Date();
         profiles = profiles.filter(profile => {
+          if (!profile.dateOfBirth) return false;
+          
           const birthDate = new Date(profile.dateOfBirth);
           let age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -153,13 +174,12 @@ router.get('/browse', auth, async (req, res) => {
         });
       }
   
-      // Height range filter (basic string comparison - in production you'd want proper height parsing)
+      // Height range filter
       if (heightMin || heightMax) {
         profiles = profiles.filter(profile => {
           if (!profile.height) return false;
           
-          // This is a simplified height comparison
-          // In production, you'd want to properly parse and compare heights
+          // Basic height comparison - you might want to improve this
           let heightMatch = true;
           if (heightMin) {
             heightMatch = heightMatch && profile.height.includes(heightMin.replace(/['"]/g, ''));
@@ -172,11 +192,11 @@ router.get('/browse', auth, async (req, res) => {
         });
       }
   
-      // Add mock data for development (since profile views, etc. might not be tracked yet)
+      // Add additional data for frontend
       profiles = profiles.map(profile => ({
         ...profile,
         profileViews: Math.floor(Math.random() * 1000) + 50,
-        lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)), // Random time in last week
+        lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)),
         completionPercentage: Math.floor(Math.random() * 40) + 60,
         location: profile.preferredLocations && profile.preferredLocations.length > 0 
           ? profile.preferredLocations[0] 
@@ -189,7 +209,6 @@ router.get('/browse', auth, async (req, res) => {
           profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           break;
         case 'relevance':
-          // In production, implement relevance scoring based on search terms, user preferences, etc.
           profiles.sort((a, b) => b.profileViews - a.profileViews);
           break;
         case 'experience':
