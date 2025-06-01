@@ -116,10 +116,17 @@ router.get('/browse', async (req, res) => {
       .skip((page - 1) * limit)
       .select('-applications -companyNotes');
 
+    // Add application count to each opportunity
+    const opportunitiesWithCount = opportunities.map(opp => {
+      const oppObj = opp.toObject();
+      oppObj.applicationCount = opp.applications ? opp.applications.length : 0;
+      return oppObj;
+    });
+
     const total = await Opportunity.countDocuments(query);
 
     res.json({
-      opportunities,
+      opportunities: opportunitiesWithCount,
       totalPages: Math.ceil(total / limit),
       currentPage: parseInt(page),
       total,
@@ -138,7 +145,7 @@ router.get('/browse', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const opportunity = await Opportunity.findById(req.params.id)
-      .populate('company', 'companyName logo address description website socialMedia foundedYear companySize');
+      .populate('company', 'companyName logo address description website socialMedia foundedYear companySize owner admins');
 
     if (!opportunity) {
       return res.status(404).json({
@@ -166,19 +173,33 @@ router.get('/:id', async (req, res) => {
     opportunity.views = (opportunity.views || 0) + 1;
     await opportunity.save();
 
-    // Remove sensitive information for non-owners
+    // Prepare response data
     let responseData = opportunity.toObject();
+    
+    // Add application count
+    responseData.applicationCount = opportunity.applications ? opportunity.applications.length : 0;
+
+    // Handle application data based on user type and ownership
     if (!req.user) {
+      // Public user - remove applications
       delete responseData.applications;
     } else {
       const company = await Company.findById(opportunity.company);
-      if (!company.owner.equals(req.userId) && !company.admins.includes(req.userId)) {
-        // For regular users, only show their own application
+      const isOwner = company.owner.equals(req.userId) || company.admins.includes(req.userId);
+      
+      if (req.user.userType === 'hiring' && isOwner) {
+        // Company owner/admin - keep all applications for management view
+        // Applications will be fetched separately via /applications endpoint
+        delete responseData.applications;
+      } else if (req.user.userType === 'model') {
+        // Model user - only show their own application status
         const userApplication = opportunity.applications.find(app => 
           app.applicant.toString() === req.userId
         );
         responseData.userApplication = userApplication || null;
-        responseData.applicationCount = opportunity.applications.length;
+        delete responseData.applications;
+      } else {
+        // Other users - remove applications
         delete responseData.applications;
       }
     }
@@ -213,7 +234,14 @@ router.get('/company/mine', auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .populate('company', 'companyName logo');
 
-    res.json(opportunities);
+    // Add application count to each opportunity
+    const opportunitiesWithCount = opportunities.map(opp => {
+      const oppObj = opp.toObject();
+      oppObj.applicationCount = opp.applications ? opp.applications.length : 0;
+      return oppObj;
+    });
+
+    res.json(opportunitiesWithCount);
 
   } catch (error) {
     console.error('Get company opportunities error:', error);
@@ -534,7 +562,14 @@ router.get('/saved/mine', auth, async (req, res) => {
     .select('-applications')
     .sort({ 'saves.savedAt': -1 });
 
-    res.json(opportunities);
+    // Add application count to each opportunity
+    const opportunitiesWithCount = opportunities.map(opp => {
+      const oppObj = opp.toObject();
+      oppObj.applicationCount = opp.applications ? opp.applications.length : 0;
+      return oppObj;
+    });
+
+    res.json(opportunitiesWithCount);
 
   } catch (error) {
     console.error('Get saved opportunities error:', error);

@@ -19,9 +19,16 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Token is no longer valid' });
     }
 
-    // Add user id to request
+    // Add user info to request
     req.userId = decoded.userId;
-    req.user = user;
+    req.user = {
+      id: user._id.toString(),
+      userType: user.userType,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
+    
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);

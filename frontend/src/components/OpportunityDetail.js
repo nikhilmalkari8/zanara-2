@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) => {
   const [opportunity, setOpportunity] = useState(null);
@@ -10,16 +10,16 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
     portfolioUrls: []
   });
   const [userApplication, setUserApplication] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    fetchOpportunity();
-    if (user && user.userType === 'model') {
-      checkApplicationStatus();
-    }
-  }, [opportunityId]);
+  // Check if user owns this opportunity
+  const isOwner = user && opportunity && opportunity.company && 
+    (opportunity.company.owner === user.id || 
+     (opportunity.company.admins && opportunity.company.admins.includes(user.id)));
 
-  const fetchOpportunity = async () => {
+  const fetchOpportunity = useCallback(async () => {
     try {
       const headers = {};
       if (user) {
@@ -40,9 +40,11 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [opportunityId, user]);
 
-  const checkApplicationStatus = async () => {
+  const checkApplicationStatus = useCallback(async () => {
+    if (!user || user.userType !== 'model') return;
+    
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:8001/api/opportunities/${opportunityId}/my-application`, {
@@ -58,7 +60,44 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
     } catch (error) {
       console.error('Error checking application status:', error);
     }
-  };
+  }, [opportunityId, user]);
+
+  const fetchApplications = useCallback(async () => {
+    if (!user || user.userType !== 'hiring' || !isOwner) return;
+    
+    setLoadingApplications(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8001/api/opportunities/${opportunityId}/applications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setApplications(data.applications || []);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, [opportunityId, user, isOwner]);
+
+  useEffect(() => {
+    fetchOpportunity();
+    if (user && user.userType === 'model') {
+      checkApplicationStatus();
+    }
+  }, [fetchOpportunity, checkApplicationStatus, user]);
+
+  useEffect(() => {
+    // If user is hiring and owns this opportunity, fetch applications
+    if (user && user.userType === 'hiring' && opportunity && isOwner) {
+      fetchApplications();
+    }
+  }, [fetchApplications, user, opportunity, isOwner]);
 
   const handleApply = async () => {
     if (!user) {
@@ -98,6 +137,8 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
             coverLetter: applicationData.coverLetter
           }
         });
+        // Refresh the opportunity to get updated application count
+        fetchOpportunity();
       } else {
         setMessage(data.message || 'Failed to submit application');
       }
@@ -105,6 +146,29 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
       setMessage('Error submitting application. Please try again.');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const updateApplicationStatus = async (applicationId, status, notes = '') => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8001/api/opportunities/${opportunityId}/applications/${applicationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, companyNotes: notes })
+      });
+
+      if (response.ok) {
+        // Refresh applications
+        fetchApplications();
+        setMessage(`Application ${status} successfully!`);
+      }
+    } catch (error) {
+      console.error('Error updating application:', error);
+      setMessage('Error updating application status');
     }
   };
 
@@ -261,7 +325,7 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
 
       {/* Main Content */}
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isOwner ? '1fr' : '2fr 1fr', gap: '30px' }}>
           
           {/* Left Column - Opportunity Details */}
           <div>
@@ -527,292 +591,451 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
             </div>
           </div>
 
-          {/* Right Column - Application Panel */}
-          <div>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '15px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              padding: '25px',
-              position: 'sticky',
-              top: '20px'
-            }}>
-              <h3 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '20px' }}>
-                Application
-              </h3>
-
-              {/* Application Status */}
-              {userApplication?.hasApplied ? (
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  padding: '20px',
-                  borderRadius: '10px',
-                  marginBottom: '20px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    background: getApplicationStatusColor(userApplication.application.status),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 15px',
-                    fontSize: '24px'
-                  }}>
-                    {userApplication.application.status === 'selected' ? '🎉' : 
-                     userApplication.application.status === 'rejected' ? '❌' : 
-                     userApplication.application.status === 'shortlisted' ? '⭐' : '⏳'}
-                  </div>
-                  <h4 style={{
-                    color: getApplicationStatusColor(userApplication.application.status),
-                    margin: '0 0 10px 0',
-                    fontSize: '1.1rem'
-                  }}>
-                    {getApplicationStatusText(userApplication.application.status)}
-                  </h4>
-                  <p style={{ color: '#ccc', fontSize: '0.9rem', margin: 0 }}>
-                    Applied on {formatDate(userApplication.application.appliedAt)}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {opportunity.applicationProcess?.requiresCoverLetter && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>
-                        Cover Letter {opportunity.applicationProcess.requiresCoverLetter ? '*' : '(Optional)'}
-                      </label>
-                      <textarea
-                        value={applicationData.coverLetter}
-                        onChange={(e) => setApplicationData(prev => ({ ...prev, coverLetter: e.target.value }))}
-                        rows="4"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          fontSize: '14px',
-                          outline: 'none',
-                          resize: 'vertical'
-                        }}
-                        placeholder="Tell them why you're perfect for this opportunity..."
-                      />
-                    </div>
-                  )}
-
-                  {/* Custom Questions */}
-                  {opportunity.applicationProcess?.customQuestions && opportunity.applicationProcess.customQuestions.length > 0 && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '15px', fontSize: '1rem' }}>Additional Questions</h4>
-                      {opportunity.applicationProcess.customQuestions.map((question, index) => (
-                        <div key={index} style={{ marginBottom: '15px' }}>
-                          <label style={{
-                            display: 'block',
-                            color: '#ccc',
-                            marginBottom: '8px',
-                            fontSize: '0.9rem'
-                          }}>
-                            {question.question} {question.required ? '*' : ''}
-                          </label>
-                          {question.type === 'textarea' ? (
-                            <textarea
-                              value={applicationData.customAnswers[index]?.answer || ''}
-                              onChange={(e) => {
-                                const newAnswers = [...applicationData.customAnswers];
-                                newAnswers[index] = {
-                                  questionId: question._id,
-                                  question: question.question,
-                                  answer: e.target.value
-                                };
-                                setApplicationData(prev => ({ ...prev, customAnswers: newAnswers }));
-                              }}
-                              rows="3"
-                              style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '6px',
-                                border: '1px solid rgba(255, 255, 255, 0.3)',
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                color: 'white',
-                                fontSize: '14px',
-                                outline: 'none'
-                              }}
-                            />
-                          ) : question.type === 'select' ? (
-                            <select
-                              value={applicationData.customAnswers[index]?.answer || ''}
-                              onChange={(e) => {
-                                const newAnswers = [...applicationData.customAnswers];
-                                newAnswers[index] = {
-                                  questionId: question._id,
-                                  question: question.question,
-                                  answer: e.target.value
-                                };
-                                setApplicationData(prev => ({ ...prev, customAnswers: newAnswers }));
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '6px',
-                                border: '1px solid rgba(255, 255, 255, 0.3)',
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                color: 'white',
-                                fontSize: '14px',
-                                outline: 'none'
-                              }}
-                            >
-                              <option value="">Select an option</option>
-                              {question.options?.map((option, optIndex) => (
-                                <option key={optIndex} value={option} style={{ background: '#333' }}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              value={applicationData.customAnswers[index]?.answer || ''}
-                              onChange={(e) => {
-                                const newAnswers = [...applicationData.customAnswers];
-                                newAnswers[index] = {
-                                  questionId: question._id,
-                                  question: question.question,
-                                  answer: e.target.value
-                                };
-                                setApplicationData(prev => ({ ...prev, customAnswers: newAnswers }));
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '6px',
-                                border: '1px solid rgba(255, 255, 255, 0.3)',
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                color: 'white',
-                                fontSize: '14px',
-                                outline: 'none'
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Portfolio URLs */}
-                  {opportunity.applicationProcess?.requiresPortfolio && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>
-                        Portfolio URLs (comma separated)
-                      </label>
-                      <input
-                        type="text"
-                        value={applicationData.portfolioUrls.join(', ')}
-                        onChange={(e) => setApplicationData(prev => ({
-                          ...prev,
-                          portfolioUrls: e.target.value.split(',').map(url => url.trim()).filter(url => url)
-                        }))}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          fontSize: '14px',
-                          outline: 'none'
-                        }}
-                        placeholder="https://instagram.com/yourprofile, https://yourwebsite.com"
-                      />
-                    </div>
-                  )}
-
-                  {message && (
-                    <div style={{
-                      padding: '15px',
-                      borderRadius: '8px',
-                      marginBottom: '20px',
-                      background: message.includes('successfully') 
-                        ? 'rgba(76, 175, 80, 0.2)' 
-                        : 'rgba(244, 67, 54, 0.2)',
-                      border: `1px solid ${message.includes('successfully') ? '#4CAF50' : '#F44336'}`,
-                      color: message.includes('successfully') ? '#81C784' : '#EF5350',
-                      fontSize: '0.9rem'
-                    }}>
-                      {message}
-                    </div>
-                  )}
-
-                  {/* Apply Button */}
-                  <button
-                    onClick={handleApply}
-                    disabled={applying || getDaysRemaining(opportunity.applicationDeadline) === 'Expired'}
-                    style={{
-                      width: '100%',
-                      padding: '15px',
-                      background: applying 
-                        ? '#666' 
-                        : getDaysRemaining(opportunity.applicationDeadline) === 'Expired'
-                          ? '#666'
-                          : 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: applying || getDaysRemaining(opportunity.applicationDeadline) === 'Expired' 
-                        ? 'not-allowed' 
-                        : 'pointer',
-                      fontSize: '1rem',
-                      fontWeight: 'bold',
-                      marginBottom: '15px'
-                    }}
-                  >
-                    {applying 
-                      ? 'Submitting Application...' 
-                      : getDaysRemaining(opportunity.applicationDeadline) === 'Expired'
-                        ? 'Application Deadline Passed'
-                        : 'Apply Now'
-                    }
-                  </button>
-                </>
-              )}
-
-              {/* Application Stats */}
+          {/* Right Column - Application Panel or Applications List */}
+          {!isOwner && (
+            <div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                padding: '15px',
-                borderRadius: '8px',
-                textAlign: 'center'
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '15px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                padding: '25px',
+                position: 'sticky',
+                top: '20px'
               }}>
-                <p style={{ color: '#ccc', fontSize: '0.9rem', margin: '0 0 5px 0' }}>
-                  {opportunity.applicationCount || 0} applications received
-                </p>
-                <p style={{ color: '#999', fontSize: '0.8rem', margin: 0 }}>
-                  {opportunity.views || 0} views
-                </p>
-              </div>
+                <h3 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '20px' }}>
+                  Application
+                </h3>
 
-              {/* Application Instructions */}
-              {opportunity.applicationProcess?.instructions && (
+                {/* Application Status */}
+                {userApplication?.hasApplied ? (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '20px',
+                    borderRadius: '10px',
+                    marginBottom: '20px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '50%',
+                      background: getApplicationStatusColor(userApplication.application.status),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 15px',
+                      fontSize: '24px'
+                    }}>
+                      {userApplication.application.status === 'selected' ? '🎉' : 
+                       userApplication.application.status === 'rejected' ? '❌' : 
+                       userApplication.application.status === 'shortlisted' ? '⭐' : '⏳'}
+                    </div>
+                    <h4 style={{
+                      color: getApplicationStatusColor(userApplication.application.status),
+                      margin: '0 0 10px 0',
+                      fontSize: '1.1rem'
+                    }}>
+                      {getApplicationStatusText(userApplication.application.status)}
+                    </h4>
+                    <p style={{ color: '#ccc', fontSize: '0.9rem', margin: 0 }}>
+                      Applied on {formatDate(userApplication.application.appliedAt)}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {opportunity.applicationProcess?.requiresCoverLetter && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>
+                          Cover Letter {opportunity.applicationProcess.requiresCoverLetter ? '*' : '(Optional)'}
+                        </label>
+                        <textarea
+                          value={applicationData.coverLetter}
+                          onChange={(e) => setApplicationData(prev => ({ ...prev, coverLetter: e.target.value }))}
+                          rows="4"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'white',
+                            fontSize: '14px',
+                            outline: 'none',
+                            resize: 'vertical'
+                          }}
+                          placeholder="Tell them why you're perfect for this opportunity..."
+                        />
+                      </div>
+                    )}
+
+                    {/* Portfolio URLs */}
+                    {opportunity.applicationProcess?.requiresPortfolio && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>
+                          Portfolio URLs (comma separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={applicationData.portfolioUrls.join(', ')}
+                          onChange={(e) => setApplicationData(prev => ({
+                            ...prev,
+                            portfolioUrls: e.target.value.split(',').map(url => url.trim()).filter(url => url)
+                          }))}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'white',
+                            fontSize: '14px',
+                            outline: 'none'
+                          }}
+                          placeholder="https://instagram.com/yourprofile, https://yourwebsite.com"
+                        />
+                      </div>
+                    )}
+
+                    {message && (
+                      <div style={{
+                        padding: '15px',
+                        borderRadius: '8px',
+                        marginBottom: '20px',
+                        background: message.includes('successfully') 
+                          ? 'rgba(76, 175, 80, 0.2)' 
+                          : 'rgba(244, 67, 54, 0.2)',
+                        border: `1px solid ${message.includes('successfully') ? '#4CAF50' : '#F44336'}`,
+                        color: message.includes('successfully') ? '#81C784' : '#EF5350',
+                        fontSize: '0.9rem'
+                      }}>
+                        {message}
+                      </div>
+                    )}
+
+                    {/* Apply Button */}
+                    <button
+                      onClick={handleApply}
+                      disabled={applying || getDaysRemaining(opportunity.applicationDeadline) === 'Expired'}
+                      style={{
+                        width: '100%',
+                        padding: '15px',
+                        background: applying 
+                          ? '#666' 
+                          : getDaysRemaining(opportunity.applicationDeadline) === 'Expired'
+                            ? '#666'
+                            : 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: applying || getDaysRemaining(opportunity.applicationDeadline) === 'Expired' 
+                          ? 'not-allowed' 
+                          : 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        marginBottom: '15px'
+                      }}
+                    >
+                      {applying 
+                        ? 'Submitting Application...' 
+                        : getDaysRemaining(opportunity.applicationDeadline) === 'Expired'
+                          ? 'Application Deadline Passed'
+                          : 'Apply Now'
+                      }
+                    </button>
+                  </>
+                )}
+
+                {/* Application Stats */}
                 <div style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   padding: '15px',
                   borderRadius: '8px',
-                  marginTop: '15px'
+                  textAlign: 'center'
                 }}>
-                  <h4 style={{ color: 'white', fontSize: '0.9rem', margin: '0 0 8px 0' }}>
-                    Application Instructions
-                  </h4>
-                  <p style={{ color: '#ccc', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
-                    {opportunity.applicationProcess.instructions}
+                  <p style={{ color: '#ccc', fontSize: '0.9rem', margin: '0 0 5px 0' }}>
+                    {applications.length || opportunity.applicationCount || 0} applications received
+                  </p>
+                  <p style={{ color: '#999', fontSize: '0.8rem', margin: 0 }}>
+                    {opportunity.views || 0} views
                   </p>
                 </div>
-              )}
+
+                {/* Application Instructions */}
+                {opportunity.applicationProcess?.instructions && (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '15px',
+                    borderRadius: '8px',
+                    marginTop: '15px'
+                  }}>
+                    <h4 style={{ color: 'white', fontSize: '0.9rem', margin: '0 0 8px 0' }}>
+                      Application Instructions
+                    </h4>
+                    <p style={{ color: '#ccc', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
+                      {opportunity.applicationProcess.instructions}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
+
+        {/* Applications Management Section (for hiring companies) */}
+        {isOwner && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            padding: '25px',
+            marginTop: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
+                Applications ({applications.length})
+              </h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <span style={{
+                  padding: '6px 12px',
+                  background: 'rgba(255, 193, 7, 0.3)',
+                  color: '#FFD54F',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem'
+                }}>
+                  {applications.filter(app => app.status === 'pending').length} Pending
+                </span>
+                <span style={{
+                  padding: '6px 12px',
+                  background: 'rgba(76, 175, 80, 0.3)',
+                  color: '#81C784',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem'
+                }}>
+                  {applications.filter(app => app.status === 'shortlisted').length} Shortlisted
+                </span>
+                <span style={{
+                  padding: '6px 12px',
+                  background: 'rgba(33, 150, 243, 0.3)',
+                  color: '#64B5F6',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem'
+                }}>
+                  {applications.filter(app => app.status === 'selected').length} Selected
+                </span>
+              </div>
+            </div>
+
+            {message && (
+              <div style={{
+                padding: '15px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                background: message.includes('successfully') 
+                  ? 'rgba(76, 175, 80, 0.2)' 
+                  : 'rgba(244, 67, 54, 0.2)',
+                border: `1px solid ${message.includes('successfully') ? '#4CAF50' : '#F44336'}`,
+                color: message.includes('successfully') ? '#81C784' : '#EF5350',
+                fontSize: '0.9rem'
+              }}>
+                {message}
+              </div>
+            )}
+
+            {loadingApplications ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#ccc' }}>
+                Loading applications...
+              </div>
+            ) : applications.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '15px' }}>📝</div>
+                <h4 style={{ color: 'white', marginBottom: '10px' }}>No Applications Yet</h4>
+                <p style={{ color: '#ccc' }}>Applications will appear here when models apply to your opportunity.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '15px' }}>
+                {applications.map((application) => (
+                  <div key={application._id} style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '20px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
+                      <div>
+                        <h4 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1.1rem' }}>
+                          {application.applicant?.firstName} {application.applicant?.lastName}
+                        </h4>
+                        <p style={{ color: '#ccc', margin: '0 0 5px 0', fontSize: '0.9rem' }}>
+                          {application.applicant?.email}
+                        </p>
+                        <p style={{ color: '#999', margin: 0, fontSize: '0.8rem' }}>
+                          Applied: {formatDate(application.appliedAt)}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          background: `rgba(${
+                            application.status === 'selected' ? '76, 175, 80' :
+                            application.status === 'shortlisted' ? '255, 193, 7' :
+                            application.status === 'reviewing' ? '33, 150, 243' :
+                            application.status === 'rejected' ? '244, 67, 54' :
+                            '158, 158, 158'
+                          }, 0.3)`,
+                          color: getApplicationStatusColor(application.status),
+                          borderRadius: '12px',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold'
+                        }}>
+                          {getApplicationStatusText(application.status)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {application.coverLetter && (
+                      <div style={{ marginBottom: '15px' }}>
+                        <h5 style={{ color: '#ccc', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Cover Letter:</h5>
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', lineHeight: '1.4' }}>
+                          {application.coverLetter}
+                        </p>
+                      </div>
+                    )}
+
+                    {application.portfolioUrls && application.portfolioUrls.length > 0 && (
+                      <div style={{ marginBottom: '15px' }}>
+                        <h5 style={{ color: '#ccc', margin: '0 0 8px 0', fontSize: '0.9rem' }}>Portfolio:</h5>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {application.portfolioUrls.map((url, index) => (
+                            <a
+                              key={index}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: '#4ecdc4',
+                                textDecoration: 'underline',
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              Portfolio {index + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {application.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => updateApplicationStatus(application._id, 'reviewing')}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'linear-gradient(45deg, #42A5F5, #1E88E5)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          Mark as Reviewing
+                        </button>
+                        <button
+                          onClick={() => updateApplicationStatus(application._id, 'shortlisted')}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'linear-gradient(45deg, #66BB6A, #4CAF50)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          Shortlist
+                        </button>
+                        <button
+                          onClick={() => updateApplicationStatus(application._id, 'rejected')}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'linear-gradient(45deg, #F44336, #D32F2F)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+
+                    {(application.status === 'reviewing' || application.status === 'shortlisted') && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {application.status === 'reviewing' && (
+                          <button
+                            onClick={() => updateApplicationStatus(application._id, 'shortlisted')}
+                            style={{
+                              padding: '6px 12px',
+                              background: 'linear-gradient(45deg, #66BB6A, #4CAF50)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            Shortlist
+                          </button>
+                        )}
+                        <button
+                          onClick={() => updateApplicationStatus(application._id, 'selected')}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'linear-gradient(45deg, #4CAF50, #388E3C)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          Select
+                        </button>
+                        <button
+                          onClick={() => updateApplicationStatus(application._id, 'rejected')}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'linear-gradient(45deg, #F44336, #D32F2F)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+
+                    {application.companyNotes && (
+                      <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px' }}>
+                        <h5 style={{ color: '#ccc', margin: '0 0 5px 0', fontSize: '0.8rem' }}>Notes:</h5>
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                          {application.companyNotes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

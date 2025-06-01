@@ -283,7 +283,9 @@ const opportunitySchema = new mongoose.Schema({
     lowercase: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Indexes
