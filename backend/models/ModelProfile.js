@@ -110,6 +110,30 @@ const modelProfileSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+
+  // Metrics & Activity
+  profileViews: {
+    type: Number,
+    default: 0
+  },
+  lastActive: {
+    type: Date,
+    default: Date.now
+  },
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  reviewCount: {
+    type: Number,
+    default: 0
+  },
+  connections: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

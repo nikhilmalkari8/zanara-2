@@ -1,3 +1,5 @@
+// Update the App.js file to include the browse-talent route
+
 import React, { useState, useEffect } from 'react';
 import Home from './components/Home';
 import RegisterModel from './components/RegisterModel';
@@ -10,7 +12,7 @@ import CompanyDashboard from './components/CompanyDashboard';
 import Opportunities from './components/Opportunities';
 import CreateOpportunity from './components/CreateOpportunity';
 import OpportunityDetail from './components/OpportunityDetail';
-import BrowseTalent from './components/BrowseTalent'; // Import the new component
+import BrowseTalent from './components/BrowseTalent'; // Import the BrowseTalent component
 import './App.css';
 
 function App() {
@@ -229,7 +231,7 @@ function App() {
         <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
       
-      {/* Add the new BrowseTalent component */}
+      {/* Add the BrowseTalent component */}
       {currentPage === 'browse-talent' && (
         <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}

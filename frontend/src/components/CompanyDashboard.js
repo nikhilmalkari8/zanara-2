@@ -112,7 +112,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               + Post Opportunity
             </button>
             <button
-              onClick={() => setCurrentPage('opportunities')}
+              onClick={() => setCurrentPage('browse-talent')}
               style={{
                 padding: '10px 20px',
                 background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
@@ -252,7 +252,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               <span style={{ marginRight: '10px', fontSize: '24px' }}>⚡</span>
               Quick Actions
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
               <button 
                 onClick={() => setCurrentPage('create-opportunity')}
                 style={{
@@ -269,7 +269,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
                 📝 Post Opportunity
               </button>
               <button 
-                onClick={() => setCurrentPage('opportunities')}
+                onClick={() => setCurrentPage('browse-talent')}
                 style={{
                   padding: '15px',
                   background: 'linear-gradient(45deg, #2196F3, #42A5F5)',
@@ -283,16 +283,19 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               >
                 🔍 Browse Talent
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #FF9800, #FFB74D)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+              <button
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #FFC107, #FFB300)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+                onClick={() => setCurrentPage('edit-profile')}
+              >
                 🏢 Edit Profile
               </button>
               <button style={{
