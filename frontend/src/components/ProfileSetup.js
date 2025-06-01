@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ProfileSetup = ({ user, onLogout }) => {
+const ProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');

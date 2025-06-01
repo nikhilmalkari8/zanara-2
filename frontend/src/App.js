@@ -7,9 +7,10 @@ import ProfileSetup from './components/ProfileSetup';
 import CompanyProfileSetup from './components/CompanyProfileSetup';
 import Dashboard from './components/Dashboard';
 import CompanyDashboard from './components/CompanyDashboard';
-import Opportunities from './components/Opportunities'; // NEW
-import CreateOpportunity from './components/CreateOpportunity'; // NEW
-import OpportunityDetail from './components/OpportunityDetail'; // NEW
+import Opportunities from './components/Opportunities';
+import CreateOpportunity from './components/CreateOpportunity';
+import OpportunityDetail from './components/OpportunityDetail';
+import BrowseTalent from './components/BrowseTalent'; // Import the new component
 import './App.css';
 
 function App() {
@@ -226,6 +227,11 @@ function App() {
 
       {currentPage === 'create-opportunity' && (
         <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+      )}
+      
+      {/* Add the new BrowseTalent component */}
+      {currentPage === 'browse-talent' && (
+        <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
     </div>
   );
