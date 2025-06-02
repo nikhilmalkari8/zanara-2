@@ -1,5 +1,6 @@
 const express = require('express');
 const ModelProfile = require('../models/ModelProfile');
+const ActivityService = require('../services/activityService');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -12,6 +13,7 @@ router.post('/complete', auth, async (req, res) => {
 
     // Check if profile already exists
     let profile = await ModelProfile.findOne({ userId });
+    let isNewProfile = !profile;
     
     if (profile) {
       // Update existing profile
@@ -19,6 +21,13 @@ router.post('/complete', auth, async (req, res) => {
         { userId },
         { ...profileData, isComplete: true },
         { new: true, runValidators: true }
+      );
+      
+      // Create activity for profile update
+      await ActivityService.createProfileUpdateActivity(
+        userId,
+        'profile',
+        { section: 'complete_profile', isUpdate: true }
       );
     } else {
       // Create new profile
@@ -28,6 +37,13 @@ router.post('/complete', auth, async (req, res) => {
         isComplete: true
       });
       await profile.save();
+      
+      // Create activity for new profile completion
+      await ActivityService.createProfileUpdateActivity(
+        userId,
+        'profile',
+        { section: 'complete_profile', isUpdate: false }
+      );
     }
 
     res.status(201).json({
@@ -44,9 +60,151 @@ router.post('/complete', auth, async (req, res) => {
   }
 });
 
-// Add this route to backend/routes/profile.js
+// Update specific profile sections
+router.put('/update', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { section, data } = req.body;
 
-// Browse models with filtering and pagination
+    if (!section || !data) {
+      return res.status(400).json({
+        message: 'Section and data are required for profile updates'
+      });
+    }
+
+    const profile = await ModelProfile.findOne({ userId });
+
+    if (!profile) {
+      return res.status(404).json({
+        message: 'Profile not found. Please complete your profile first.'
+      });
+    }
+
+    // Update the specific section
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined) {
+        profile[key] = data[key];
+      }
+    });
+
+    await profile.save();
+
+    // Create activity for profile section update
+    await ActivityService.createProfileUpdateActivity(
+      userId,
+      section,
+      { section, updatedFields: Object.keys(data) }
+    );
+
+    res.json({
+      message: `${section} updated successfully`,
+      profile
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({
+      message: 'Server error during profile update',
+      error: error.message
+    });
+  }
+});
+
+// Add achievement
+router.post('/achievement', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { achievement } = req.body;
+
+    if (!achievement) {
+      return res.status(400).json({
+        message: 'Achievement data is required'
+      });
+    }
+
+    const profile = await ModelProfile.findOne({ userId });
+
+    if (!profile) {
+      return res.status(404).json({
+        message: 'Profile not found'
+      });
+    }
+
+    // Add achievement to profile
+    profile.achievements = profile.achievements || [];
+    profile.achievements.push(achievement);
+    await profile.save();
+
+    // Create activity for achievement
+    await ActivityService.createAchievementActivity(userId, {
+      type: achievement.type || 'general',
+      name: achievement.name || achievement,
+      description: achievement.description || `Added new achievement: ${achievement.name || achievement}`
+    });
+
+    res.json({
+      message: 'Achievement added successfully',
+      profile
+    });
+
+  } catch (error) {
+    console.error('Add achievement error:', error);
+    res.status(500).json({
+      message: 'Server error adding achievement',
+      error: error.message
+    });
+  }
+});
+
+// Update portfolio
+router.put('/portfolio', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { photos, videos, socialMedia } = req.body;
+
+    const profile = await ModelProfile.findOne({ userId });
+
+    if (!profile) {
+      return res.status(404).json({
+        message: 'Profile not found'
+      });
+    }
+
+    // Update portfolio sections
+    if (photos) profile.portfolio.photos = photos;
+    if (videos) profile.portfolio.videos = videos;
+    if (socialMedia) profile.socialMedia = { ...profile.socialMedia, ...socialMedia };
+
+    await profile.save();
+
+    // Create activity for portfolio update
+    await ActivityService.createProfileUpdateActivity(
+      userId,
+      'portfolio',
+      { 
+        section: 'portfolio',
+        updatedItems: {
+          photos: photos ? photos.length : 0,
+          videos: videos ? videos.length : 0,
+          socialMedia: socialMedia ? Object.keys(socialMedia) : []
+        }
+      }
+    );
+
+    res.json({
+      message: 'Portfolio updated successfully',
+      profile
+    });
+
+  } catch (error) {
+    console.error('Portfolio update error:', error);
+    res.status(500).json({
+      message: 'Server error updating portfolio',
+      error: error.message
+    });
+  }
+});
+
 // Browse models with filtering and pagination
 router.get('/browse', auth, async (req, res) => {
     try {

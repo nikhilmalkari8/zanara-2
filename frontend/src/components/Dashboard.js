@@ -89,19 +89,6 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
             >
               🎯 Browse Opportunities
             </button>
-            <button
-              onClick={onLogout}
-              style={{
-                padding: '10px 20px',
-                background: 'rgba(255, 0, 0, 0.2)',
-                color: '#ff6b6b',
-                border: '1px solid rgba(255, 0, 0, 0.3)',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              Logout
-            </button>
           </div>
         </div>
       </div>
@@ -145,13 +132,13 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                   <strong>Body Type:</strong> {profile.bodyType}
                 </p>
                 <p>
-                  <strong>Experience:</strong> {profile.experience.slice(0, 100)}...
+                  <strong>Experience:</strong> {profile.experience ? profile.experience.slice(0, 100) + '...' : 'Not specified'}
                 </p>
                 <p>
-                  <strong>Skills:</strong> {profile.skills.slice(0, 3).join(', ')}
+                  <strong>Skills:</strong> {profile.skills && profile.skills.length > 0 ? profile.skills.slice(0, 3).join(', ') : 'Not specified'}
                 </p>
                 <p>
-                  <strong>Availability:</strong> {profile.availability}
+                  <strong>Availability:</strong> {profile.availability || 'Not specified'}
                 </p>
               </div>
             ) : (
@@ -255,9 +242,26 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>3 days ago</p>
               </div>
             </div>
+            <button
+              onClick={() => setCurrentPage('activity-feed')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                marginTop: '15px'
+              }}
+            >
+              📱 View Full Activity Feed
+            </button>
           </div>
 
-          {/* Quick Actions Card (Enhanced) */}
+          {/* Quick Actions Card (Enhanced with Content) */}
           <div
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
@@ -285,6 +289,87 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 gap: '10px'
               }}
             >
+              <button
+                onClick={() => setCurrentPage('activity-feed')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                📱 Activity Feed
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('notifications')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #F44336, #FF6B6B)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🔔 Notifications
+              </button>
+
+              {/* NEW CONTENT BUTTONS */}
+              <button
+                onClick={() => setCurrentPage('content-creator')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #9C27B0, #BA68C8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                ✏️ Create Content
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('my-content')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #607D8B, #78909C)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                📚 My Content
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('content-browser')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #795548, #8D6E63)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🔍 Browse Content
+              </button>
+
               <button
                 style={{
                   padding: '15px',
@@ -346,36 +431,6 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 }}
               >
                 🕸️ Network Map
-              </button>
-
-              <button
-                style={{
-                  padding: '15px',
-                  background: 'linear-gradient(45deg, #FF5722, #FF7043)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                📸 Upload Photos
-              </button>
-
-              <button
-                style={{
-                  padding: '15px',
-                  background: 'linear-gradient(45deg, #E91E63, #EC407A)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                💬 Messages
               </button>
             </div>
           </div>
@@ -603,7 +658,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
         </div>
 
         {/* Social Media Links */}
-        {profile?.socialMedia && (
+        {profile?.socialMedia && Object.values(profile.socialMedia).some(Boolean) && (
           <div
             style={{
               background: 'rgba(255, 255, 255, 0.1)',

@@ -3,6 +3,7 @@ const Opportunity = require('../models/Opportunity');
 const Company = require('../models/Company');
 const ModelProfile = require('../models/ModelProfile');
 const User = require('../models/User');
+const ActivityService = require('../services/activityService');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -37,6 +38,18 @@ router.post('/create', auth, async (req, res) => {
     // Update company stats
     company.stats.jobsPosted = (company.stats.jobsPosted || 0) + 1;
     await company.save();
+
+    // Create activity for opportunity posting
+    await ActivityService.createOpportunityActivity(
+      opportunity._id,
+      req.userId,
+      {
+        type: opportunity.type,
+        title: opportunity.title,
+        location: opportunity.location,
+        compensation: opportunity.compensation
+      }
+    );
 
     res.status(201).json({
       message: 'Opportunity created successfully',
@@ -365,6 +378,16 @@ router.post('/:id/apply', auth, async (req, res) => {
 
     opportunity.applications.push(application);
     await opportunity.save();
+
+    // Get company owner for notification
+    const company = await Company.findById(opportunity.company);
+    
+    // Create activity for application
+    await ActivityService.createApplicationActivity(
+      req.userId,
+      opportunity._id,
+      company.owner
+    );
 
     res.json({
       message: 'Application submitted successfully'

@@ -125,19 +125,6 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
             >
               🔍 Browse Talent
             </button>
-            <button
-              onClick={onLogout}
-              style={{
-                padding: '10px 20px',
-                background: 'rgba(255, 0, 0, 0.2)',
-                color: '#ff6b6b',
-                border: '1px solid rgba(255, 0, 0, 0.3)',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              Logout
-            </button>
           </div>
         </div>
       </div>
@@ -238,6 +225,23 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>3 days ago</p>
               </div>
             </div>
+            <button
+              onClick={() => setCurrentPage('activity-feed')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(45deg, #4ecdc4, #44a08d)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                marginTop: '15px'
+              }}
+            >
+              📱 View Full Activity Feed
+            </button>
           </div>
 
           {/* Quick Actions Card (Enhanced) */}
@@ -253,6 +257,36 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               Quick Actions
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+              <button
+                onClick={() => setCurrentPage('activity-feed')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #4ecdc4, #44a08d)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                📱 Activity Feed
+              </button>
+              <button
+                onClick={() => setCurrentPage('notifications')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #F44336, #FF6B6B)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🔔 Notifications
+              </button>
               <button
                 onClick={() => setCurrentPage('create-opportunity')}
                 style={{

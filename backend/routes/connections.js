@@ -2,6 +2,7 @@ const express = require('express');
 const Connection = require('../models/Connection');
 const IntroductionRequest = require('../models/IntroductionRequest');
 const User = require('../models/User');
+const ActivityService = require('../services/activityService');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -109,6 +110,15 @@ router.put('/respond/:connectionId', auth, async (req, res) => {
     }
     
     await connection.save();
+    
+    // Create activity for accepted connections
+    if (action === 'accept') {
+      await ActivityService.createConnectionActivity(
+        connection._id,
+        req.userId, // The person who accepted
+        connection.requester // The person who sent the request
+      );
+    }
     
     // Populate user details for response
     await connection.populate([
@@ -414,6 +424,8 @@ router.delete('/:connectionId', auth, async (req, res) => {
 // Get connection analytics
 router.get('/analytics/stats', auth, async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    
     const stats = await Promise.all([
       // Total connections
       Connection.countDocuments({
@@ -440,8 +452,8 @@ router.get('/analytics/stats', auth, async (req, res) => {
         {
           $match: {
             $or: [
-              { requester: mongoose.Types.ObjectId(req.userId), status: 'accepted' },
-              { recipient: mongoose.Types.ObjectId(req.userId), status: 'accepted' }
+              { requester: new mongoose.Types.ObjectId(req.userId), status: 'accepted' },
+              { recipient: new mongoose.Types.ObjectId(req.userId), status: 'accepted' }
             ]
           }
         },

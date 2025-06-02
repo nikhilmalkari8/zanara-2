@@ -1,3 +1,4 @@
+/* global d3 */
 import React, { useState, useEffect, useRef } from 'react';
 
 const NetworkVisualization = ({ user, onLogout, setCurrentPage }) => {

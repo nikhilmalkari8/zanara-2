@@ -14,12 +14,21 @@ import OpportunityDetail from './components/OpportunityDetail';
 import BrowseTalent from './components/BrowseTalent';
 import Connections from './components/Connections';
 import NetworkVisualization from './components/NetworkVisualization';
+import ActivityFeed from './components/ActivityFeed';
+import Notifications from './components/Notifications';
+import NavigationHeader from './components/NavigationHeader';
+// NEW CONTENT COMPONENTS
+import ContentCreator from './components/ContentCreator';
+import ContentViewer from './components/ContentViewer';
+import MyContent from './components/MyContent';
+import ContentBrowser from './components/ContentBrowser';
 import './App.css';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [contentId, setContentId] = useState(null); // For content editing/viewing
 
   // Check if user is already logged in when app starts
   useEffect(() => {
@@ -157,6 +166,31 @@ function App() {
     }
   };
 
+  // NEW CONTENT HANDLERS
+  const handleCreateContent = () => {
+    setContentId(null);
+    setCurrentPage('content-creator');
+  };
+
+  const handleEditContent = (id) => {
+    setContentId(id);
+    setCurrentPage('content-creator');
+  };
+
+  const handleViewContent = (id) => {
+    setContentId(id);
+    setCurrentPage('content-viewer');
+  };
+
+  const handleContentSaved = () => {
+    setCurrentPage('my-content');
+  };
+
+  const handleBackFromContent = () => {
+    const previousPage = user?.userType === 'model' ? 'dashboard' : 'company-dashboard';
+    setCurrentPage(previousPage);
+  };
+
   if (isLoading) {
     return (
       <div style={{
@@ -184,65 +218,123 @@ function App() {
     );
   }
 
+  // Show navigation header for logged-in users (except on auth pages)
+  const showNavigation = user && !['home', 'login', 'register-model', 'register-company', 'profile-setup', 'company-profile-setup'].includes(currentPage);
+
   return (
     <div className="App">
-      {currentPage === 'home' && <Home setCurrentPage={setCurrentPage} />}
-      
-      {currentPage === 'register-model' && (
-        <RegisterModel setCurrentPage={setCurrentPage} />
-      )}
-      
-      {currentPage === 'register-company' && (
-        <RegisterCompany setCurrentPage={setCurrentPage} />
-      )}
-      
-      {currentPage === 'login' && (
-        <Login setCurrentPage={setCurrentPage} onLogin={handleSuccessfulLogin} />
-      )}
-      
-      {currentPage === 'profile-setup' && (
-        <ProfileSetup 
-          user={user} 
-          onLogout={handleLogout} 
-          onProfileComplete={handleProfileComplete}
+      {showNavigation && (
+        <NavigationHeader 
+          user={user}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          onLogout={handleLogout}
         />
       )}
-      
-      {currentPage === 'company-profile-setup' && (
-        <CompanyProfileSetup 
-          user={user} 
-          onLogout={handleLogout} 
-          onProfileComplete={handleProfileComplete}
-        />
-      )}
-      
-      {currentPage === 'dashboard' && (
-        <Dashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
-      
-      {currentPage === 'company-dashboard' && (
-        <CompanyDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
 
-      {currentPage === 'opportunities' && (
-        <Opportunities user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
+      {/* Add padding-top when navigation is shown */}
+      <div style={{ paddingTop: showNavigation ? '80px' : '0' }}>
+        {currentPage === 'home' && <Home setCurrentPage={setCurrentPage} />}
+        
+        {currentPage === 'register-model' && (
+          <RegisterModel setCurrentPage={setCurrentPage} />
+        )}
+        
+        {currentPage === 'register-company' && (
+          <RegisterCompany setCurrentPage={setCurrentPage} />
+        )}
+        
+        {currentPage === 'login' && (
+          <Login setCurrentPage={setCurrentPage} onLogin={handleSuccessfulLogin} />
+        )}
+        
+        {currentPage === 'profile-setup' && (
+          <ProfileSetup 
+            user={user} 
+            onLogout={handleLogout} 
+            onProfileComplete={handleProfileComplete}
+          />
+        )}
+        
+        {currentPage === 'company-profile-setup' && (
+          <CompanyProfileSetup 
+            user={user} 
+            onLogout={handleLogout} 
+            onProfileComplete={handleProfileComplete}
+          />
+        )}
+        
+        {currentPage === 'dashboard' && (
+          <Dashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+        
+        {currentPage === 'company-dashboard' && (
+          <CompanyDashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
 
-      {currentPage === 'create-opportunity' && (
-        <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
-      
-      {currentPage === 'browse-talent' && (
-        <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
+        {currentPage === 'activity-feed' && (
+          <ActivityFeed user={user} />
+        )}
 
-      {currentPage === 'connections' && (
-        <Connections user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
+        {currentPage === 'notifications' && (
+          <Notifications user={user} />
+        )}
 
-      {currentPage === 'network-visualization' && (
-        <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
-      )}
+        {currentPage === 'opportunities' && (
+          <Opportunities user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+
+        {currentPage === 'create-opportunity' && (
+          <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+        
+        {currentPage === 'browse-talent' && (
+          <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+
+        {currentPage === 'connections' && (
+          <Connections user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+
+        {currentPage === 'network-visualization' && (
+          <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+
+        {/* NEW CONTENT PAGES */}
+        {currentPage === 'content-creator' && (
+          <ContentCreator 
+            user={user} 
+            contentId={contentId}
+            onCancel={handleBackFromContent}
+            onSave={handleContentSaved}
+          />
+        )}
+
+        {currentPage === 'content-viewer' && (
+          <ContentViewer 
+            contentId={contentId}
+            user={user}
+            onBack={handleBackFromContent}
+            onEdit={handleEditContent}
+          />
+        )}
+
+        {currentPage === 'my-content' && (
+          <MyContent 
+            user={user}
+            onCreateNew={handleCreateContent}
+            onViewContent={handleViewContent}
+            onEditContent={handleEditContent}
+          />
+        )}
+
+        {currentPage === 'content-browser' && (
+          <ContentBrowser 
+            user={user}
+            onViewContent={handleViewContent}
+          />
+        )}
+      </div>
     </div>
   );
 }
