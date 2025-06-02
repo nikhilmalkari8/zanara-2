@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const activitySchema = new mongoose.Schema({
-  // User who performed the action
+  // User who performed the action (not required for system-generated activities)
   actor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: function() { return !this.isSystemGenerated; }
   },
-  
-  // Type of activity
+
+  // Type of activity (including content-related types)
   type: {
     type: String,
     required: true,
@@ -25,22 +25,28 @@ const activitySchema = new mongoose.Schema({
       'introduction_request',
       'opportunity_filled',
       'new_team_member',
-      'company_milestone'
+      'company_milestone',
+      // Content-related types
+      'content_published',
+      'content_liked',
+      'content_commented'
     ]
   },
-  
+
   // Activity title/summary
   title: {
     type: String,
-    required: true
+    required: true,
+    maxlength: 200
   },
-  
+
   // Detailed description
   description: {
-    type: String
+    type: String,
+    maxlength: 1000
   },
-  
-  // Related object references
+
+  // Related object references (including content)
   relatedObjects: {
     opportunity: {
       type: mongoose.Schema.Types.ObjectId,
@@ -61,9 +67,13 @@ const activitySchema = new mongoose.Schema({
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
+    },
+    content: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Content'
     }
   },
-  
+
   // Metadata for the activity
   metadata: {
     location: String,
@@ -72,39 +82,43 @@ const activitySchema = new mongoose.Schema({
     opportunityType: String,
     compensationType: String
   },
-  
+
   // Visibility settings
   visibility: {
     type: String,
     default: 'public',
     enum: ['public', 'connections', 'private']
   },
-  
+
   // Engagement metrics
   engagement: {
     views: { type: Number, default: 0 },
-    likes: [{ 
-      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      likedAt: { type: Date, default: Date.now }
-    }],
-    comments: [{
-      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      comment: String,
-      commentedAt: { type: Date, default: Date.now }
-    }],
+    likes: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        likedAt: { type: Date, default: Date.now }
+      }
+    ],
+    comments: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        comment: String,
+        commentedAt: { type: Date, default: Date.now }
+      }
+    ],
     shares: { type: Number, default: 0 }
   },
-  
+
   // Activity importance/priority
   priority: {
     type: String,
     default: 'normal',
     enum: ['low', 'normal', 'high', 'urgent']
   },
-  
-  // Expiration for time-sensitive activities
+
+  // Expiration for time-sensitive activities (e.g., deadline reminders)
   expiresAt: Date,
-  
+
   // Flag for system-generated vs user-generated
   isSystemGenerated: {
     type: Boolean,
@@ -132,12 +146,12 @@ activitySchema.virtual('commentCount').get(function() {
   return this.engagement.comments.length;
 });
 
-// Method to check if user liked the activity
+// Method to check if a given user has liked this activity
 activitySchema.methods.isLikedBy = function(userId) {
   return this.engagement.likes.some(like => like.user.toString() === userId.toString());
 };
 
-// Static method to create activity
+// Static method to create a new activity
 activitySchema.statics.createActivity = async function(activityData) {
   try {
     const activity = new this(activityData);
@@ -148,40 +162,42 @@ activitySchema.statics.createActivity = async function(activityData) {
   }
 };
 
-// Static method to get user feed
-activitySchema.statics.getUserFeed = async function(userId, options = {}) {
+// Static method to fetch a user's feed based on connections and system-generated activities
+activitySchema.statics.getUserFeed = function(userId, options = {}) {
   const {
     page = 1,
     limit = 20,
-    type = null,
+    type,
     connections = []
   } = options;
   
-  const skip = (page - 1) * limit;
-  
-  // Build query
-  const query = {
+  // Build query for user's feed
+  let query = {
     $or: [
-      { actor: userId }, // User's own activities
-      { actor: { $in: connections } }, // Connections' activities
-      { isSystemGenerated: true, visibility: 'public' } // System-generated public activities
+      { visibility: 'public' },
+      {
+        visibility: 'connections',
+        $or: [
+          { actor: userId },
+          { actor: { $in: connections } }
+        ]
+      }
     ]
   };
   
-  if (type) {
+  // Filter by activity type if specified
+  if (type && type !== 'all') {
     query.type = type;
   }
   
   return this.find(query)
     .populate('actor', 'firstName lastName userType')
-    .populate('relatedObjects.opportunity', 'title type compensation.type location.city')
+    .populate('relatedObjects.opportunity', 'title type location compensation')
     .populate('relatedObjects.company', 'companyName industry')
-    .populate('relatedObjects.user', 'firstName lastName userType')
-    .populate('engagement.likes.user', 'firstName lastName')
-    .populate('engagement.comments.user', 'firstName lastName')
+    .populate('relatedObjects.content', 'title category excerpt coverImage')
     .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
     .lean();
 };
 

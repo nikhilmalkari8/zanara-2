@@ -197,33 +197,73 @@ class ActivityService {
     }
   }
 
-  // NEW: Create content activity
+  // Create content activity (NEW implementation)
   static async createContentActivity(userId, contentId, contentData) {
     try {
       const activityData = {
         actor: userId,
-        type: contentData.type || 'content_published',
-        title: `Published new content: ${contentData.title}`,
-        description: `Shared insights about ${contentData.category.replace('-', ' ')}`,
+        type: 'content_published',
+        title: `Published: ${contentData.title}`,
+        description: `Shared new content about ${contentData.category.replace('-', ' ')}`,
         relatedObjects: {
           content: contentId
         },
         metadata: {
           contentCategory: contentData.category,
-          contentType: 'article',
-          industry: 'modeling'
+          contentTitle: contentData.title,
+          contentType: 'article'
         },
-        visibility: 'public',
+        visibility: contentData.visibility === 'connections' ? 'connections' : 'public',
         priority: 'normal'
       };
       
-      return await Activity.createActivity(activityData);
+      console.log('Creating content activity:', activityData);
+      const activity = await Activity.create(activityData);
+      
+      // If content is visible to connections only, notify each connection
+      if (contentData.visibility === 'connections') {
+        const connections = await Connection.find({
+          $or: [
+            { requester: userId, status: 'accepted' },
+            { recipient: userId, status: 'accepted' }
+          ]
+        }).lean();
+
+        const connectionUserIds = connections.map(conn =>
+          conn.requester.toString() === userId.toString()
+            ? conn.recipient
+            : conn.requester
+        );
+
+        for (const connectionId of connectionUserIds) {
+          try {
+            await Notification.create({
+              recipient: connectionId,
+              sender: userId,
+              type: 'content_published',
+              title: 'New Content from Connection',
+              message: `${contentData.title}`,
+              relatedActivity: activity._id,
+              relatedObjects: {
+                content: contentId
+              },
+              status: 'unread',
+              priority: 'normal'
+            });
+          } catch (notifError) {
+            console.error('Error creating notification for connection:', notifError);
+          }
+        }
+      }
+      
+      return activity;
     } catch (error) {
       console.error('Error creating content activity:', error);
+      throw error;
     }
   }
 
-  // NEW: Create content engagement activity
+  // Create content engagement activity
   static async createContentEngagementActivity(userId, contentId, engagementData) {
     try {
       const { type, contentTitle, authorId, comment } = engagementData;
@@ -245,9 +285,9 @@ class ActivityService {
 
       const activityData = {
         actor: userId,
-        type: type,
-        title: title,
-        description: description,
+        type,
+        title,
+        description,
         relatedObjects: {
           content: contentId,
           user: authorId
@@ -261,15 +301,15 @@ class ActivityService {
       
       const activity = await Activity.createActivity(activityData);
 
-      // Create notification for content author
+      // Create notification for content author if not self
       if (authorId && authorId.toString() !== userId.toString()) {
         await Notification.createNotification({
           recipient: authorId,
           sender: userId,
-          type: type,
-          title: title,
-          message: type === 'content_liked' 
-            ? `Someone liked your content "${contentTitle}"` 
+          type,
+          title,
+          message: type === 'content_liked'
+            ? `Someone liked your content "${contentTitle}"`
             : `Someone commented on your content "${contentTitle}"`,
           relatedActivity: activity._id,
           relatedObjects: {
@@ -371,7 +411,7 @@ class ActivityService {
       
       activity.engagement.comments.push({
         user: userId,
-        comment: comment,
+        comment,
         commentedAt: new Date()
       });
       

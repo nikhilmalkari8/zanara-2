@@ -22,6 +22,8 @@ import ContentCreator from './components/ContentCreator';
 import ContentViewer from './components/ContentViewer';
 import MyContent from './components/MyContent';
 import ContentBrowser from './components/ContentBrowser';
+// NEW PROFILE COMPONENT
+import ModelProfilePage from './components/ModelProfilePage';
 import './App.css';
 
 function App() {
@@ -29,6 +31,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [contentId, setContentId] = useState(null); // For content editing/viewing
+  const [viewingProfileId, setViewingProfileId] = useState(null); // For profile viewing
 
   // Check if user is already logged in when app starts
   useEffect(() => {
@@ -191,6 +194,23 @@ function App() {
     setCurrentPage(previousPage);
   };
 
+  // NEW PROFILE HANDLERS
+  const handleViewMyProfile = () => {
+    setViewingProfileId(user._id);
+    setCurrentPage('my-profile');
+  };
+
+  const handleViewProfile = (profileId) => {
+    setViewingProfileId(profileId);
+    setCurrentPage('view-profile');
+  };
+
+  const handleBackFromProfile = () => {
+    setViewingProfileId(null);
+    const previousPage = user?.userType === 'model' ? 'dashboard' : 'company-dashboard';
+    setCurrentPage(previousPage);
+  };
+
   if (isLoading) {
     return (
       <div style={{
@@ -265,7 +285,12 @@ function App() {
         )}
         
         {currentPage === 'dashboard' && (
-          <Dashboard user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+          <Dashboard 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+            onViewProfile={handleViewMyProfile}
+          />
         )}
         
         {currentPage === 'company-dashboard' && (
@@ -298,6 +323,27 @@ function App() {
 
         {currentPage === 'network-visualization' && (
           <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+        )}
+
+        {/* NEW PROFILE PAGES */}
+        {currentPage === 'my-profile' && (
+          <ModelProfilePage
+            modelId={viewingProfileId}
+            user={user}
+            onBack={handleBackFromProfile}
+            onConnect={() => {}} // Not needed for own profile
+            onMessage={() => {}} // Not needed for own profile
+          />
+        )}
+
+        {currentPage === 'view-profile' && (
+          <ModelProfilePage
+            modelId={viewingProfileId}
+            user={user}
+            onBack={handleBackFromProfile}
+            onConnect={handleBackFromProfile} // Refresh after connecting
+            onMessage={() => setCurrentPage('messages')} // Navigate to messages
+          />
         )}
 
         {/* NEW CONTENT PAGES */}

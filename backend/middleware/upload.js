@@ -1,183 +1,180 @@
+// middleware/upload.js
+
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directories exist
+// Ensure directories exist (profiles, content covers/images, portfolios, misc)
 const ensureDirectoryExists = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 };
 
-// Storage configuration
+const uploadDirs = [
+  'uploads/profiles',
+  'uploads/content/covers',
+  'uploads/content/images',
+  'uploads/portfolios',
+  'uploads/misc'
+];
+uploadDirs.forEach(dir => ensureDirectoryExists(dir));
+
+// Multer storage configuration
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     let uploadPath = 'uploads/';
-    
-    // Organize by file type
-    if (file.fieldname === 'coverImage') {
-      uploadPath += 'content/covers/';
-    } else if (file.fieldname === 'contentImages') {
-      uploadPath += 'content/images/';
-    } else {
-      uploadPath += 'content/misc/';
+
+    // Route fieldname to folder
+    switch (file.fieldname) {
+      case 'profilePicture':
+      case 'coverPhoto':
+        uploadPath += 'profiles/';
+        break;
+      case 'portfolioPhotos':
+        uploadPath += 'portfolios/';
+        break;
+      case 'coverImage':
+        uploadPath += 'content/covers/';
+        break;
+      case 'contentImages':
+        uploadPath += 'content/images/';
+        break;
+      default:
+        uploadPath += 'misc/';
     }
-    
-    // Organize by date
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    uploadPath += `${year}/${month}/`;
-    
+
     ensureDirectoryExists(uploadPath);
     cb(null, uploadPath);
   },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const extension = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, extension);
-    
-    // Sanitize filename
-    const sanitizedBasename = basename
+    const basename = path.basename(file.originalname, extension)
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    
-    cb(null, `${sanitizedBasename}-${uniqueSuffix}${extension}`);
+
+    cb(null, `${file.fieldname}-${uniqueSuffix}-${basename}${extension}`);
   }
 });
 
-// File filter
+// File filter: only images allowed
 const fileFilter = (req, file, cb) => {
-  // Check file type
-  const allowedTypes = {
-    'image/jpeg': true,
-    'image/jpg': true,
-    'image/png': true,
-    'image/gif': true,
-    'image/webp': true
-  };
-  
-  if (allowedTypes[file.mimetype]) {
+  if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
+    cb(new Error('Invalid file type. Only image files are allowed.'), false);
   }
 };
 
-// Multer configuration
+// Multer instance
 const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+  storage,
+  fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-    files: 10 // Maximum 10 files per request
+    fileSize: 10 * 1024 * 1024, // 10 MB
+    files: 10                   // max 10 files per request
   }
 });
 
-// Middleware for different upload scenarios
+// Middleware variants
 const uploadMiddleware = {
-  // Single cover image
-  coverImage: upload.single('coverImage'),
-  
-  // Multiple content images
+  // Single file fields
+  profilePicture: upload.single('profilePicture'),
+  coverPhoto: upload.single('coverPhoto'),
+
+  // Multiple files arrays
+  portfolioPhotos: upload.array('portfolioPhotos', 10),
   contentImages: upload.array('contentImages', 10),
-  
-  // Mixed upload (cover + content images)
+
+  // Mixed fields: coverImage + contentImages
   mixed: upload.fields([
     { name: 'coverImage', maxCount: 1 },
     { name: 'contentImages', maxCount: 10 }
   ]),
-  
-  // Error handling middleware
+
+  // Error handling
   handleUploadErrors: (error, req, res, next) => {
     if (error instanceof multer.MulterError) {
-      if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({
-          success: false,
-          message: 'File too large. Maximum size is 10MB per file.'
-        });
+      switch (error.code) {
+        case 'LIMIT_FILE_SIZE':
+          return res.status(400).json({
+            success: false,
+            message: 'File too large. Maximum size is 10MB per file.'
+          });
+        case 'LIMIT_FILE_COUNT':
+          return res.status(400).json({
+            success: false,
+            message: 'Too many files. Maximum 10 files allowed.'
+          });
+        case 'LIMIT_UNEXPECTED_FILE':
+          return res.status(400).json({
+            success: false,
+            message: 'Unexpected field name for file upload.'
+          });
+        default:
+          return res.status(400).json({
+            success: false,
+            message: `Multer error: ${error.message}`
+          });
       }
-      if (error.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({
-          success: false,
-          message: 'Too many files. Maximum 10 files allowed.'
-        });
-      }
-      if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-        return res.status(400).json({
-          success: false,
-          message: 'Unexpected field name for file upload.'
-        });
-      }
-    }
-    
-    if (error.message.includes('Invalid file type')) {
+    } else if (error) {
+      // Non-Multer errors (e.g., invalid file type)
       return res.status(400).json({
         success: false,
         message: error.message
       });
     }
-    
-    return res.status(500).json({
-      success: false,
-      message: 'File upload error occurred.'
-    });
+    next();
   }
 };
 
-// Helper function to get file URL
-const getFileUrl = (filePath) => {
-  if (!filePath) return null;
-  
-  // In production, this would be your CDN or static file server URL
-  const baseUrl = process.env.BASE_URL || 'http://localhost:8001';
-  return `${baseUrl}/${filePath.replace(/\\/g, '/')}`;
-};
-
-// Helper function to delete file
+// Delete a file from disk
 const deleteFile = (filePath) => {
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+  if (!filePath) return false;
+  const fullPath = path.join(__dirname, '..', filePath);
+  if (fs.existsSync(fullPath)) {
+    try {
+      fs.unlinkSync(fullPath);
       return true;
+    } catch (err) {
+      console.error('Error deleting file:', err);
+      return false;
     }
-  } catch (error) {
-    console.error('Error deleting file:', error);
   }
   return false;
 };
 
-// Helper function to process uploaded files
-const processUploadedFiles = (files) => {
-  if (!files) return [];
-  
-  const processFile = (file) => ({
-    filename: file.filename,
-    originalName: file.originalname,
-    path: file.path,
-    url: getFileUrl(file.path),
-    size: file.size,
-    mimetype: file.mimetype
+// Validate image dimensions (optional utility)
+const validateImageDimensions = (filePath, minWidth = 100, minHeight = 100) => {
+  return new Promise((resolve, reject) => {
+    const sharp = require('sharp');
+    sharp(filePath)
+      .metadata()
+      .then(({ width, height }) => {
+        if (width < minWidth || height < minHeight) {
+          reject(new Error(`Image must be at least ${minWidth}x${minHeight} pixels`));
+        } else {
+          resolve({ width, height });
+        }
+      })
+      .catch(reject);
   });
-  
-  if (Array.isArray(files)) {
-    return files.map(processFile);
-  } else if (files.coverImage) {
-    return {
-      coverImage: files.coverImage.map(processFile),
-      contentImages: files.contentImages ? files.contentImages.map(processFile) : []
-    };
-  } else {
-    return processFile(files);
-  }
+};
+
+// Helper to convert file path to public URL
+const getFileUrl = (filePath) => {
+  if (!filePath) return null;
+  const baseUrl = process.env.BASE_URL || 'http://localhost:8001';
+  return `${baseUrl}/${filePath.replace(/\\/g, '/')}`;
 };
 
 module.exports = {
   uploadMiddleware,
-  getFileUrl,
   deleteFile,
-  processUploadedFiles
+  validateImageDimensions,
+  getFileUrl,
+  ensureDirectoryExists
 };

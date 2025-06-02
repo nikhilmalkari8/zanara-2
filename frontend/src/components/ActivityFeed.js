@@ -90,7 +90,7 @@ const ActivityFeed = ({ user }) => {
     }
   };
 
-  const handleComment = async (activityId, comment) => {
+  const handleComment = async (activityId, commentText) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:8001/api/activity/${activityId}/comment`, {
@@ -99,7 +99,7 @@ const ActivityFeed = ({ user }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ comment })
+        body: JSON.stringify({ comment: commentText })
       });
       
       const data = await response.json();
@@ -151,7 +151,10 @@ const ActivityFeed = ({ user }) => {
       'achievement_added': '🏆',
       'company_update': '🏢',
       'opportunity_deadline_reminder': '⏰',
-      'portfolio_update': '📸'
+      'portfolio_update': '📸',
+      'content_published': '📝',
+      'content_liked': '❤️',
+      'content_commented': '💬'
     };
     return iconMap[type] || '📌';
   };
@@ -165,7 +168,10 @@ const ActivityFeed = ({ user }) => {
       'achievement_added': '#FFD700',
       'company_update': '#607D8B',
       'opportunity_deadline_reminder': '#F44336',
-      'portfolio_update': '#E91E63'
+      'portfolio_update': '#E91E63',
+      'content_published': '#673AB7',
+      'content_liked': '#E91E63',
+      'content_commented': '#4CAF50'
     };
     return colorMap[type] || '#757575';
   };
@@ -243,7 +249,7 @@ const ActivityFeed = ({ user }) => {
             </p>
           )}
           
-          {/* Related Object Info */}
+          {/* Related Object: Opportunity */}
           {activity.relatedObjects?.opportunity && (
             <div
               style={{
@@ -263,6 +269,7 @@ const ActivityFeed = ({ user }) => {
             </div>
           )}
 
+          {/* Related Object: Company */}
           {activity.relatedObjects?.company && (
             <div
               style={{
@@ -281,6 +288,54 @@ const ActivityFeed = ({ user }) => {
               </p>
             </div>
           )}
+
+          {/* Related Object: Content */}
+          {activity.relatedObjects?.content && (
+            <div
+              style={{
+                background: 'rgba(103, 58, 183, 0.1)',
+                border: '1px solid rgba(103, 58, 183, 0.3)',
+                borderRadius: '8px',
+                padding: '15px',
+                marginTop: '10px',
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                if (window.setCurrentPage && window.setContentId) {
+                  window.setCurrentPage('content-viewer');
+                  window.setContentId(activity.relatedObjects.content._id);
+                }
+              }}
+            >
+              <div style={{ display: 'flex', gap: '15px' }}>
+                {activity.relatedObjects.content.coverImage && (
+                  <img
+                    src={`http://localhost:8001/${activity.relatedObjects.content.coverImage.url}`}
+                    alt={activity.relatedObjects.content.title}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      objectFit: 'cover',
+                      borderRadius: '8px'
+                    }}
+                  />
+                )}
+                <div style={{ flex: 1 }}>
+                  <strong style={{ color: '#673AB7', fontSize: '16px' }}>
+                    📝 {activity.relatedObjects.content.title}
+                  </strong>
+                  <p style={{ color: '#ddd', fontSize: '14px', margin: '5px 0 0 0' }}>
+                    {activity.relatedObjects.content.category.replace('-', ' ')} • Click to read
+                  </p>
+                  {activity.relatedObjects.content.excerpt && (
+                    <p style={{ color: '#bbb', fontSize: '12px', margin: '8px 0 0 0' }}>
+                      {activity.relatedObjects.content.excerpt.substring(0, 100)}...
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Activity Engagement */}
@@ -288,7 +343,7 @@ const ActivityFeed = ({ user }) => {
           activity={activity}
           isLiked={isLiked}
           onLike={() => handleLike(activity._id)}
-          onComment={(comment) => handleComment(activity._id, comment)}
+          onComment={(commentText) => handleComment(activity._id, commentText)}
           user={user}
         />
       </div>

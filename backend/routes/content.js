@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Content = require('../models/Content');
+const Activity = require('../models/Activity'); // ← Import Activity model for debug
 const auth = require('../middleware/auth');
 const { uploadMiddleware, processUploadedFiles, deleteFile } = require('../middleware/upload');
 const ActivityService = require('../services/activityService');
@@ -151,6 +152,25 @@ router.get('/trending', async (req, res) => {
   }
 });
 
+// GET /api/content/debug/activities - Debug endpoint for content_published activities
+router.get('/debug/activities', auth, async (req, res) => {
+  try {
+    const activities = await Activity.find({ type: 'content_published' })
+      .populate('actor', 'firstName lastName')
+      .populate('relatedObjects.content', 'title status visibility')
+      .sort({ createdAt: -1 })
+      .limit(10);
+    
+    res.json({
+      success: true,
+      count: activities.length,
+      activities
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/content/:id - Get specific content by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -192,7 +212,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/content - Create new content
+// POST /api/content - Create new content (with activity logging)
 router.post('/', auth, uploadMiddleware.mixed, async (req, res) => {
   try {
     const {
@@ -244,13 +264,22 @@ router.post('/', auth, uploadMiddleware.mixed, async (req, res) => {
 
     await newContent.save();
 
-    // Create activity if published
-    if (status === 'published') {
-      await ActivityService.createContentActivity(req.user.id, newContent._id, {
-        title: newContent.title,
-        category: newContent.category,
-        type: 'content_published'
-      });
+    // IMPORTANT: Create activity ONLY if published and not private
+    let activityCreated = false;
+    if (status === 'published' && visibility !== 'private') {
+      try {
+        await ActivityService.createContentActivity(req.user.id, newContent._id, {
+          title: newContent.title,
+          category: newContent.category,
+          type: 'content_published',
+          visibility: newContent.visibility
+        });
+        activityCreated = true;
+        console.log('Content activity created successfully');
+      } catch (activityError) {
+        console.error('Error creating content activity:', activityError);
+        // Continue without failing content creation
+      }
     }
 
     await newContent.populate('author', 'firstName lastName userType');
@@ -258,6 +287,7 @@ router.post('/', auth, uploadMiddleware.mixed, async (req, res) => {
     res.status(201).json({
       success: true,
       data: newContent,
+      activityCreated,
       message: 'Content created successfully'
     });
   } catch (error) {
@@ -343,11 +373,17 @@ router.put('/:id', auth, uploadMiddleware.mixed, async (req, res) => {
     await content.save();
 
     if (!wasPublished && status === 'published') {
-      await ActivityService.createContentActivity(req.user.id, content._id, {
-        title: content.title,
-        category: content.category,
-        type: 'content_published'
-      });
+      try {
+        await ActivityService.createContentActivity(req.user.id, content._id, {
+          title: content.title,
+          category: content.category,
+          type: 'content_published',
+          visibility: content.visibility
+        });
+        console.log('Content activity created successfully');
+      } catch (activityError) {
+        console.error('Error creating content activity:', activityError);
+      }
     }
 
     await content.populate('author', 'firstName lastName userType');
@@ -441,12 +477,15 @@ router.post('/:id/like', auth, async (req, res) => {
 
       // Create notification if not self-like
       if (content.author.toString() !== userId) {
-        // This would be implemented in ActivityService
-        await ActivityService.createContentEngagementActivity(userId, content._id, {
-          type: 'content_liked',
-          contentTitle: content.title,
-          authorId: content.author
-        });
+        try {
+          await ActivityService.createContentEngagementActivity(userId, content._id, {
+            type: 'content_liked',
+            contentTitle: content.title,
+            authorId: content.author
+          });
+        } catch (activityError) {
+          console.error('Error creating like activity:', activityError);
+        }
       }
     }
 
@@ -500,12 +539,16 @@ router.post('/:id/comment', auth, async (req, res) => {
 
     // Create notification if not self-comment
     if (content.author.toString() !== req.user.id) {
-      await ActivityService.createContentEngagementActivity(req.user.id, content._id, {
-        type: 'content_commented',
-        contentTitle: content.title,
-        authorId: content.author,
-        comment: comment.trim()
-      });
+      try {
+        await ActivityService.createContentEngagementActivity(req.user.id, content._id, {
+          type: 'content_commented',
+          contentTitle: content.title,
+          authorId: content.author,
+          comment: comment.trim()
+        });
+      } catch (activityError) {
+        console.error('Error creating comment activity:', activityError);
+      }
     }
 
     await content.populate('engagement.comments.user', 'firstName lastName');
@@ -527,7 +570,7 @@ router.post('/:id/comment', auth, async (req, res) => {
   }
 });
 
-// GET /api/content/categories - Get available categories
+// GET /api/content/meta/categories - Get available categories
 router.get('/meta/categories', (req, res) => {
   const categories = [
     { value: 'behind-the-scenes', label: 'Behind the Scenes', icon: '🎬' },
