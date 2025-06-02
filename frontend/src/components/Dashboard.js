@@ -10,7 +10,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
         const token = localStorage.getItem('token');
         const response = await fetch('http://localhost:8001/api/profile/me', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
 
@@ -30,36 +30,42 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
 
   if (isLoading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
         <div style={{ color: 'white', fontSize: '1.5rem' }}>Loading Dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px'
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}
+    >
       {/* Header */}
       <div style={{ maxWidth: '1200px', margin: '0 auto 30px' }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          padding: '20px',
-          borderRadius: '15px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '20px',
+            borderRadius: '15px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
           <div>
             <h1 style={{ color: 'white', fontSize: '2rem', margin: 0 }}>
               Welcome back, {user?.firstName || profile?.userId?.firstName}! 👋
@@ -102,27 +108,51 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
 
       {/* Dashboard Content */}
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '20px'
+          }}
+        >
           {/* Profile Summary Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>👤</span>
               Profile Summary
             </h3>
             {profile ? (
               <div style={{ color: '#ccc', lineHeight: '1.6' }}>
-                <p><strong>Height:</strong> {profile.height}</p>
-                <p><strong>Body Type:</strong> {profile.bodyType}</p>
-                <p><strong>Experience:</strong> {profile.experience.slice(0, 100)}...</p>
-                <p><strong>Skills:</strong> {profile.skills.slice(0, 3).join(', ')}</p>
-                <p><strong>Availability:</strong> {profile.availability}</p>
+                <p>
+                  <strong>Height:</strong> {profile.height}
+                </p>
+                <p>
+                  <strong>Body Type:</strong> {profile.bodyType}
+                </p>
+                <p>
+                  <strong>Experience:</strong> {profile.experience.slice(0, 100)}...
+                </p>
+                <p>
+                  <strong>Skills:</strong> {profile.skills.slice(0, 3).join(', ')}
+                </p>
+                <p>
+                  <strong>Availability:</strong> {profile.availability}
+                </p>
               </div>
             ) : (
               <p style={{ color: '#ccc' }}>Loading profile...</p>
@@ -130,14 +160,23 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
           </div>
 
           {/* Quick Stats Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>📊</span>
               Quick Stats
             </h3>
@@ -162,59 +201,106 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
           </div>
 
           {/* Recent Activity Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>🔔</span>
               Recent Activity
             </h3>
             <div style={{ color: '#ccc', lineHeight: '1.8' }}>
-              <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+              <div
+                style={{
+                  marginBottom: '15px',
+                  padding: '10px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px'
+                }}
+              >
                 <p style={{ margin: 0, fontSize: '14px' }}>✅ Profile viewed by Fashion Brand Co.</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>2 hours ago</p>
               </div>
-              <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+              <div
+                style={{
+                  marginBottom: '15px',
+                  padding: '10px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px'
+                }}
+              >
                 <p style={{ margin: 0, fontSize: '14px' }}>📩 New casting opportunity available</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>1 day ago</p>
               </div>
-              <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+              <div
+                style={{
+                  padding: '10px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px'
+                }}
+              >
                 <p style={{ margin: 0, fontSize: '14px' }}>⭐ Received 5-star review from client</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>3 days ago</p>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          {/* Quick Actions Card (Enhanced) */}
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>⚡</span>
               Quick Actions
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '10px'
+              }}
+            >
+              <button
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
                 📝 Edit Profile
               </button>
-              <button 
+
+              <button
                 onClick={() => setCurrentPage('opportunities')}
                 style={{
                   padding: '15px',
@@ -229,88 +315,173 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
               >
                 🔍 Browse Opportunities
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #FF9800, #FFB74D)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+
+              <button
+                onClick={() => setCurrentPage('connections')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #9C27B0, #BA68C8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🌐 My Network
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('network-visualization')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #FF9800, #FFB74D)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🕸️ Network Map
+              </button>
+
+              <button
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #FF5722, #FF7043)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
                 📸 Upload Photos
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #E91E63, #EC407A)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+
+              <button
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #E91E63, #EC407A)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
                 💬 Messages
               </button>
             </div>
           </div>
 
           {/* Applications Status Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>📋</span>
               Recent Applications
             </h3>
             <div style={{ color: '#ccc', lineHeight: '1.6' }}>
-              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  marginBottom: '15px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
                 <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Fashion Week Campaign</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Elite Fashion Agency</p>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>
+                    Fashion Week Campaign
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                    Elite Fashion Agency
+                  </p>
                 </div>
-                <span style={{
-                  padding: '4px 8px',
-                  background: 'rgba(255, 193, 7, 0.3)',
-                  color: '#FFD54F',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}>
+                <span
+                  style={{
+                    padding: '4px 8px',
+                    background: 'rgba(255, 193, 7, 0.3)',
+                    color: '#FFD54F',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                >
                   Pending
                 </span>
               </div>
-              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  marginBottom: '15px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
                 <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Summer Catalog Shoot</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Trendy Brands Inc.</p>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>
+                    Summer Catalog Shoot
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                    Trendy Brands Inc.
+                  </p>
                 </div>
-                <span style={{
-                  padding: '4px 8px',
-                  background: 'rgba(76, 175, 80, 0.3)',
-                  color: '#81C784',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}>
+                <span
+                  style={{
+                    padding: '4px 8px',
+                    background: 'rgba(76, 175, 80, 0.3)',
+                    color: '#81C784',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                >
                   Shortlisted
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
                 <div>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>Beauty Product Ad</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>Glamour Cosmetics</p>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold' }}>
+                    Beauty Product Ad
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                    Glamour Cosmetics
+                  </p>
                 </div>
-                <span style={{
-                  padding: '4px 8px',
-                  background: 'rgba(33, 150, 243, 0.3)',
-                  color: '#64B5F6',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}>
+                <span
+                  style={{
+                    padding: '4px 8px',
+                    background: 'rgba(33, 150, 243, 0.3)',
+                    color: '#64B5F6',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                >
                   Reviewing
                 </span>
               </div>
@@ -318,22 +489,49 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
           </div>
 
           {/* Opportunities Recommendation Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <h3
+              style={{
+                color: 'white',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
               <span style={{ marginRight: '10px', fontSize: '24px' }}>💡</span>
               Recommended For You
             </h3>
             <div style={{ color: '#ccc', lineHeight: '1.6' }}>
-              <div style={{ marginBottom: '15px', padding: '15px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Editorial Fashion Shoot</p>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>NYC • $1,500 • 2 days left</p>
-                <button 
+              <div
+                style={{
+                  marginBottom: '15px',
+                  padding: '15px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px'
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 5px 0',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: 'white'
+                  }}
+                >
+                  Editorial Fashion Shoot
+                </p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>
+                  NYC • $1,500 • 2 days left
+                </p>
+                <button
                   onClick={() => setCurrentPage('opportunities')}
                   style={{
                     padding: '6px 12px',
@@ -348,10 +546,28 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                   View Details
                 </button>
               </div>
-              <div style={{ marginBottom: '15px', padding: '15px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Commercial Campaign</p>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>LA • $2,000 • 5 days left</p>
-                <button 
+              <div
+                style={{
+                  marginBottom: '15px',
+                  padding: '15px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '8px'
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 5px 0',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: 'white'
+                  }}
+                >
+                  Commercial Campaign
+                </p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>
+                  LA • $2,000 • 5 days left
+                </p>
+                <button
                   onClick={() => setCurrentPage('opportunities')}
                   style={{
                     padding: '6px 12px',
@@ -367,7 +583,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 </button>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setCurrentPage('opportunities')}
               style={{
                 width: '100%',
@@ -388,19 +604,25 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
 
         {/* Social Media Links */}
         {profile?.socialMedia && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            padding: '25px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            marginTop: '20px'
-          }}>
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              padding: '25px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              marginTop: '20px'
+            }}
+          >
             <h3 style={{ color: 'white', marginBottom: '20px' }}>🌐 Social Media</h3>
             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
               {profile.socialMedia.instagram && (
-                <a 
-                  href={profile.socialMedia.instagram.startsWith('http') ? profile.socialMedia.instagram : `https://instagram.com/${profile.socialMedia.instagram.replace('@', '')}`}
+                <a
+                  href={
+                    profile.socialMedia.instagram.startsWith('http')
+                      ? profile.socialMedia.instagram
+                      : `https://instagram.com/${profile.socialMedia.instagram.replace('@', '')}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -417,8 +639,12 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 </a>
               )}
               {profile.socialMedia.tiktok && (
-                <a 
-                  href={profile.socialMedia.tiktok.startsWith('http') ? profile.socialMedia.tiktok : `https://tiktok.com/@${profile.socialMedia.tiktok.replace('@', '')}`}
+                <a
+                  href={
+                    profile.socialMedia.tiktok.startsWith('http')
+                      ? profile.socialMedia.tiktok
+                      : `https://tiktok.com/@${profile.socialMedia.tiktok.replace('@', '')}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -435,7 +661,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage }) => {
                 </a>
               )}
               {profile.socialMedia.youtube && (
-                <a 
+                <a
                   href={profile.socialMedia.youtube}
                   target="_blank"
                   rel="noopener noreferrer"

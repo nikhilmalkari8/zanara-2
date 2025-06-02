@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as d3 from 'd3';
 
 const NetworkVisualization = ({ user, onLogout, setCurrentPage }) => {
   const [networkData, setNetworkData] = useState({ nodes: [], links: [] });
@@ -377,7 +376,20 @@ const NetworkVisualization = ({ user, onLogout, setCurrentPage }) => {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
-              onClick={() => setCurrentPage('dashboard')}
+              onClick={() => setCurrentPage('connections')}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              🌐 Connections
+            </button>
+            <button
+              onClick={() => setCurrentPage(user.userType === 'model' ? 'dashboard' : 'company-dashboard')}
               style={{
                 padding: '10px 20px',
                 background: 'rgba(255, 255, 255, 0.2)',

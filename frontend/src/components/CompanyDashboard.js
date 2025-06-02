@@ -13,7 +13,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
         // Fetch company data
         const companyResponse = await fetch('http://localhost:8001/api/company/me/profile', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
 
@@ -25,7 +25,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
         // Fetch company opportunities
         const opportunitiesResponse = await fetch('http://localhost:8001/api/opportunities/company/mine', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
 
@@ -240,7 +240,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
             </div>
           </div>
 
-          {/* Quick Actions Card */}
+          {/* Quick Actions Card (Enhanced) */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.1)',
             backdropFilter: 'blur(10px)',
@@ -253,7 +253,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               Quick Actions
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-              <button 
+              <button
                 onClick={() => setCurrentPage('create-opportunity')}
                 style={{
                   padding: '15px',
@@ -268,7 +268,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
               >
                 📝 Post Opportunity
               </button>
-              <button 
+              <button
                 onClick={() => setCurrentPage('browse-talent')}
                 style={{
                   padding: '15px',
@@ -284,6 +284,37 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
                 🔍 Browse Talent
               </button>
               <button
+                onClick={() => setCurrentPage('connections')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #9C27B0, #BA68C8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🌐 My Network
+              </button>
+              <button
+                onClick={() => setCurrentPage('network-visualization')}
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #FF9800, #FFB74D)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                🕸️ Network Map
+              </button>
+              <button
+                onClick={() => setCurrentPage('edit-profile')}
                 style={{
                   padding: '15px',
                   background: 'linear-gradient(45deg, #FFC107, #FFB300)',
@@ -294,20 +325,21 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
                   fontSize: '14px',
                   fontWeight: 'bold'
                 }}
-                onClick={() => setCurrentPage('edit-profile')}
               >
                 🏢 Edit Profile
               </button>
-              <button style={{
-                padding: '15px',
-                background: 'linear-gradient(45deg, #E91E63, #EC407A)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
+              <button
+                style={{
+                  padding: '15px',
+                  background: 'linear-gradient(45deg, #E91E63, #EC407A)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
                 💬 Messages
               </button>
             </div>
@@ -470,7 +502,7 @@ const CompanyDashboard = ({ user, onLogout, setCurrentPage }) => {
                   fontSize: '14px',
                   fontWeight: 'bold'
                 }}>
-                  {Math.floor(getTotalApplications() * 0.1)}
+                  {Math.floor(getTotalApplications() * 0.10)}
                 </span>
               </div>
               <button style={{

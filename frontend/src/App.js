@@ -1,5 +1,4 @@
-// Update the App.js file to include the browse-talent route
-
+// frontend/src/App.js
 import React, { useState, useEffect } from 'react';
 import Home from './components/Home';
 import RegisterModel from './components/RegisterModel';
@@ -12,7 +11,9 @@ import CompanyDashboard from './components/CompanyDashboard';
 import Opportunities from './components/Opportunities';
 import CreateOpportunity from './components/CreateOpportunity';
 import OpportunityDetail from './components/OpportunityDetail';
-import BrowseTalent from './components/BrowseTalent'; // Import the BrowseTalent component
+import BrowseTalent from './components/BrowseTalent';
+import Connections from './components/Connections';
+import NetworkVisualization from './components/NetworkVisualization';
 import './App.css';
 
 function App() {
@@ -231,9 +232,16 @@ function App() {
         <CreateOpportunity user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
       
-      {/* Add the BrowseTalent component */}
       {currentPage === 'browse-talent' && (
         <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+      )}
+
+      {currentPage === 'connections' && (
+        <Connections user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+      )}
+
+      {currentPage === 'network-visualization' && (
+        <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       )}
     </div>
   );
