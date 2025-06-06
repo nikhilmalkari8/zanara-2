@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
+const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessage }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,12 +32,13 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
 
   useEffect(() => {
     fetchModelProfile();
-  }, [modelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
 
   const fetchModelProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/profile/model/${modelId}`, {
+      const response = await fetch(`http://localhost:8001/api/profile/model/${profileId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -63,56 +64,30 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     setIsEditing(!isEditing);
   };
 
+  // Updated handleSaveChanges
   const handleSaveChanges = async () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Prepare the data for your existing backend structure
-      const updateData = {
-        // Basic info
-        fullName: editData.fullName,
-        headline: editData.headline,
-        bio: editData.bio,
-        location: editData.location,
-        phone: editData.phone,
-        website: editData.website,
-        
-        // Profile-specific data from ModelProfile schema
-        dateOfBirth: editData.dateOfBirth,
-        gender: editData.gender,
-        nationality: editData.nationality,
-        languages: ensureArray(editData.languages),
-        height: editData.height,
-        weight: editData.weight,
-        bodyType: editData.bodyType,
-        hairColor: editData.hairColor,
-        eyeColor: editData.eyeColor,
-        skinTone: editData.skinTone,
-        experience: editData.experience,
-        skills: ensureArray(editData.skills),
-        specializations: ensureArray(editData.specializations),
-        achievements: ensureArray(editData.achievements),
-        socialMedia: editData.socialMedia || {},
-        preferredLocations: ensureArray(editData.preferredLocations),
-        preferredTypes: ensureArray(editData.preferredTypes),
-        availability: editData.availability,
-        rate: editData.rate || {}
-      };
-
+      // Debug: Let's see what we're sending
+      console.log('Sending update data:', editData);
+      
       const response = await fetch('http://localhost:8001/api/profile/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(editData)
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (response.ok) {
-        setProfile(data);
-        setEditData(data);
+        // Refresh the profile data
+        await fetchModelProfile();
         setIsEditing(false);
         alert('Profile updated successfully!');
       } else {
@@ -124,7 +99,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     }
   };
 
-  // Profile Picture Upload - FIXED
+  // Profile Picture Upload
   const handleProfilePictureUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -168,7 +143,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     }
   };
 
-  // Cover Photo Upload - FIXED
+  // Cover Photo Upload
   const handleCoverPhotoUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -177,7 +152,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     setUploading(true);
     
     const formData = new FormData();
-    formData.append('profilePicture', file); // ✅ Using profilePicture field name (same middleware)
+    formData.append('profilePicture', file); // Using same field name in middleware
 
     try {
       const token = localStorage.getItem('token');
@@ -212,7 +187,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     }
   };
 
-  // Portfolio Photos Upload - FIXED
+  // Portfolio Photos Upload
   const handlePortfolioPhotosUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
@@ -388,7 +363,27 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   }
 
   const displayPhotos = showAllPhotos ? ensureArray(profile.photos) : ensureArray(profile.photos).slice(0, 8);
-  const isOwnProfile = user && user._id === profile.userId;
+
+  const isOwnProfile = user && (
+    user._id === profile.userId ||
+    user.id === profile.userId ||
+    user._id === profile._id ||
+    user.id === profile._id ||
+    user._id === profileId ||
+    user._id === targetUser._id ||
+    user.id === targetUser.id ||
+    user.id === profileId
+  );
+  // DEBUG: Remove this after fixing
+  console.log('DEBUG Profile Check:', {
+    'user._id': user?._id,
+    'user.id': user?.id,
+    'profile.userId': profile?.userId,
+    'profile._id': profile?._id,
+    'profileId': profileId,
+    'isOwnProfile': isOwnProfile
+  });
+
   const currentProfile = isEditing ? editData : profile;
 
   return (
@@ -1209,4 +1204,4 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   );
 };
 
-export default ModelProfilePage;
+export default ModelProfile;

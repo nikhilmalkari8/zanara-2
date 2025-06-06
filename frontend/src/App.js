@@ -25,7 +25,7 @@ import ContentViewer from './components/ContentViewer';
 import MyContent from './components/MyContent';
 import ContentBrowser from './components/ContentBrowser';
 // PROFILE COMPONENT
-import ModelProfilePage from './components/ModelProfilePage';
+import ProfileRouter from './components/ProfileRouter';
 import './App.css';
 
 function App() {
@@ -197,9 +197,12 @@ function App() {
   };
 
   // PROFILE HANDLERS
+  // UPDATED: Add check to ensure user and ID exist
   const handleViewMyProfile = () => {
-    setViewingProfileId(user._id || user.id); // FIXED: Handle both _id and id
-    setCurrentPage('my-profile');
+    if (user && (user._id || user.id)) {
+      setViewingProfileId(user._id || user.id);
+      setCurrentPage('my-profile');
+    }
   };
 
   const handleViewProfile = (profileId) => {
@@ -298,6 +301,7 @@ function App() {
             onLogout={handleLogout} 
             setCurrentPage={setCurrentPage}
             onViewProfile={handleViewMyProfile}
+            setViewingProfileId={setViewingProfileId}
           />
         )}
         
@@ -333,25 +337,24 @@ function App() {
           <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
         )}
 
-        {/* PROFILE PAGES */}
         {currentPage === 'my-profile' && (
-          <ModelProfilePage
-            modelId={viewingProfileId}
+        <ProfileRouter
+            profileId={viewingProfileId}
             user={user}
             onBack={handleBackFromProfile}
             onConnect={() => {}} // Not needed for own profile
             onMessage={() => {}} // Not needed for own profile
-          />
+        />
         )}
 
         {currentPage === 'view-profile' && (
-          <ModelProfilePage
-            modelId={viewingProfileId}
+        <ProfileRouter
+            profileId={viewingProfileId}
             user={user}
             onBack={handleBackFromProfile}
             onConnect={handleBackFromProfile} // Refresh after connecting
             onMessage={() => setCurrentPage('messages')} // Navigate to messages
-          />
+        />
         )}
 
         {/* CONTENT PAGES */}

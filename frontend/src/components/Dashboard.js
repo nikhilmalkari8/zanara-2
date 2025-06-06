@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
+const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile, setViewingProfileId }) => {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,8 +30,9 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
 
   // Handle viewing own profile
   const handleViewOwnProfile = () => {
-    if (user && user._id) {
-      onViewProfile(); // This will trigger the profile page
+    if (user && (user._id || user.id)) {
+      setViewingProfileId(user._id || user.id);
+      setCurrentPage('my-profile');
     }
   };
 
@@ -507,7 +508,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
               </button>
 
               <button
-                onClick={() => setCurrentPage('my-content')}
+                onClick={() => setCurrentPage('my-content')} 
                 style={{
                   padding: '15px',
                   background: 'linear-gradient(45deg, #607D8B, #78909C)',
