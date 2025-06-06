@@ -23,15 +23,13 @@ const Home = ({ setCurrentPage }) => {
         }}>
           Welcome to Zanara
         </h1>
-        
         <p style={{
           fontSize: '1.5rem',
           marginBottom: '40px',
           opacity: '0.9'
         }}>
-          Connect talent with opportunity. Whether you're a model looking for work or a company seeking talent, we've got you covered.
+          The complete fashion industry ecosystem. Connect designers, stylists, photographers, models, makeup artists, brands, and agencies in one powerful platform.
         </p>
-        
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -39,8 +37,9 @@ const Home = ({ setCurrentPage }) => {
           maxWidth: '700px',
           margin: '0 auto'
         }}>
-          <div 
-            onClick={() => setCurrentPage('register-model')}
+          {/* UPDATED: Changed from register-model to register */}
+          <div
+            onClick={() => setCurrentPage('register')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -71,16 +70,18 @@ const Home = ({ setCurrentPage }) => {
               justifyContent: 'center',
               fontSize: '24px'
             }}>
-              👤
+              🌟
             </div>
-            <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Register as Model</h3>
+            {/* UPDATED: Changed title and description */}
+            <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Join as Creative Professional</h3>
             <p style={{ opacity: '0.8' }}>
-              Join our platform as a model and get discovered by top brands and agencies.
+              Models, designers, stylists, photographers, and makeup artists - showcase your talent and get discovered.
             </p>
           </div>
           
-          <div 
-            onClick={() => setCurrentPage('register-company')}
+          {/* UPDATED: Changed from register-company to register */}
+          <div
+            onClick={() => setCurrentPage('register')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -111,15 +112,17 @@ const Home = ({ setCurrentPage }) => {
               justifyContent: 'center',
               fontSize: '24px'
             }}>
-              💼
+              🏢
             </div>
-            <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Register for Hiring</h3>
+            {/* UPDATED: Changed title and description */}
+            <h3 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Join as Brand or Agency</h3>
             <p style={{ opacity: '0.8' }}>
-              Find the perfect models for your brand, campaign, or project.
+              Fashion brands and modeling agencies - find verified talent and build your creative team.
             </p>
           </div>
-
-          <div 
+          
+          {/* KEPT: Login section unchanged */}
+          <div
             onClick={() => setCurrentPage('login')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',

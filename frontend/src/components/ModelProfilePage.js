@@ -7,7 +7,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(null);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
 
   // Helper functions to handle schema mismatches
@@ -66,113 +66,191 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   const handleSaveChanges = async () => {
     try {
       const token = localStorage.getItem('token');
+      
+      // Prepare the data for your existing backend structure
+      const updateData = {
+        // Basic info
+        fullName: editData.fullName,
+        headline: editData.headline,
+        bio: editData.bio,
+        location: editData.location,
+        phone: editData.phone,
+        website: editData.website,
+        
+        // Profile-specific data from ModelProfile schema
+        dateOfBirth: editData.dateOfBirth,
+        gender: editData.gender,
+        nationality: editData.nationality,
+        languages: ensureArray(editData.languages),
+        height: editData.height,
+        weight: editData.weight,
+        bodyType: editData.bodyType,
+        hairColor: editData.hairColor,
+        eyeColor: editData.eyeColor,
+        skinTone: editData.skinTone,
+        experience: editData.experience,
+        skills: ensureArray(editData.skills),
+        specializations: ensureArray(editData.specializations),
+        achievements: ensureArray(editData.achievements),
+        socialMedia: editData.socialMedia || {},
+        preferredLocations: ensureArray(editData.preferredLocations),
+        preferredTypes: ensureArray(editData.preferredTypes),
+        availability: editData.availability,
+        rate: editData.rate || {}
+      };
+
       const response = await fetch('http://localhost:8001/api/profile/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(editData)
+        body: JSON.stringify(updateData)
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const updatedProfile = await response.json();
-        setProfile(updatedProfile);
+        setProfile(data);
+        setEditData(data);
         setIsEditing(false);
         alert('Profile updated successfully!');
       } else {
-        alert('Failed to update profile');
+        alert(data.message || 'Failed to update profile');
       }
     } catch (error) {
+      console.error('Error updating profile:', error);
       alert('Error updating profile');
     }
   };
 
-  // Profile Picture Upload
+  // Profile Picture Upload - FIXED
   const handleProfilePictureUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    console.log('Profile picture file selected:', file.name);
     setUploading(true);
+    
     const formData = new FormData();
-    formData.append('profilePicture', file);
+    formData.append('profilePicture', file); // ✅ Correct field name
 
     try {
       const token = localStorage.getItem('token');
+      console.log('Uploading profile picture...');
+      
       const response = await fetch('http://localhost:8001/api/profile/picture', {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type for FormData
+        },
         body: formData
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('Upload response status:', response.status);
+      const data = await response.json();
+      console.log('Upload response data:', data);
+
+      if (response.ok && data.success) {
         const updatedProfile = { ...profile, profilePicture: data.profilePicture };
         setProfile(updatedProfile);
         setEditData(updatedProfile);
+        alert('Profile picture updated successfully!');
+      } else {
+        alert(data.message || 'Failed to upload profile picture');
       }
     } catch (error) {
+      console.error('Profile picture upload error:', error);
       alert('Failed to upload profile picture');
     } finally {
       setUploading(false);
     }
   };
 
-  // Cover Photo Upload
+  // Cover Photo Upload - FIXED
   const handleCoverPhotoUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    console.log('Cover photo file selected:', file.name);
     setUploading(true);
+    
     const formData = new FormData();
-    formData.append('coverPhoto', file);
+    formData.append('profilePicture', file); // ✅ Using profilePicture field name (same middleware)
 
     try {
       const token = localStorage.getItem('token');
+      console.log('Uploading cover photo...');
+      
       const response = await fetch('http://localhost:8001/api/profile/cover-photo', {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type for FormData
+        },
         body: formData
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('Cover upload response status:', response.status);
+      const data = await response.json();
+      console.log('Cover upload response data:', data);
+
+      if (response.ok && data.success) {
         const updatedProfile = { ...profile, coverPhoto: data.coverPhoto };
         setProfile(updatedProfile);
         setEditData(updatedProfile);
+        alert('Cover photo updated successfully!');
+      } else {
+        alert(data.message || 'Failed to upload cover photo');
       }
     } catch (error) {
+      console.error('Cover photo upload error:', error);
       alert('Failed to upload cover photo');
     } finally {
       setUploading(false);
     }
   };
 
-  // Portfolio Photos Upload
+  // Portfolio Photos Upload - FIXED
   const handlePortfolioPhotosUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
 
+    console.log('Portfolio photos selected:', files.length, 'files');
     setUploading(true);
+    
     const formData = new FormData();
-    files.forEach(file => formData.append('portfolioPhotos', file));
+    files.forEach(file => formData.append('portfolioPhotos', file)); // ✅ Correct field name
 
     try {
       const token = localStorage.getItem('token');
+      console.log('Uploading portfolio photos...');
+      
       const response = await fetch('http://localhost:8001/api/profile/photos', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type for FormData
+        },
         body: formData
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('Portfolio upload response status:', response.status);
+      const data = await response.json();
+      console.log('Portfolio upload response data:', data);
+
+      if (response.ok && data.success) {
         const updatedPhotos = [...(ensureArray(profile.photos)), ...data.photos];
         const updatedProfile = { ...profile, photos: updatedPhotos };
         setProfile(updatedProfile);
         setEditData(updatedProfile);
+        alert(`${files.length} photos uploaded successfully!`);
+      } else {
+        alert(data.message || 'Failed to upload photos');
       }
     } catch (error) {
+      console.error('Portfolio photos upload error:', error);
       alert('Failed to upload photos');
     } finally {
       setUploading(false);
@@ -182,11 +260,10 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   // Remove Portfolio Photo
   const removePortfolioPhoto = async (photoIndex) => {
     const profilePhotos = ensureArray(profile.photos);
-    const photoToRemove = profilePhotos[photoIndex];
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/profile/photos/${photoToRemove.id || photoIndex}`, {
+      const response = await fetch(`http://localhost:8001/api/profile/photos/${photoIndex}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -232,12 +309,66 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
     setEditData({ ...editData, experience: updatedExperience });
   };
 
+  // Inline styles for consistent formatting
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    },
+    header: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '15px',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      padding: '20px',
+      marginBottom: '20px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    card: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '15px',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      padding: '25px',
+      marginBottom: '20px'
+    },
+    input: {
+      width: '100%',
+      padding: '12px',
+      borderRadius: '8px',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: 'white',
+      fontSize: '16px',
+      outline: 'none'
+    },
+    button: {
+      padding: '12px 24px',
+      borderRadius: '8px',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 'bold',
+      fontSize: '14px'
+    },
+    primaryButton: {
+      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+      color: 'white'
+    },
+    secondaryButton: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: 'white',
+      border: '1px solid rgba(255, 255, 255, 0.3)'
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+      <div style={styles.container}>
+        <div style={{ textAlign: 'center', color: 'white', fontSize: '18px', marginTop: '50px' }}>
+          Loading profile...
         </div>
       </div>
     );
@@ -245,10 +376,10 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button onClick={onBack} className="text-blue-600 hover:underline">
+      <div style={styles.container}>
+        <div style={{ textAlign: 'center', marginTop: '50px' }}>
+          <p style={{ color: '#ff6b6b', marginBottom: '20px' }}>{error}</p>
+          <button onClick={onBack} style={{ ...styles.button, ...styles.secondaryButton }}>
             ← Go Back
           </button>
         </div>
@@ -261,33 +392,33 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
   const currentProfile = isEditing ? editData : profile;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with Back Button and Edit Controls */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div style={styles.container}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={styles.header}>
           <button 
             onClick={onBack}
-            className="flex items-center text-gray-600 hover:text-gray-800"
+            style={{ ...styles.button, ...styles.secondaryButton }}
           >
             ← Back
           </button>
-          <h1 className="text-xl font-semibold text-gray-800">
+          <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
             {isEditing ? 'Edit Profile' : 'Model Profile'}
           </h1>
-          <div className="flex space-x-2">
+          <div style={{ display: 'flex', gap: '10px' }}>
             {isOwnProfile && (
               <>
                 {isEditing ? (
                   <>
                     <button
                       onClick={handleSaveChanges}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      style={{ ...styles.button, ...styles.primaryButton }}
                     >
                       Save Changes
                     </button>
                     <button
                       onClick={handleEditToggle}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      style={{ ...styles.button, ...styles.secondaryButton }}
                     >
                       Cancel
                     </button>
@@ -295,7 +426,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
                 ) : (
                   <button
                     onClick={handleEditToggle}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    style={{ ...styles.button, ...styles.primaryButton }}
                   >
                     ✏️ Edit Profile
                   </button>
@@ -304,38 +435,56 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
             )}
           </div>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Cover Photo Section */}
-        <div className="relative mb-6">
-          <div className="h-64 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg overflow-hidden relative">
-            {currentProfile.coverPhoto ? (
-              <img 
-                src={currentProfile.coverPhoto} 
-                alt="Cover" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-white text-lg">No cover photo</p>
+        <div style={{ position: 'relative', marginBottom: '80px' }}>
+          <div style={{
+            height: '200px',
+            background: currentProfile.coverPhoto 
+              ? `url(http://localhost:8001${currentProfile.coverPhoto}) center/cover`
+              : 'linear-gradient(45deg, #667eea, #764ba2)',
+            borderRadius: '15px',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {!currentProfile.coverPhoto && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'white',
+                fontSize: '18px'
+              }}>
+                No cover photo
               </div>
             )}
             
-            {/* Edit Cover Photo Button */}
             {isEditing && (
-              <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
                 <input
                   type="file"
                   id="coverPhoto"
                   accept="image/*"
                   onChange={handleCoverPhotoUpload}
-                  className="hidden"
+                  style={{ display: 'none' }}
                   disabled={uploading}
                 />
                 <label
                   htmlFor="coverPhoto"
-                  className="px-4 py-2 bg-white text-gray-800 rounded-lg cursor-pointer hover:bg-gray-100"
+                  style={{
+                    ...styles.button,
+                    background: 'white',
+                    color: '#333',
+                    cursor: 'pointer'
+                  }}
                 >
                   {uploading ? 'Uploading...' : 'Change Cover Photo'}
                 </label>
@@ -344,99 +493,125 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
           </div>
           
           {/* Profile Picture */}
-          <div className="absolute -bottom-16 left-6">
-            <div className="w-32 h-32 border-4 border-white rounded-full overflow-hidden bg-gray-200 relative">
-              {currentProfile.profilePicture ? (
-                <img 
-                  src={currentProfile.profilePicture} 
-                  alt={currentProfile.fullName}
-                  className="w-full h-full object-cover"
+          <div style={{
+            position: 'absolute',
+            bottom: '-40px',
+            left: '25px',
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            border: '4px solid white',
+            overflow: 'hidden',
+            background: '#f0f0f0'
+          }}>
+            {currentProfile.profilePicture ? (
+              <img 
+                src={`http://localhost:8001${currentProfile.profilePicture}`}
+                alt={currentProfile.fullName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '48px',
+                color: '#999'
+              }}>
+                👤
+              </div>
+            )}
+            
+            {isEditing && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <input
+                  type="file"
+                  id="profilePicture"
+                  accept="image/*"
+                  onChange={handleProfilePictureUpload}
+                  style={{ display: 'none' }}
+                  disabled={uploading}
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500">
-                  <span className="text-3xl">👤</span>
-                </div>
-              )}
-              
-              {/* Edit Profile Picture Button */}
-              {isEditing && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                  <input
-                    type="file"
-                    id="profilePicture"
-                    accept="image/*"
-                    onChange={handleProfilePictureUpload}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                  <label
-                    htmlFor="profilePicture"
-                    className="text-white text-xs cursor-pointer hover:underline"
-                  >
-                    {uploading ? '...' : '📷'}
-                  </label>
-                </div>
-              )}
-            </div>
+                <label
+                  htmlFor="profilePicture"
+                  style={{
+                    color: 'white',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {uploading ? '...' : '📷'}
+                </label>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Profile Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6" style={{ marginTop: '4rem' }}>
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
+        <div style={styles.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
               {isEditing ? (
-                <div className="space-y-4">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <input
                     type="text"
                     value={editData.fullName || ''}
                     onChange={(e) => setEditData({ ...editData, fullName: e.target.value })}
-                    className="text-3xl font-bold text-gray-800 border-b-2 border-gray-300 focus:border-blue-500 outline-none bg-transparent w-full"
+                    style={{ ...styles.input, fontSize: '24px', fontWeight: 'bold' }}
                     placeholder="Full Name"
                   />
                   <input
                     type="text"
                     value={editData.headline || ''}
                     onChange={(e) => setEditData({ ...editData, headline: e.target.value })}
-                    className="text-xl text-gray-600 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent w-full"
+                    style={{ ...styles.input, fontSize: '18px' }}
                     placeholder="Professional Headline"
                   />
                   <input
                     type="text"
                     value={editData.location || ''}
                     onChange={(e) => setEditData({ ...editData, location: e.target.value })}
-                    className="text-gray-500 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent"
+                    style={styles.input}
                     placeholder="📍 Location"
                   />
                 </div>
               ) : (
                 <>
-                  <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                  <h1 style={{ color: 'white', fontSize: '2rem', margin: '0 0 10px 0' }}>
                     {currentProfile.fullName}
                   </h1>
-                  <p className="text-xl text-gray-600 mb-3">
+                  <p style={{ color: '#ddd', fontSize: '1.2rem', margin: '0 0 15px 0' }}>
                     {currentProfile.headline || 'Professional Model'}
                   </p>
-                  <div className="flex items-center text-gray-500 mb-4">
-                    <span className="mr-4">📍 {currentProfile.location}</span>
-                    <span className="mr-4">👥 {currentProfile.connectionsCount || 0} connections</span>
-                    {currentProfile.verified && <span className="text-blue-500">✓ Verified</span>}
+                  <div style={{ color: '#ccc', fontSize: '14px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                    <span>📍 {currentProfile.location}</span>
+                    <span>👥 {currentProfile.connectionsCount || 0} connections</span>
+                    {currentProfile.verified && <span style={{ color: '#4CAF50' }}>✓ Verified</span>}
                   </div>
                 </>
               )}
             </div>
             
             {!isOwnProfile && (
-              <div className="flex space-x-3">
+              <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
                   onClick={onConnect}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  style={{ ...styles.button, ...styles.primaryButton }}
                 >
                   Connect
                 </button>
                 <button 
                   onClick={onMessage}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  style={{ ...styles.button, ...styles.secondaryButton }}
                 >
                   Message
                 </button>
@@ -446,84 +621,88 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main Info */}
-          <div className="lg:col-span-2 space-y-6">
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+          {/* Left Column */}
+          <div>
             {/* About Section */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">About</h2>
-                {isEditing && isOwnProfile && (
-                  <span className="text-sm text-gray-500">Edit mode</span>
-                )}
-              </div>
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>About</h2>
               {isEditing ? (
                 <textarea
                   value={editData.bio || editData.experience || ''}
                   onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  rows="6"
+                  style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
                   placeholder="Tell the world about yourself..."
                 />
               ) : (
-                <p className="text-gray-600 leading-relaxed">
+                <p style={{ color: '#ddd', lineHeight: '1.6' }}>
                   {currentProfile.bio || currentProfile.experience || 'No bio available'}
                 </p>
               )}
             </div>
 
             {/* Experience Section */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">Experience</h2>
+            <div style={styles.card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>Experience</h2>
                 {isEditing && (
                   <button
                     onClick={addExperience}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                    style={{ ...styles.button, ...styles.primaryButton, fontSize: '12px' }}
                   >
                     + Add Experience
                   </button>
                 )}
               </div>
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {ensureExperienceArray(currentProfile.experience).map((exp, index) => (
-                  <div key={index} className="border-l-2 border-blue-200 pl-4 relative">
+                  <div key={index} style={{
+                    borderLeft: '3px solid #4CAF50',
+                    paddingLeft: '15px',
+                    position: 'relative'
+                  }}>
                     {isEditing ? (
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 space-y-2">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <input
                               type="text"
                               value={exp.role || ''}
                               onChange={(e) => updateExperience(index, 'role', e.target.value)}
-                              className="w-full font-semibold border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent"
+                              style={styles.input}
                               placeholder="Job Title"
                             />
                             <input
                               type="text"
                               value={exp.company || ''}
                               onChange={(e) => updateExperience(index, 'company', e.target.value)}
-                              className="w-full text-gray-600 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent"
+                              style={styles.input}
                               placeholder="Company Name"
                             />
                             <input
                               type="text"
                               value={exp.duration || ''}
                               onChange={(e) => updateExperience(index, 'duration', e.target.value)}
-                              className="w-full text-sm text-gray-500 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent"
+                              style={styles.input}
                               placeholder="Duration (e.g., Jan 2020 - Present)"
                             />
                             <textarea
                               value={exp.description || ''}
                               onChange={(e) => updateExperience(index, 'description', e.target.value)}
-                              className="w-full text-gray-600 border border-gray-300 rounded focus:border-blue-500 outline-none p-2 resize-none"
-                              rows="2"
+                              style={{ ...styles.input, minHeight: '60px', resize: 'vertical' }}
                               placeholder="Description..."
                             />
                           </div>
                           <button
                             onClick={() => removeExperience(index)}
-                            className="ml-2 text-red-500 hover:text-red-700"
+                            style={{
+                              marginLeft: '10px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#ff6b6b',
+                              cursor: 'pointer',
+                              fontSize: '18px'
+                            }}
                           >
                             🗑️
                           </button>
@@ -531,24 +710,24 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
                       </div>
                     ) : (
                       <>
-                        <h3 className="font-semibold text-gray-800">{exp.role || 'Experience'}</h3>
-                        {exp.company && <p className="text-gray-600">{exp.company}</p>}
-                        {exp.duration && <p className="text-sm text-gray-500">{exp.duration}</p>}
-                        {exp.description && (
-                          <p className="text-gray-600 mt-2">{exp.description}</p>
-                        )}
+                        <h3 style={{ color: 'white', fontSize: '16px', margin: '0 0 5px 0' }}>
+                          {exp.role || 'Experience'}
+                        </h3>
+                        {exp.company && <p style={{ color: '#ddd', margin: '0 0 5px 0' }}>{exp.company}</p>}
+                        {exp.duration && <p style={{ color: '#ccc', fontSize: '14px', margin: '0 0 10px 0' }}>{exp.duration}</p>}
+                        {exp.description && <p style={{ color: '#ddd', lineHeight: '1.5' }}>{exp.description}</p>}
                       </>
                     )}
                   </div>
-                ))}
+                ))} 
               </div>
             </div>
 
             {/* Portfolio Photos */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">Portfolio</h2>
-                <div className="flex space-x-2">
+            <div style={styles.card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>Portfolio</h2>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   {isEditing && (
                     <div>
                       <input
@@ -557,12 +736,18 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
                         accept="image/*"
                         multiple
                         onChange={handlePortfolioPhotosUpload}
-                        className="hidden"
+                        style={{ display: 'none' }}
                         disabled={uploading}
                       />
                       <label
                         htmlFor="portfolioPhotos"
-                        className="px-3 py-1 bg-green-600 text-white text-sm rounded cursor-pointer hover:bg-green-700"
+                        style={{
+                          ...styles.button,
+                          ...styles.primaryButton,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'inline-block'
+                        }}
                       >
                         {uploading ? 'Uploading...' : '+ Add Photos'}
                       </label>
@@ -571,7 +756,7 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
                   {ensureArray(profile.photos).length > 8 && (
                     <button 
                       onClick={() => setShowAllPhotos(!showAllPhotos)}
-                      className="text-blue-600 hover:underline"
+                      style={{ ...styles.button, ...styles.secondaryButton, fontSize: '12px' }}
                     >
                       {showAllPhotos ? 'Show Less' : `View All ${ensureArray(profile.photos).length} Photos`}
                     </button>
@@ -580,26 +765,57 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
               </div>
               
               {displayPhotos.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: '15px'
+                }}>
                   {displayPhotos.map((photo, index) => (
                     <div 
                       key={index} 
-                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative group"
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: !isEditing ? 'pointer' : 'default',
+                        position: 'relative'
+                      }}
                       onClick={() => !isEditing && setActivePhotoIndex(index)}
                     >
                       <img 
-                        src={typeof photo === 'string' ? photo : photo.url} 
+                        src={`http://localhost:8001${typeof photo === 'string' ? photo : photo.url}`}
                         alt={typeof photo === 'object' ? photo.caption : `Portfolio ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          transition: 'opacity 0.3s ease'
+                        }}
                       />
                       {isEditing && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div style={{
+                          position: 'absolute',
+                          top: '5px',
+                          right: '5px'
+                        }}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               removePortfolioPhoto(index);
                             }}
-                            className="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              background: '#ff4444',
+                              color: 'white',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
                           >
                             ×
                           </button>
@@ -609,23 +825,28 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-4xl mb-2">📸</div>
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#ddd' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>📸</div>
                   <p>No portfolio photos yet</p>
                   {isEditing && (
-                    <div className="mt-4">
+                    <div style={{ marginTop: '20px' }}>
                       <input
                         type="file"
                         id="firstPortfolioPhotos"
                         accept="image/*"
                         multiple
                         onChange={handlePortfolioPhotosUpload}
-                        className="hidden"
+                        style={{ display: 'none' }}
                         disabled={uploading}
                       />
                       <label
                         htmlFor="firstPortfolioPhotos"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 inline-block"
+                        style={{
+                          ...styles.button,
+                          ...styles.primaryButton,
+                          cursor: 'pointer',
+                          display: 'inline-block'
+                        }}
                       >
                         {uploading ? 'Uploading...' : 'Upload Your First Photos'}
                       </label>
@@ -636,61 +857,55 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
             </div>
           </div>
 
-          {/* Right Column - Details */}
-          <div className="space-y-6">
+          {/* Right Column */}
+          <div>
             {/* Contact Info */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Contact</h2>
-              <div className="space-y-3">
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>Contact</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {isEditing ? (
                   <>
-                    <div>
-                      <input
-                        type="email"
-                        value={editData.email || ''}
-                        onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded focus:border-blue-500 outline-none"
-                        placeholder="✉️ Email"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="tel"
-                        value={editData.phone || ''}
-                        onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded focus:border-blue-500 outline-none"
-                        placeholder="📞 Phone"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="url"
-                        value={editData.website || ''}
-                        onChange={(e) => setEditData({ ...editData, website: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded focus:border-blue-500 outline-none"
-                        placeholder="🌐 Website"
-                      />
-                    </div>
+                    <input
+                      type="email"
+                      value={editData.email || ''}
+                      onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                      style={styles.input}
+                      placeholder="✉️ Email"
+                    />
+                    <input
+                      type="tel"
+                      value={editData.phone || ''}
+                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                      style={styles.input}
+                      placeholder="📞 Phone"
+                    />
+                    <input
+                      type="url"
+                      value={editData.website || ''}
+                      onChange={(e) => setEditData({ ...editData, website: e.target.value })}
+                      style={styles.input}
+                      placeholder="🌐 Website"
+                    />
                   </>
                 ) : (
                   <>
                     {currentProfile.email && (
-                      <div className="flex items-center">
-                        <span className="w-6 text-gray-500">✉️</span>
-                        <span className="text-gray-700">{currentProfile.email}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>✉️</span>
+                        <span style={{ color: 'white' }}>{currentProfile.email}</span>
                       </div>
                     )}
                     {currentProfile.phone && (
-                      <div className="flex items-center">
-                        <span className="w-6 text-gray-500">📞</span>
-                        <span className="text-gray-700">{currentProfile.phone}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>📞</span>
+                        <span style={{ color: 'white' }}>{currentProfile.phone}</span>
                       </div>
                     )}
                     {currentProfile.website && (
-                      <div className="flex items-center">
-                        <span className="w-6 text-gray-500">🌐</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>🌐</span>
                         <a href={currentProfile.website} target="_blank" rel="noopener noreferrer" 
-                           className="text-blue-600 hover:underline">
+                           style={{ color: '#4CAF50', textDecoration: 'none' }}>
                           {currentProfile.website}
                         </a>
                       </div>
@@ -700,52 +915,292 @@ const ModelProfilePage = ({ modelId, user, onBack, onConnect, onMessage }) => {
               </div>
             </div>
 
+            {/* Physical Attributes */}
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>Physical Attributes</h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={editData.height || ''}
+                    onChange={(e) => setEditData({ ...editData, height: e.target.value })}
+                    style={styles.input}
+                    placeholder="Height"
+                  />
+                  <input
+                    type="text"
+                    value={editData.weight || ''}
+                    onChange={(e) => setEditData({ ...editData, weight: e.target.value })}
+                    style={styles.input}
+                    placeholder="Weight"
+                  />
+                  <select
+                    value={editData.bodyType || ''}
+                    onChange={(e) => setEditData({ ...editData, bodyType: e.target.value })}
+                    style={styles.input}
+                  >
+                    <option value="">Select Body Type</option>
+                    <option value="athletic">Athletic</option>
+                    <option value="slim">Slim</option>
+                    <option value="average">Average</option>
+                    <option value="muscular">Muscular</option>
+                    <option value="curvy">Curvy</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={editData.hairColor || ''}
+                    onChange={(e) => setEditData({ ...editData, hairColor: e.target.value })}
+                    style={styles.input}
+                    placeholder="Hair Color"
+                  />
+                  <input
+                    type="text"
+                    value={editData.eyeColor || ''}
+                    onChange={(e) => setEditData({ ...editData, eyeColor: e.target.value })}
+                    style={styles.input}
+                    placeholder="Eye Color"
+                  />
+                  <input
+                    type="text"
+                    value={editData.skinTone || ''}
+                    onChange={(e) => setEditData({ ...editData, skinTone: e.target.value })}
+                    style={styles.input}
+                    placeholder="Skin Tone"
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div><strong style={{ color: 'white' }}>Height:</strong> {currentProfile.height || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Weight:</strong> {currentProfile.weight || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Body Type:</strong> {currentProfile.bodyType || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Hair Color:</strong> {currentProfile.hairColor || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Eye Color:</strong> {currentProfile.eyeColor || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Skin Tone:</strong> {currentProfile.skinTone || 'Not specified'}</div>
+                </div>
+              )}
+            </div>
+
             {/* Skills */}
-            {(ensureArray(currentProfile.skills).length > 0 || isEditing) && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Skills</h2>
-                {isEditing ? (
-                  <textarea
-                    value={ensureArray(editData.skills).join(', ')}
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>Skills</h2>
+              {isEditing ? (
+                <textarea
+                  value={ensureArray(editData.skills).join(', ')}
+                  onChange={(e) => setEditData({ 
+                    ...editData, 
+                    skills: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
+                  })}
+                  style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                  placeholder="Enter skills separated by commas (e.g., Fashion Modeling, Commercial Photography, Runway)"
+                />
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {ensureArray(currentProfile.skills).map((skill, index) => (
+                    <span 
+                      key={index}
+                      style={{
+                        background: 'rgba(76, 175, 80, 0.2)',
+                        color: '#81C784',
+                        padding: '6px 12px',
+                        borderRadius: '15px',
+                        fontSize: '12px',
+                        border: '1px solid rgba(76, 175, 80, 0.3)'
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                  {ensureArray(currentProfile.skills).length === 0 && (
+                    <span style={{ color: '#999', fontStyle: 'italic' }}>No skills specified</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Social Media */}
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>Social Media</h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={editData.socialMedia?.instagram || ''}
                     onChange={(e) => setEditData({ 
                       ...editData, 
-                      skills: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
+                      socialMedia: { ...editData.socialMedia, instagram: e.target.value }
                     })}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    rows="3"
-                    placeholder="Enter skills separated by commas (e.g., Fashion Modeling, Commercial Photography, Runway)"
+                    style={styles.input}
+                    placeholder="📷 Instagram (@username or URL)"
                   />
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {ensureArray(currentProfile.skills).map((skill, index) => (
-                      <span 
-                        key={index}
-                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                  <input
+                    type="text"
+                    value={editData.socialMedia?.tiktok || ''}
+                    onChange={(e) => setEditData({ 
+                      ...editData, 
+                      socialMedia: { ...editData.socialMedia, tiktok: e.target.value }
+                    })}
+                    style={styles.input}
+                    placeholder="🎵 TikTok (@username or URL)"
+                  />
+                  <input
+                    type="text"
+                    value={editData.socialMedia?.youtube || ''}
+                    onChange={(e) => setEditData({ 
+                      ...editData, 
+                      socialMedia: { ...editData.socialMedia, youtube: e.target.value }
+                    })}
+                    style={styles.input}
+                    placeholder="🎥 YouTube (Channel URL)"
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {currentProfile.socialMedia?.instagram && (
+                    <a
+                      href={
+                        currentProfile.socialMedia.instagram.startsWith('http')
+                          ? currentProfile.socialMedia.instagram
+                          : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#E4405F',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>📷</span>
+                      <span>Instagram</span>
+                    </a>
+                  )}
+                  {currentProfile.socialMedia?.tiktok && (
+                    <a
+                      href={
+                        currentProfile.socialMedia.tiktok.startsWith('http')
+                          ? currentProfile.socialMedia.tiktok
+                          : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#333',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>🎵</span>
+                      <span>TikTok</span>
+                    </a>
+                  )}
+                  {currentProfile.socialMedia?.youtube && (
+                    <a
+                      href={currentProfile.socialMedia.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#FF0000',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>🎥</span>
+                      <span>YouTube</span>
+                    </a>
+                  )}
+                  {(!currentProfile.socialMedia || 
+                    (!currentProfile.socialMedia.instagram && 
+                     !currentProfile.socialMedia.tiktok && 
+                     !currentProfile.socialMedia.youtube)) && (
+                    <span style={{ color: '#999', fontStyle: 'italic' }}>No social media links</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Availability & Rates */}
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>Availability & Rates</h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <select
+                    value={editData.availability || ''}
+                    onChange={(e) => setEditData({ ...editData, availability: e.target.value })}
+                    style={styles.input}
+                  >
+                    <option value="">Select Availability</option>
+                    <option value="full-time">Full Time</option>
+                    <option value="part-time">Part Time</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="weekends-only">Weekends Only</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={editData.rate?.hourly || ''}
+                    onChange={(e) => setEditData({ 
+                      ...editData, 
+                      rate: { ...editData.rate, hourly: e.target.value }
+                    })}
+                    style={styles.input}
+                    placeholder="Hourly Rate (USD)"
+                  />
+                  <input
+                    type="number"
+                    value={editData.rate?.daily || ''}
+                    onChange={(e) => setEditData({ 
+                      ...editData, 
+                      rate: { ...editData.rate, daily: e.target.value }
+                    })}
+                    style={styles.input}
+                    placeholder="Daily Rate (USD)"
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div><strong style={{ color: 'white' }}>Availability:</strong> {currentProfile.availability || 'Not specified'}</div>
+                  <div><strong style={{ color: 'white' }}>Hourly Rate:</strong> ${currentProfile.rate?.hourly || 'Not set'}</div>
+                  <div><strong style={{ color: 'white' }}>Daily Rate:</strong> ${currentProfile.rate?.daily || 'Not set'}</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Photo Modal */}
       {activePhotoIndex !== null && ensureArray(profile.photos).length > 0 && !isEditing && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
-             onClick={() => setActivePhotoIndex(null)}>
-          <div className="max-w-4xl max-h-4xl p-4">
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setActivePhotoIndex(null)}
+        >
+          <div style={{ maxWidth: '90vw', maxHeight: '90vh', padding: '20px' }}>
             <img 
-              src={typeof ensureArray(profile.photos)[activePhotoIndex] === 'string' 
+              src={`http://localhost:8001${typeof ensureArray(profile.photos)[activePhotoIndex] === 'string' 
                 ? ensureArray(profile.photos)[activePhotoIndex] 
-                : ensureArray(profile.photos)[activePhotoIndex]?.url}
+                : ensureArray(profile.photos)[activePhotoIndex]?.url}`}
               alt={typeof ensureArray(profile.photos)[activePhotoIndex] === 'object' 
                 ? ensureArray(profile.photos)[activePhotoIndex]?.caption 
                 : `Portfolio ${activePhotoIndex + 1}`}
-              className="max-w-full max-h-full object-contain"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                borderRadius: '8px'
+              }}
             />
           </div>
         </div>

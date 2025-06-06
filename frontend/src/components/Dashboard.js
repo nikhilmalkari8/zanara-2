@@ -28,20 +28,27 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
     fetchProfile();
   }, []);
 
+  // Handle viewing own profile
+  const handleViewOwnProfile = () => {
+    if (user && user._id) {
+      onViewProfile(); // This will trigger the profile page
+    }
+  };
+
   // Calculate profile completion percentage
   const calculateProfileCompletion = () => {
     if (!user && !profile) return 0;
     
     const profileData = profile || user;
     const fields = [
-      profileData.fullName || profileData.userId?.firstName,
-      profileData.email || profileData.userId?.email,
+      profileData.fullName || profileData.firstName,
+      profileData.email,
       profileData.headline,
       profileData.bio,
       profileData.location,
       profileData.profilePicture,
       profileData.photos && profileData.photos.length > 0,
-      profileData.experience && profileData.experience.length > 0,
+      profileData.experience,
       profileData.skills && profileData.skills.length > 0
     ];
     
@@ -123,7 +130,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
             gap: '20px'
           }}
         >
-          {/* Profile Summary Card - UPDATED */}
+          {/* Profile Summary Card */}
           <div
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
@@ -151,7 +158,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
                 Profile Summary
               </h3>
               <button
-                onClick={() => onViewProfile && onViewProfile()}
+                onClick={handleViewOwnProfile}
                 style={{
                   padding: '8px 16px',
                   background: 'rgba(255, 255, 255, 0.2)',
@@ -181,7 +188,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
               }}>
                 {profile?.profilePicture || user?.profilePicture ? (
                   <img 
-                    src={profile?.profilePicture || user?.profilePicture} 
+                    src={`http://localhost:8001${profile?.profilePicture || user?.profilePicture}`}
                     alt="Profile"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
@@ -270,7 +277,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
                   Complete your profile to attract more opportunities!
                 </p>
                 <button 
-                  onClick={() => onViewProfile && onViewProfile()}
+                  onClick={handleViewOwnProfile}
                   style={{
                     padding: '6px 12px',
                     background: 'rgba(255, 193, 7, 0.3)',
@@ -405,7 +412,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
             </button>
           </div>
 
-          {/* Quick Actions Card - UPDATED with Portfolio Features */}
+          {/* Quick Actions Card */}
           <div
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
@@ -435,7 +442,7 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
             >
               {/* Profile Management Actions */}
               <button
-                onClick={() => onViewProfile && onViewProfile()}
+                onClick={handleViewOwnProfile}
                 style={{
                   padding: '15px',
                   background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
@@ -448,22 +455,6 @@ const Dashboard = ({ user, onLogout, setCurrentPage, onViewProfile }) => {
                 }}
               >
                 ✏️ Edit Profile
-              </button>
-
-              <button
-                onClick={() => setCurrentPage('portfolio-manager')}
-                style={{
-                  padding: '15px',
-                  background: 'linear-gradient(45deg, #9C27B0, #BA68C8)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                🎨 Manage Portfolios
               </button>
 
               <button

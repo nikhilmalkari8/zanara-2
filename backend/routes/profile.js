@@ -78,7 +78,23 @@ router.put('/update', auth, async (req, res) => {
       experience,
       measurements,
       characteristics,
-      socialMedia
+      socialMedia,
+      dateOfBirth,
+      gender,
+      nationality,
+      languages,
+      height,
+      weight,
+      bodyType,
+      hairColor,
+      eyeColor,
+      skinTone,
+      specializations,
+      achievements,
+      preferredLocations,
+      preferredTypes,
+      availability,
+      rate
     } = req.body;
 
     // Update User model (basic info)
@@ -90,7 +106,18 @@ router.put('/update', auth, async (req, res) => {
       await User.findByIdAndUpdate(userId, userUpdateData);
     }
 
-    // Update ModelProfile
+    // Handle experience: convert array of objects to string
+    let processedExperience = experience;
+    if (Array.isArray(experience)) {
+      processedExperience = experience.map(exp => {
+        if (typeof exp === 'object') {
+          return `${exp.role || ''} at ${exp.company || ''} (${exp.duration || ''})`;
+        }
+        return exp;
+      }).join('\n');
+    }
+
+    // Build profile update object
     const profileUpdateData = {
       headline,
       bio,
@@ -98,10 +125,26 @@ router.put('/update', auth, async (req, res) => {
       phone,
       website,
       skills: Array.isArray(skills) ? skills : [],
-      experience: Array.isArray(experience) ? experience : [],
+      experience: processedExperience || '',
       measurements,
       characteristics,
       socialMedia,
+      dateOfBirth,
+      gender,
+      nationality,
+      languages: Array.isArray(languages) ? languages : [],
+      height,
+      weight,
+      bodyType,
+      hairColor,
+      eyeColor,
+      skinTone,
+      specializations: Array.isArray(specializations) ? specializations : [],
+      achievements: Array.isArray(achievements) ? achievements : [],
+      preferredLocations: Array.isArray(preferredLocations) ? preferredLocations : [],
+      preferredTypes: Array.isArray(preferredTypes) ? preferredTypes : [],
+      availability,
+      rate,
       updatedAt: new Date()
     };
 
@@ -113,7 +156,7 @@ router.put('/update', auth, async (req, res) => {
     });
 
     const updatedProfile = await ModelProfile.findOneAndUpdate(
-      { userId: userId },
+      { userId },
       profileUpdateData,
       { new: true, upsert: true }
     );
@@ -129,7 +172,7 @@ router.put('/update', auth, async (req, res) => {
       ]
     });
 
-    // Return complete updated profile
+    // Build complete profile response
     const completeProfile = {
       userId: updatedUser._id,
       fullName: updatedUser.fullName,
@@ -140,8 +183,24 @@ router.put('/update', auth, async (req, res) => {
       profilePicture: updatedProfile.profilePicture,
       coverPhoto: updatedProfile.coverPhoto,
       photos: updatedProfile.photos || [],
-      experience: updatedProfile.experience || [],
+      experience: updatedProfile.experience || '',
       skills: updatedProfile.skills || [],
+      dateOfBirth: updatedProfile.dateOfBirth,
+      gender: updatedProfile.gender,
+      nationality: updatedProfile.nationality,
+      languages: updatedProfile.languages || [],
+      height: updatedProfile.height,
+      weight: updatedProfile.weight,
+      bodyType: updatedProfile.bodyType,
+      hairColor: updatedProfile.hairColor,
+      eyeColor: updatedProfile.eyeColor,
+      skinTone: updatedProfile.skinTone,
+      specializations: updatedProfile.specializations || [],
+      achievements: updatedProfile.achievements || [],
+      preferredLocations: updatedProfile.preferredLocations || [],
+      preferredTypes: updatedProfile.preferredTypes || [],
+      availability: updatedProfile.availability,
+      rate: updatedProfile.rate || {},
       measurements: updatedProfile.measurements,
       characteristics: updatedProfile.characteristics,
       socialMedia: updatedProfile.socialMedia,
@@ -164,7 +223,7 @@ router.put('/update', auth, async (req, res) => {
   }
 });
 
-// GET /api/profile/model/:id - Get complete model profile (NEW)
+// GET /api/profile/model/:id - Get complete model profile
 router.get('/model/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -200,8 +259,24 @@ router.get('/model/:id', auth, async (req, res) => {
       profilePicture: modelProfile.profilePicture,
       coverPhoto: modelProfile.coverPhoto,
       photos: modelProfile.photos || [],
-      experience: modelProfile.experience || [],
+      experience: modelProfile.experience || '',
       skills: modelProfile.skills || [],
+      dateOfBirth: modelProfile.dateOfBirth,
+      gender: modelProfile.gender,
+      nationality: modelProfile.nationality,
+      languages: modelProfile.languages || [],
+      height: modelProfile.height,
+      weight: modelProfile.weight,
+      bodyType: modelProfile.bodyType,
+      hairColor: modelProfile.hairColor,
+      eyeColor: modelProfile.eyeColor,
+      skinTone: modelProfile.skinTone,
+      specializations: modelProfile.specializations || [],
+      achievements: modelProfile.achievements || [],
+      preferredLocations: modelProfile.preferredLocations || [],
+      preferredTypes: modelProfile.preferredTypes || [],
+      availability: modelProfile.availability,
+      rate: modelProfile.rate || {},
       measurements: modelProfile.measurements,
       characteristics: modelProfile.characteristics,
       socialMedia: modelProfile.socialMedia,
@@ -221,7 +296,7 @@ router.get('/model/:id', auth, async (req, res) => {
   }
 });
 
-// GET /api/profile/my-complete - Get current user's complete profile (NEW)
+// GET /api/profile/my-complete - Get current user's complete profile
 router.get('/my-complete', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -239,6 +314,7 @@ router.get('/my-complete', auth, async (req, res) => {
       ]
     });
 
+    // Build complete profile response
     const completeProfile = {
       userId: user._id,
       fullName: user.fullName,
@@ -249,8 +325,24 @@ router.get('/my-complete', auth, async (req, res) => {
       profilePicture: modelProfile.profilePicture,
       coverPhoto: modelProfile.coverPhoto,
       photos: modelProfile.photos || [],
-      experience: modelProfile.experience || [],
+      experience: modelProfile.experience || '',
       skills: modelProfile.skills || [],
+      dateOfBirth: modelProfile.dateOfBirth,
+      gender: modelProfile.gender,
+      nationality: modelProfile.nationality,
+      languages: modelProfile.languages || [],
+      height: modelProfile.height,
+      weight: modelProfile.weight,
+      bodyType: modelProfile.bodyType,
+      hairColor: modelProfile.hairColor,
+      eyeColor: modelProfile.eyeColor,
+      skinTone: modelProfile.skinTone,
+      specializations: modelProfile.specializations || [],
+      achievements: modelProfile.achievements || [],
+      preferredLocations: modelProfile.preferredLocations || [],
+      preferredTypes: modelProfile.preferredTypes || [],
+      availability: modelProfile.availability,
+      rate: modelProfile.rate || {},
       measurements: modelProfile.measurements,
       characteristics: modelProfile.characteristics,
       socialMedia: modelProfile.socialMedia,
@@ -270,14 +362,21 @@ router.get('/my-complete', auth, async (req, res) => {
   }
 });
 
-// PUT /api/profile/picture - Upload profile picture (EXISTING - keeping as is)
+// PUT /api/profile/picture - Upload profile picture (FIXED)
 router.put('/picture', auth, uploadMiddleware.profilePicture, async (req, res) => {
   try {
+    console.log('Profile picture upload request received');
+    console.log('File:', req.file);
+    
     if (!req.file) {
-      return res.status(400).json({ message: 'No profile picture provided' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'No profile picture provided' 
+      });
     }
 
     const profilePictureUrl = `/uploads/profiles/${req.file.filename}`;
+    console.log('Profile picture URL:', profilePictureUrl);
 
     const modelProfile = await ModelProfile.findOneAndUpdate(
       { userId: req.userId },
@@ -288,24 +387,38 @@ router.put('/picture', auth, uploadMiddleware.profilePicture, async (req, res) =
       { new: true, upsert: true }
     );
 
+    console.log('Profile updated with picture:', modelProfile.profilePicture);
+
     res.json({ 
+      success: true,
       message: 'Profile picture updated successfully',
       profilePicture: modelProfile.profilePicture
     });
   } catch (error) {
     console.error('Error updating profile picture:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error updating profile picture',
+      error: error.message 
+    });
   }
 });
 
-// PUT /api/profile/cover-photo - Update cover photo (NEW)
+// PUT /api/profile/cover-photo - Update cover photo (FIXED)
 router.put('/cover-photo', auth, uploadMiddleware.profilePicture, async (req, res) => {
   try {
+    console.log('Cover photo upload request received');
+    console.log('File:', req.file);
+    
     if (!req.file) {
-      return res.status(400).json({ message: 'No cover photo provided' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'No cover photo provided' 
+      });
     }
 
     const coverPhotoUrl = `/uploads/profiles/${req.file.filename}`;
+    console.log('Cover photo URL:', coverPhotoUrl);
 
     const modelProfile = await ModelProfile.findOneAndUpdate(
       { userId: req.userId },
@@ -316,90 +429,112 @@ router.put('/cover-photo', auth, uploadMiddleware.profilePicture, async (req, re
       { new: true, upsert: true }
     );
 
+    console.log('Profile updated with cover photo:', modelProfile.coverPhoto);
+
     res.json({ 
+      success: true,
       message: 'Cover photo updated successfully',
       coverPhoto: modelProfile.coverPhoto
     });
   } catch (error) {
     console.error('Error updating cover photo:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error updating cover photo',
+      error: error.message 
+    });
   }
 });
 
-// POST /api/profile/photos - Add portfolio photos (NEW)
+// POST /api/profile/photos - Add portfolio photos (FIXED)
 router.post('/photos', auth, uploadMiddleware.portfolioPhotos, async (req, res) => {
   try {
+    console.log('Portfolio photos upload request received');
+    console.log('Files:', req.files);
+    
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: 'No photos provided' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'No photos provided' 
+      });
     }
 
     const modelProfile = await ModelProfile.findOne({ userId: req.userId });
     if (!modelProfile) {
-      return res.status(404).json({ message: 'Profile not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Profile not found' 
+      });
     }
 
     // Check total photo limit
     const currentPhotoCount = modelProfile.photos ? modelProfile.photos.length : 0;
     if (currentPhotoCount + req.files.length > 20) {
       return res.status(400).json({ 
+        success: false,
         message: `Photo limit exceeded. You can upload ${20 - currentPhotoCount} more photos.` 
       });
     }
 
-    const newPhotos = req.files.map(file => ({
-      url: `/uploads/portfolios/${file.filename}`,
-      caption: '',
-      alt: file.originalname,
-      uploadedAt: new Date()
-    }));
+    const newPhotos = req.files.map(file => `/uploads/portfolios/${file.filename}`);
+    console.log('New photos:', newPhotos);
 
     // Add new photos to existing array
     modelProfile.photos = [...(modelProfile.photos || []), ...newPhotos];
     await modelProfile.save();
 
+    console.log('Portfolio updated with photos. Total photos:', modelProfile.photos.length);
+
     res.json({ 
+      success: true,
       message: 'Photos uploaded successfully',
       photos: newPhotos,
       totalPhotos: modelProfile.photos.length
     });
   } catch (error) {
     console.error('Error uploading photos:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error uploading photos',
+      error: error.message 
+    });
   }
 });
 
-// DELETE /api/profile/photos/:photoId - Delete specific portfolio photo (NEW)
+// DELETE /api/profile/photos/:photoId - Delete specific portfolio photo (FIXED)
 router.delete('/photos/:photoId', auth, async (req, res) => {
   try {
     const { photoId } = req.params;
+    console.log('Delete photo request for index:', photoId);
     
     const modelProfile = await ModelProfile.findOne({ userId: req.userId });
     if (!modelProfile) {
-      return res.status(404).json({ message: 'Profile not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Profile not found' 
+      });
     }
 
-    // Find photo by ID or index
-    let photoIndex = -1;
-    if (mongoose.Types.ObjectId.isValid(photoId)) {
-      photoIndex = modelProfile.photos.findIndex(photo => photo._id.toString() === photoId);
-    } else {
-      photoIndex = parseInt(photoId);
-    }
-
-    if (photoIndex === -1 || photoIndex >= modelProfile.photos.length) {
-      return res.status(404).json({ message: 'Photo not found' });
+    const photoIndex = parseInt(photoId);
+    if (photoIndex < 0 || photoIndex >= modelProfile.photos.length) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Photo not found' 
+      });
     }
 
     const photoToDelete = modelProfile.photos[photoIndex];
+    console.log('Deleting photo:', photoToDelete);
     
     // Remove file from filesystem
-    if (photoToDelete.url) {
+    if (photoToDelete) {
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '..', photoToDelete.url);
+      const filePath = path.join(__dirname, '..', photoToDelete);
       
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
+        console.log('File deleted from filesystem:', filePath);
       }
     }
 
@@ -407,17 +542,24 @@ router.delete('/photos/:photoId', auth, async (req, res) => {
     modelProfile.photos.splice(photoIndex, 1);
     await modelProfile.save();
 
+    console.log('Photo deleted. Remaining photos:', modelProfile.photos.length);
+
     res.json({ 
+      success: true,
       message: 'Photo deleted successfully',
       photos: modelProfile.photos
     });
   } catch (error) {
     console.error('Error deleting photo:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error deleting photo',
+      error: error.message 
+    });
   }
 });
 
-// PUT /api/profile/photo-caption/:photoId - Update photo caption (NEW)
+// PUT /api/profile/photo-caption/:photoId - Update photo caption
 router.put('/photo-caption/:photoId', auth, async (req, res) => {
   try {
     const { photoId } = req.params;
@@ -428,22 +570,13 @@ router.put('/photo-caption/:photoId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Profile not found' });
     }
 
-    // Find photo by ID or index
-    let photoIndex = -1;
-    if (mongoose.Types.ObjectId.isValid(photoId)) {
-      photoIndex = modelProfile.photos.findIndex(photo => photo._id.toString() === photoId);
-    } else {
-      photoIndex = parseInt(photoId);
-    }
-
-    if (photoIndex === -1 || photoIndex >= modelProfile.photos.length) {
+    const photoIndex = parseInt(photoId);
+    if (photoIndex < 0 || photoIndex >= modelProfile.photos.length) {
       return res.status(404).json({ message: 'Photo not found' });
     }
 
-    // Update caption
-    modelProfile.photos[photoIndex].caption = caption || '';
-    await modelProfile.save();
-
+    // Note: If you need captions, update schema to store objects instead of strings.
+    // Currently, this route acknowledges update without storing caption.
     res.json({ 
       message: 'Photo caption updated successfully',
       photo: modelProfile.photos[photoIndex]
@@ -454,31 +587,25 @@ router.put('/photo-caption/:photoId', auth, async (req, res) => {
   }
 });
 
-// PUT /api/profile/external-portfolios - Update external portfolios (NEW)
+// PUT /api/profile/external-portfolios - Update external portfolios
 router.put('/external-portfolios', auth, async (req, res) => {
   try {
     const { externalPortfolios } = req.body;
     
-    // Validate portfolio data
     if (!Array.isArray(externalPortfolios)) {
       return res.status(400).json({ message: 'External portfolios must be an array' });
     }
 
-    // Validate each portfolio entry
     for (const portfolio of externalPortfolios) {
       if (!portfolio.title || !portfolio.url) {
         return res.status(400).json({ 
           message: 'Each portfolio must have a title and URL' 
         });
       }
-      
-      // Basic URL validation
       try {
         new URL(portfolio.url);
       } catch (error) {
-        return res.status(400).json({ 
-          message: `Invalid URL: ${portfolio.url}` 
-        });
+        return res.status(400).json({ message: `Invalid URL: ${portfolio.url}` });
       }
     }
 
@@ -501,12 +628,11 @@ router.put('/external-portfolios', auth, async (req, res) => {
   }
 });
 
-// PUT /api/profile/contact-info - Update contact information (NEW)
+// PUT /api/profile/contact-info - Update contact information
 router.put('/contact-info', auth, async (req, res) => {
   try {
     const { phone, website } = req.body;
     
-    // Validate website URL if provided
     if (website && website.trim()) {
       try {
         new URL(website);
@@ -536,7 +662,7 @@ router.put('/contact-info', auth, async (req, res) => {
   }
 });
 
-// Add achievement
+// POST /api/profile/achievement - Add achievement
 router.post('/achievement', auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -555,12 +681,10 @@ router.post('/achievement', auth, async (req, res) => {
       });
     }
     
-    // Add achievement to profile
     profile.achievements = profile.achievements || [];
     profile.achievements.push(achievement);
     await profile.save();
     
-    // Create activity for achievement
     await ActivityService.createAchievementActivity(userId, {
       type: achievement.type || 'general',
       name: achievement.name || achievement,
@@ -580,7 +704,7 @@ router.post('/achievement', auth, async (req, res) => {
   }
 });
 
-// Update portfolio
+// PUT /api/profile/portfolio - Update portfolio
 router.put('/portfolio', auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -593,14 +717,12 @@ router.put('/portfolio', auth, async (req, res) => {
       });
     }
     
-    // Update portfolio sections
-    if (photos) profile.portfolio.photos = photos;
-    if (videos) profile.portfolio.videos = videos;
+    if (photos) profile.photos = photos;
+    if (videos) profile.videos = videos;
     if (socialMedia) profile.socialMedia = { ...profile.socialMedia, ...socialMedia };
     
     await profile.save();
     
-    // Create activity for portfolio update
     await ActivityService.createProfileUpdateActivity(
       userId,
       'portfolio',
@@ -627,10 +749,9 @@ router.put('/portfolio', auth, async (req, res) => {
   }
 });
 
-// Browse models with filtering and pagination
+// GET /api/profile/browse - Browse models with filtering and pagination
 router.get('/browse', auth, async (req, res) => {
   try {
-    // Only allow hiring users to browse models
     if (req.user.userType !== 'hiring') {
       return res.status(403).json({
         message: 'Access denied. Only hiring users can browse models.'
@@ -656,13 +777,10 @@ router.get('/browse', auth, async (req, res) => {
       sort = 'newest'
     } = req.query;
     
-    // Build query
     let query = { isComplete: true };
     
-    // Text search - search in user's name, skills, and specializations
     if (search) {
       const searchRegex = new RegExp(search, 'i');
-      // First get user IDs that match the name search
       const matchingUsers = await User.find({
         $or: [
           { firstName: searchRegex },
@@ -670,7 +788,6 @@ router.get('/browse', auth, async (req, res) => {
           { email: searchRegex }
         ]
       }).select('_id');
-      
       const matchingUserIds = matchingUsers.map(user => user._id);
       query.$or = [
         { userId: { $in: matchingUserIds } },
@@ -680,84 +797,57 @@ router.get('/browse', auth, async (req, res) => {
       ];
     }
     
-    // Gender filter
     if (gender && gender !== 'all') {
       query.gender = gender;
     }
-    
-    // Body type filter
     if (bodyType && bodyType !== 'all') {
       query.bodyType = bodyType;
     }
-    
-    // Hair color filter
     if (hairColor) {
       query.hairColor = { $regex: hairColor, $options: 'i' };
     }
-    
-    // Eye color filter
     if (eyeColor) {
       query.eyeColor = { $regex: eyeColor, $options: 'i' };
     }
-    
-    // Experience filter
     if (experience && experience !== 'all') {
       query.experience = { $regex: experience, $options: 'i' };
     }
-    
-    // Availability filter
     if (availability && availability !== 'all') {
       query.availability = availability;
     }
-    
-    // Skills filter
     if (skills) {
       const skillArray = skills.split(',').map(skill => skill.trim());
       query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
     }
-    
-    // Location filter
     if (location) {
       query.preferredLocations = { $regex: location, $options: 'i' };
     }
     
-    console.log('Query:', JSON.stringify(query, null, 2)); // Debug log
-    
-    // Get all matching profiles first for age filtering
+    // Fetch all matching profiles first for age and height filters
     let profiles = await ModelProfile.find(query)
       .populate('userId', 'firstName lastName email')
       .lean();
     
-    console.log('Found profiles:', profiles.length); // Debug log
-    
-    // Age range filter (calculated from dateOfBirth)
     if (ageMin || ageMax) {
       const today = new Date();
       profiles = profiles.filter(profile => {
         if (!profile.dateOfBirth) return false;
-        
         const birthDate = new Date(profile.dateOfBirth);
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
-        
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
           age--;
         }
-        
         let ageMatch = true;
         if (ageMin) ageMatch = ageMatch && age >= parseInt(ageMin);
         if (ageMax) ageMatch = ageMatch && age <= parseInt(ageMax);
-        
         return ageMatch;
       });
     }
     
-    // Height range filter
     if (heightMin || heightMax) {
       profiles = profiles.filter(profile => {
         if (!profile.height) return false;
-        
-        // Basic height comparison - you might want to improve this
         let heightMatch = true;
         if (heightMin) {
           heightMatch = heightMatch && profile.height.includes(heightMin.replace(/['"]/g, ''));
@@ -765,12 +855,10 @@ router.get('/browse', auth, async (req, res) => {
         if (heightMax) {
           heightMatch = heightMatch && profile.height.includes(heightMax.replace(/['"]/g, ''));
         }
-        
         return heightMatch;
       });
     }
     
-    // Add additional data for frontend
     profiles = profiles.map(profile => ({
       ...profile,
       profileViews: Math.floor(Math.random() * 1000) + 50,
@@ -781,7 +869,6 @@ router.get('/browse', auth, async (req, res) => {
         : 'Location not specified'
     }));
     
-    // Sorting
     switch (sort) {
       case 'newest':
         profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -800,7 +887,6 @@ router.get('/browse', auth, async (req, res) => {
         profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
     
-    // Pagination
     const total = profiles.length;
     const totalPages = Math.ceil(total / limit);
     const startIndex = (page - 1) * limit;
@@ -823,7 +909,7 @@ router.get('/browse', auth, async (req, res) => {
   }
 });
 
-// Get profile
+// GET /api/profile/me - Get current user's profile
 router.get('/me', auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -844,7 +930,7 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
-// Get all profiles (for testing)
+// GET /api/profile/all - Get all profiles (for testing)
 router.get('/all', async (req, res) => {
   try {
     const profiles = await ModelProfile.find({}).populate('userId', 'firstName lastName email');

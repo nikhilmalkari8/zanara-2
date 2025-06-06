@@ -1,8 +1,10 @@
 // frontend/src/App.js
 import React, { useState, useEffect } from 'react';
 import Home from './components/Home';
+// UPDATED: Keep old registration components for backward compatibility AND add new one
 import RegisterModel from './components/RegisterModel';
 import RegisterCompany from './components/RegisterCompany';
+import UnifiedRegister from './components/UnifiedRegister'; // NEW: Add unified registration
 import Login from './components/Login';
 import ProfileSetup from './components/ProfileSetup';
 import CompanyProfileSetup from './components/CompanyProfileSetup';
@@ -17,12 +19,12 @@ import NetworkVisualization from './components/NetworkVisualization';
 import ActivityFeed from './components/ActivityFeed';
 import Notifications from './components/Notifications';
 import NavigationHeader from './components/NavigationHeader';
-// NEW CONTENT COMPONENTS
+// CONTENT COMPONENTS
 import ContentCreator from './components/ContentCreator';
 import ContentViewer from './components/ContentViewer';
 import MyContent from './components/MyContent';
 import ContentBrowser from './components/ContentBrowser';
-// NEW PROFILE COMPONENT
+// PROFILE COMPONENT
 import ModelProfilePage from './components/ModelProfilePage';
 import './App.css';
 
@@ -50,9 +52,9 @@ function App() {
             const userData = await userResponse.json();
             setUser(userData);
 
-            // Check profile completion based on user type
-            if (userData.userType === 'model') {
-              // Check if model profile exists
+            // UPDATED: Check profile completion based on userType (talent/hiring) instead of old model/hiring
+            if (userData.userType === 'talent' || userData.userType === 'model') {
+              // Check if talent/model profile exists
               const profileResponse = await fetch('http://localhost:8001/api/profile/me', {
                 headers: {
                   'Authorization': `Bearer ${token}`
@@ -60,10 +62,10 @@ function App() {
               });
 
               if (profileResponse.ok) {
-                // Model profile exists, go to model dashboard
+                // Profile exists, go to dashboard
                 setCurrentPage('dashboard');
               } else if (profileResponse.status === 404) {
-                // No model profile, go to model profile setup
+                // No profile, go to profile setup
                 setCurrentPage('profile-setup');
               } else {
                 // Invalid token
@@ -114,9 +116,9 @@ function App() {
     setUser(userData);
     localStorage.setItem('token', token);
     
-    // Check profile completion based on user type
+    // UPDATED: Check profile completion based on userType (talent/hiring) instead of old model/hiring
     try {
-      if (userData.userType === 'model') {
+      if (userData.userType === 'talent' || userData.userType === 'model') {
         const response = await fetch('http://localhost:8001/api/profile/me', {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -124,10 +126,10 @@ function App() {
         });
 
         if (response.ok) {
-          // Model profile exists, go to model dashboard
+          // Profile exists, go to dashboard
           setCurrentPage('dashboard');
         } else {
-          // No model profile, go to model profile setup
+          // No profile, go to profile setup
           setCurrentPage('profile-setup');
         }
       } else if (userData.userType === 'hiring') {
@@ -147,7 +149,7 @@ function App() {
       }
     } catch (error) {
       // If error checking profile, default to appropriate profile setup
-      if (userData.userType === 'model') {
+      if (userData.userType === 'talent' || userData.userType === 'model') {
         setCurrentPage('profile-setup');
       } else if (userData.userType === 'hiring') {
         setCurrentPage('company-profile-setup');
@@ -162,14 +164,14 @@ function App() {
   };
 
   const handleProfileComplete = () => {
-    if (user?.userType === 'model') {
+    if (user?.userType === 'talent' || user?.userType === 'model') {
       setCurrentPage('dashboard');
     } else if (user?.userType === 'hiring') {
       setCurrentPage('company-dashboard');
     }
   };
 
-  // NEW CONTENT HANDLERS
+  // CONTENT HANDLERS
   const handleCreateContent = () => {
     setContentId(null);
     setCurrentPage('content-creator');
@@ -190,13 +192,13 @@ function App() {
   };
 
   const handleBackFromContent = () => {
-    const previousPage = user?.userType === 'model' ? 'dashboard' : 'company-dashboard';
+    const previousPage = (user?.userType === 'talent' || user?.userType === 'model') ? 'dashboard' : 'company-dashboard';
     setCurrentPage(previousPage);
   };
 
-  // NEW PROFILE HANDLERS
+  // PROFILE HANDLERS
   const handleViewMyProfile = () => {
-    setViewingProfileId(user._id);
+    setViewingProfileId(user._id || user.id); // FIXED: Handle both _id and id
     setCurrentPage('my-profile');
   };
 
@@ -207,7 +209,7 @@ function App() {
 
   const handleBackFromProfile = () => {
     setViewingProfileId(null);
-    const previousPage = user?.userType === 'model' ? 'dashboard' : 'company-dashboard';
+    const previousPage = (user?.userType === 'talent' || user?.userType === 'model') ? 'dashboard' : 'company-dashboard';
     setCurrentPage(previousPage);
   };
 
@@ -238,8 +240,8 @@ function App() {
     );
   }
 
-  // Show navigation header for logged-in users (except on auth pages)
-  const showNavigation = user && !['home', 'login', 'register-model', 'register-company', 'profile-setup', 'company-profile-setup'].includes(currentPage);
+  // UPDATED: Show navigation header for logged-in users (except on auth pages) - include new 'register' page
+  const showNavigation = user && !['home', 'login', 'register', 'register-model', 'register-company', 'profile-setup', 'company-profile-setup'].includes(currentPage);
 
   return (
     <div className="App">
@@ -256,6 +258,12 @@ function App() {
       <div style={{ paddingTop: showNavigation ? '80px' : '0' }}>
         {currentPage === 'home' && <Home setCurrentPage={setCurrentPage} />}
         
+        {/* NEW: Add unified registration route */}
+        {currentPage === 'register' && (
+          <UnifiedRegister setCurrentPage={setCurrentPage} />
+        )}
+        
+        {/* KEEP: Original registration routes for backward compatibility */}
         {currentPage === 'register-model' && (
           <RegisterModel setCurrentPage={setCurrentPage} />
         )}
@@ -325,7 +333,7 @@ function App() {
           <NetworkVisualization user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
         )}
 
-        {/* NEW PROFILE PAGES */}
+        {/* PROFILE PAGES */}
         {currentPage === 'my-profile' && (
           <ModelProfilePage
             modelId={viewingProfileId}
@@ -346,7 +354,7 @@ function App() {
           />
         )}
 
-        {/* NEW CONTENT PAGES */}
+        {/* CONTENT PAGES */}
         {currentPage === 'content-creator' && (
           <ContentCreator 
             user={user} 

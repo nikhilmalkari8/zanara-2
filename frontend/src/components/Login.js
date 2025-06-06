@@ -89,8 +89,11 @@ const Login = ({ setCurrentPage, onLogin }) => {
             ←
           </button>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', display: 'inline' }}>
-            Login
+            Welcome Back
           </h2>
+          <p style={{ fontSize: '1rem', opacity: 0.8, marginTop: '10px', margin: '10px 0 0 0' }}>
+            Sign in to your Zanara account
+          </p>
         </div>
         
         <form onSubmit={handleSubmit}>
@@ -151,20 +154,51 @@ const Login = ({ setCurrentPage, onLogin }) => {
               transition: 'all 0.3s ease'
             }}
           >
-            {isLoading ? 'Logging in...' : 'Login'}
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
         
+        {/* UPDATED: Link to unified registration */}
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
           <p style={{ color: '#ccc' }}>
-            Don't have an account?{' '}
+            New to Zanara?{' '}
             <span 
-              onClick={() => setCurrentPage('register-model')}
-              style={{ color: '#667eea', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => setCurrentPage('register')}
+              style={{ color: '#667eea', cursor: 'pointer', textDecoration: 'underline', fontWeight: 'bold' }}
             >
-              Register here
+              Join the fashion ecosystem
             </span>
           </p>
+        </div>
+
+        {/* Forgot Password */}
+        <div style={{ textAlign: 'center', marginTop: '15px' }}>
+          <span 
+            style={{ color: 'rgba(255, 255, 255, 0.7)', cursor: 'pointer', fontSize: '14px' }}
+            onClick={() => {
+              // TODO: Implement forgot password functionality
+              setMessage('Forgot password feature coming soon!');
+            }}
+          >
+            Forgot your password?
+          </span>
+        </div>
+
+        {/* Benefits Reminder */}
+        <div style={{ 
+          marginTop: '30px', 
+          padding: '20px', 
+          background: 'rgba(255, 255, 255, 0.05)', 
+          borderRadius: '10px',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h4 style={{ color: 'white', marginBottom: '15px', fontSize: '16px' }}>Welcome Back To:</h4>
+          <ul style={{ color: '#ccc', fontSize: '14px', lineHeight: '1.6', paddingLeft: '20px', margin: 0 }}>
+            <li>Your professional fashion portfolio</li>
+            <li>Industry collaboration opportunities</li>
+            <li>Verified professional network</li>
+            <li>Real-time fashion industry insights</li>
+          </ul>
         </div>
       </div>
     </div>

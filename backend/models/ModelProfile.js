@@ -8,7 +8,35 @@ const modelProfileSchema = new mongoose.Schema({
     unique: true
   },
   
-  // Basic Info
+  // ⭐ MISSING FIELDS THAT YOUR FRONTEND NEEDS ⭐
+  headline: {
+    type: String,
+    maxlength: 200
+  },
+  bio: {
+    type: String,
+    maxlength: 2000
+  },
+  location: {
+    type: String,
+    maxlength: 100
+  },
+  phone: {
+    type: String,
+    maxlength: 20
+  },
+  website: {
+    type: String,
+    maxlength: 200
+  },
+  profilePicture: {
+    type: String // File path for profile picture
+  },
+  coverPhoto: {
+    type: String // File path for cover photo
+  },
+  
+  // Basic Info (existing)
   dateOfBirth: {
     type: Date,
     required: true
@@ -26,7 +54,7 @@ const modelProfileSchema = new mongoose.Schema({
     type: String
   }],
   
-  // Physical Attributes
+  // Physical Attributes (existing)
   height: {
     type: String,
     required: true
@@ -53,7 +81,7 @@ const modelProfileSchema = new mongoose.Schema({
     required: true
   },
   
-  // Professional Info
+  // Professional Info (existing)
   experience: {
     type: String,
     required: true
@@ -68,7 +96,7 @@ const modelProfileSchema = new mongoose.Schema({
     type: String
   }],
   
-  // Portfolio
+  // Portfolio (existing)
   photos: [{
     type: String // Will store file paths/URLs
   }],
@@ -81,7 +109,7 @@ const modelProfileSchema = new mongoose.Schema({
     youtube: String
   },
   
-  // Preferences
+  // Preferences (existing)
   preferredLocations: [{
     type: String
   }],
@@ -102,7 +130,7 @@ const modelProfileSchema = new mongoose.Schema({
     }
   },
   
-  // Status
+  // Status (existing)
   isComplete: {
     type: Boolean,
     default: false
@@ -112,7 +140,7 @@ const modelProfileSchema = new mongoose.Schema({
     default: false
   },
 
-  // Metrics & Activity
+  // Metrics & Activity (existing)
   profileViews: {
     type: Number,
     default: 0
