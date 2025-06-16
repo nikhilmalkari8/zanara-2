@@ -14,7 +14,7 @@ router.get('/feed', auth, async (req, res) => {
       type = null
     } = req.query;
     
-    const activities = await ActivityService.getUserFeed(req.user.id, {
+    const activities = await ActivityService.getUserFeed(req.userId, {
       page: parseInt(page),
       limit: parseInt(limit),
       type: type
@@ -76,13 +76,13 @@ router.get('/:id', auth, async (req, res) => {
 // Like/unlike activity
 router.post('/:id/like', auth, async (req, res) => {
   try {
-    const activity = await ActivityService.likeActivity(req.params.id, req.user.id);
+    const activity = await ActivityService.likeActivity(req.params.id, req.userId);
     
     res.json({
       success: true,
       data: {
         likeCount: activity.likeCount,
-        isLiked: activity.isLikedBy(req.user.id)
+        isLiked: activity.isLikedBy(req.userId)
       }
     });
   } catch (error) {
@@ -108,7 +108,7 @@ router.post('/:id/comment', auth, async (req, res) => {
     
     const activity = await ActivityService.commentOnActivity(
       req.params.id,
-      req.user.id,
+      req.userId,
       comment.trim()
     );
     
@@ -215,7 +215,7 @@ router.post('/create', auth, async (req, res) => {
     } = req.body;
     
     const activityData = {
-      actor: req.user.id,
+      actor: req.userId,
       type,
       title,
       description,

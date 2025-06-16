@@ -2,12 +2,12 @@ const mongoose = require('mongoose');
 
 const connectionSchema = new mongoose.Schema({
   // Users involved in the connection
-  requester: {
+  sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  recipient: {
+  receiver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
@@ -16,25 +16,15 @@ const connectionSchema = new mongoose.Schema({
   // Connection status
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'blocked', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected'],
     default: 'pending'
-  },
-  
-  // Relationship details
-  relationship: {
-    type: String,
-    enum: [
-      'colleague', 'client', 'agency-representative', 'photographer', 
-      'makeup-artist', 'stylist', 'creative-director', 'casting-director',
-      'brand-representative', 'mentor', 'mentee', 'collaborator', 'other'
-    ],
-    default: 'other'
   },
   
   // Optional message with connection request
   message: {
     type: String,
-    maxLength: 500
+    trim: true,
+    maxlength: 500
   },
   
   // Connection metadata
@@ -64,24 +54,35 @@ const connectionSchema = new mongoose.Schema({
   
   // Notes about the connection (private)
   notes: {
-    requesterNotes: String,
-    recipientNotes: String
+    senderNotes: String,
+    receiverNotes: String
   },
   
   // Mutual connections count (cached for performance)
   mutualConnectionsCount: {
     type: Number,
     default: 0
+  },
+  
+  // Connection types
+  senderType: {
+    type: String,
+    enum: ['model', 'designer', 'photographer', 'stylist'],
+    required: true
+  },
+  receiverType: {
+    type: String,
+    enum: ['model', 'designer', 'photographer', 'stylist'],
+    required: true
   }
 }, {
   timestamps: true
 });
 
 // Indexes for performance
-connectionSchema.index({ requester: 1, recipient: 1 }, { unique: true });
-connectionSchema.index({ requester: 1, status: 1 });
-connectionSchema.index({ recipient: 1, status: 1 });
-connectionSchema.index({ status: 1, createdAt: -1 });
+connectionSchema.index({ sender: 1, receiver: 1 }, { unique: true });
+connectionSchema.index({ status: 1 });
+connectionSchema.index({ createdAt: -1 });
 
 // Virtual for getting the other user in a connection
 connectionSchema.virtual('otherUser').get(function() {
@@ -93,8 +94,8 @@ connectionSchema.virtual('otherUser').get(function() {
 connectionSchema.statics.areConnected = async function(userId1, userId2) {
   const connection = await this.findOne({
     $or: [
-      { requester: userId1, recipient: userId2, status: 'accepted' },
-      { requester: userId2, recipient: userId1, status: 'accepted' }
+      { sender: userId1, receiver: userId2, status: 'accepted' },
+      { sender: userId2, receiver: userId1, status: 'accepted' }
     ]
   });
   return !!connection;
@@ -104,8 +105,8 @@ connectionSchema.statics.areConnected = async function(userId1, userId2) {
 connectionSchema.statics.getConnectionStatus = async function(userId1, userId2) {
   const connection = await this.findOne({
     $or: [
-      { requester: userId1, recipient: userId2 },
-      { requester: userId2, recipient: userId1 }
+      { sender: userId1, receiver: userId2 },
+      { sender: userId2, receiver: userId1 }
     ]
   });
   
@@ -113,8 +114,8 @@ connectionSchema.statics.getConnectionStatus = async function(userId1, userId2) 
   
   return {
     status: connection.status,
-    requester: connection.requester.toString(),
-    recipient: connection.recipient.toString(),
+    sender: connection.sender.toString(),
+    receiver: connection.receiver.toString(),
     connectionId: connection._id
   };
 };
@@ -124,25 +125,25 @@ connectionSchema.statics.getMutualConnections = async function(userId1, userId2)
   // Get all connections for both users
   const user1Connections = await this.find({
     $or: [
-      { requester: userId1, status: 'accepted' },
-      { recipient: userId1, status: 'accepted' }
+      { sender: userId1, status: 'accepted' },
+      { receiver: userId1, status: 'accepted' }
     ]
   });
   
   const user2Connections = await this.find({
     $or: [
-      { requester: userId2, status: 'accepted' },
-      { recipient: userId2, status: 'accepted' }
+      { sender: userId2, status: 'accepted' },
+      { receiver: userId2, status: 'accepted' }
     ]
   });
   
   // Extract connected user IDs
   const user1ConnectedIds = user1Connections.map(conn => 
-    conn.requester.toString() === userId1.toString() ? conn.recipient.toString() : conn.requester.toString()
+    conn.sender.toString() === userId1.toString() ? conn.receiver.toString() : conn.sender.toString()
   );
   
   const user2ConnectedIds = user2Connections.map(conn => 
-    conn.requester.toString() === userId2.toString() ? conn.recipient.toString() : conn.requester.toString()
+    conn.sender.toString() === userId2.toString() ? conn.receiver.toString() : conn.sender.toString()
   );
   
   // Find mutual connections
@@ -178,6 +179,25 @@ connectionSchema.methods.updateConnectionStrength = function(interactionType) {
 connectionSchema.pre('save', function(next) {
   if (this.isModified('status') && this.status === 'accepted' && !this.connectedAt) {
     this.connectedAt = new Date();
+  }
+  next();
+});
+
+// Prevent duplicate connections
+connectionSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    const existingConnection = await this.constructor.findOne({
+      $or: [
+        { sender: this.sender, receiver: this.receiver },
+        { sender: this.receiver, receiver: this.sender }
+      ]
+    });
+
+    if (existingConnection) {
+      const error = new Error('Connection already exists');
+      error.status = 400;
+      return next(error);
+    }
   }
   next();
 });

@@ -13,6 +13,7 @@ const MakeupArtistProfile = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
+  const [newTutorial, setNewTutorial] = useState({ title: '', description: '', videoUrl: '' });
 
   const isOwnProfile = user && (
     user._id === targetUser._id ||
@@ -132,6 +133,14 @@ const MakeupArtistProfile = ({
     }
   };
 
+  const handleAddTutorial = () => {
+    // Implementation of handleAddTutorial function
+  };
+
+  const handleShareTutorial = (tutorial) => {
+    // Implementation of handleShareTutorial function
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
@@ -174,6 +183,12 @@ const MakeupArtistProfile = ({
       cursor: 'pointer',
       fontWeight: 'bold',
       fontSize: '14px'
+    },
+    tutorialCard: {
+      background: 'rgba(255,255,255,0.1)',
+      padding: '20px',
+      borderRadius: '12px',
+      border: '1px solid rgba(255,255,255,0.2)'
     }
   };
 
@@ -421,102 +436,88 @@ const MakeupArtistProfile = ({
 
             {/* Makeup Portfolio */}
             <div style={styles.card}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '15px'
-                }}
-              >
-                <h2
-                  style={{
-                    color: 'white',
-                    fontSize: '1.3rem',
-                    margin: 0
-                  }}
-                >
-                  💄 Makeup Portfolio
-                </h2>
-                {isEditing && (
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>💄 Makeup Portfolio</h2>
+              
+              {/* Tutorial Integration */}
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Tutorials & Tips</h3>
+                {isEditing ? (
                   <div>
-                    <input
-                      type="file"
-                      id="makeupPortfolio"
-                      accept="image/*"
-                      multiple
-                      onChange={handlePortfolioUpload}
-                      style={{ display: 'none' }}
-                      disabled={uploading}
-                    />
-                    <label
-                      htmlFor="makeupPortfolio"
-                      style={{
-                        ...styles.button,
-                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                        color: 'white',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        display: 'inline-block'
-                      }}
-                    >
-                      {uploading ? 'Uploading...' : '+ Add Makeup Looks'}
-                    </label>
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Add New Tutorial</label>
+                      <div style={{ display: 'grid', gap: '10px' }}>
+                        <input
+                          type="text"
+                          value={newTutorial.title}
+                          onChange={(e) => setNewTutorial({ ...newTutorial, title: e.target.value })}
+                          style={styles.input}
+                          placeholder="Tutorial Title"
+                        />
+                        <textarea
+                          value={newTutorial.description}
+                          onChange={(e) => setNewTutorial({ ...newTutorial, description: e.target.value })}
+                          style={{ ...styles.input, minHeight: '80px' }}
+                          placeholder="Brief description of the tutorial"
+                        />
+                        <input
+                          type="text"
+                          value={newTutorial.videoUrl}
+                          onChange={(e) => setNewTutorial({ ...newTutorial, videoUrl: e.target.value })}
+                          style={styles.input}
+                          placeholder="Video URL (YouTube/Vimeo)"
+                        />
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button
+                            onClick={handleAddTutorial}
+                            style={styles.button}
+                          >
+                            Add Tutorial
+                          </button>
+                          <button
+                            onClick={() => setNewTutorial({ title: '', description: '', videoUrl: '' })}
+                            style={{ ...styles.button, background: 'rgba(255,255,255,0.1)' }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                    {currentProfile?.tutorials?.map((tutorial, index) => (
+                      <div key={index} style={styles.tutorialCard}>
+                        <div style={{ position: 'relative', paddingBottom: '56.25%', marginBottom: '15px' }}>
+                          <iframe
+                            src={tutorial.videoUrl}
+                            title={`Tutorial: ${tutorial.title}`}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{ width: '100%', aspectRatio: '16/9', borderRadius: '8px' }}
+                          />
+                        </div>
+                        <h4 style={{ color: 'white', marginBottom: '10px' }}>{tutorial.title}</h4>
+                        <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '15px' }}>{tutorial.description}</p>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button
+                            onClick={() => window.open(tutorial.videoUrl, '_blank')}
+                            style={styles.button}
+                          >
+                            Watch Tutorial
+                          </button>
+                          <button
+                            onClick={() => handleShareTutorial(tutorial)}
+                            style={{ ...styles.button, background: 'rgba(255,255,255,0.1)' }}
+                          >
+                            Share
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {profile?.photos && profile.photos.length > 0 ? (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: '15px'
-                  }}
-                >
-                  {profile.photos.map((photo, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        aspectRatio: '3/4',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        position: 'relative'
-                      }}
-                    >
-                      <img
-                        src={`http://localhost:8001${
-                          typeof photo === 'string' ? photo : photo.url
-                        }`}
-                        alt={`Makeup look ${index + 1}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '40px 0',
-                    color: '#ddd'
-                  }}
-                >
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>💄</div>
-                  <p>No makeup portfolio yet</p>
-                  <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                    Showcase your best makeup looks, transformations, and artistry work
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Notable Work & Publications */}

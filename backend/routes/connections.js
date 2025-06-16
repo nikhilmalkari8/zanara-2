@@ -10,268 +10,134 @@ const router = express.Router();
 // Send connection request
 router.post('/request', auth, async (req, res) => {
   try {
-    const { recipientId, relationship, message, tags } = req.body;
-    
-    if (req.userId === recipientId) {
-      return res.status(400).json({
-        message: 'Cannot send connection request to yourself'
-      });
+    const { receiverId, message, receiverType } = req.body;
+    const senderId = req.userId;
+
+    // Get sender's professional type
+    const sender = await User.findById(senderId);
+    if (!sender) {
+      return res.status(404).json({ message: 'User not found' });
     }
-    
-    // Check if recipient exists
-    const recipient = await User.findById(recipientId);
-    if (!recipient) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-    
-    // Check if connection already exists
-    const existingConnection = await Connection.findOne({
-      $or: [
-        { requester: req.userId, recipient: recipientId },
-        { requester: recipientId, recipient: req.userId }
-      ]
-    });
-    
-    if (existingConnection) {
-      return res.status(400).json({
-        message: 'Connection request already exists or users are already connected'
-      });
-    }
-    
-    // Create connection request
+
     const connection = new Connection({
-      requester: req.userId,
-      recipient: recipientId,
-      relationship: relationship || 'other',
+      sender: senderId,
+      receiver: receiverId,
       message,
-      tags: tags || []
+      senderType: sender.professionalType,
+      receiverType
     });
-    
+
     await connection.save();
-    
-    // Populate user details for response
-    await connection.populate([
-      { path: 'requester', select: 'firstName lastName email userType' },
-      { path: 'recipient', select: 'firstName lastName email userType' }
-    ]);
-    
-    res.status(201).json({
-      message: 'Connection request sent successfully',
-      connection
-    });
-    
+    res.status(201).json(connection);
   } catch (error) {
-    console.error('Send connection request error:', error);
-    res.status(500).json({
-      message: 'Server error sending connection request'
-    });
+    console.error('Connection request error:', error);
+    res.status(500).json({ message: 'Error sending connection request' });
   }
 });
 
-// Respond to connection request (accept/decline)
-router.put('/respond/:connectionId', auth, async (req, res) => {
+// Accept connection request
+router.put('/:id/accept', auth, async (req, res) => {
   try {
-    const { action, notes } = req.body; // action: 'accept' or 'decline'
-    
-    if (!['accept', 'decline'].includes(action)) {
-      return res.status(400).json({
-        message: 'Invalid action. Must be accept or decline'
-      });
-    }
-    
-    const connection = await Connection.findById(req.params.connectionId);
+    const connection = await Connection.findById(req.params.id);
     
     if (!connection) {
-      return res.status(404).json({
-        message: 'Connection request not found'
-      });
+      return res.status(404).json({ message: 'Connection request not found' });
     }
-    
-    // Check if user is the recipient
-    if (connection.recipient.toString() !== req.userId) {
-      return res.status(403).json({
-        message: 'Unauthorized to respond to this connection request'
-      });
+
+    if (connection.receiver.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to accept this request' });
     }
-    
-    if (connection.status !== 'pending') {
-      return res.status(400).json({
-        message: 'Connection request has already been responded to'
-      });
-    }
-    
-    // Update connection status
-    connection.status = action === 'accept' ? 'accepted' : 'cancelled';
-    
-    if (notes) {
-      connection.notes.recipientNotes = notes;
-    }
-    
+
+    connection.status = 'accepted';
     await connection.save();
-    
-    // Create activity for accepted connections
-    if (action === 'accept') {
-      await ActivityService.createConnectionActivity(
-        connection._id,
-        req.userId, // The person who accepted
-        connection.requester // The person who sent the request
-      );
-    }
-    
-    // Populate user details for response
-    await connection.populate([
-      { path: 'requester', select: 'firstName lastName email userType' },
-      { path: 'recipient', select: 'firstName lastName email userType' }
-    ]);
-    
-    res.json({
-      message: `Connection request ${action}ed successfully`,
-      connection
-    });
-    
+
+    res.json(connection);
   } catch (error) {
-    console.error('Respond to connection request error:', error);
-    res.status(500).json({
-      message: 'Server error responding to connection request'
-    });
+    console.error('Accept connection error:', error);
+    res.status(500).json({ message: 'Error accepting connection request' });
+  }
+});
+
+// Reject connection request
+router.put('/:id/reject', auth, async (req, res) => {
+  try {
+    const connection = await Connection.findById(req.params.id);
+    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection request not found' });
+    }
+
+    if (connection.receiver.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to reject this request' });
+    }
+
+    connection.status = 'rejected';
+    await connection.save();
+
+    res.json(connection);
+  } catch (error) {
+    console.error('Reject connection error:', error);
+    res.status(500).json({ message: 'Error rejecting connection request' });
   }
 });
 
 // Get user's connections
 router.get('/my-connections', auth, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, relationship, sort = 'newest' } = req.query;
-    
-    // Build query
-    let query = {
+    const connections = await Connection.find({
       $or: [
-        { requester: req.userId, status: 'accepted' },
-        { recipient: req.userId, status: 'accepted' }
-      ]
-    };
-    
-    if (relationship && relationship !== 'all') {
-      query.relationship = relationship;
-    }
-    
-    // Get connections
-    let connections = await Connection.find(query)
-      .populate('requester', 'firstName lastName email userType')
-      .populate('recipient', 'firstName lastName email userType')
-      .sort({ [sort === 'newest' ? 'connectedAt' : 'lastInteraction']: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-    
-    // Transform connections to include the "other" user
-    connections = connections.map(conn => {
-      const isRequester = conn.requester._id.toString() === req.userId;
-      const otherUser = isRequester ? conn.recipient : conn.requester;
-      
-      return {
-        _id: conn._id,
-        user: otherUser,
-        relationship: conn.relationship,
-        connectionStrength: conn.connectionStrength,
-        connectedAt: conn.connectedAt,
-        lastInteraction: conn.lastInteraction,
-        tags: conn.tags,
-        mutualConnectionsCount: conn.mutualConnectionsCount
-      };
-    });
-    
-    // Apply search filter on transformed data
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      connections = connections.filter(conn => 
-        searchRegex.test(`${conn.user.firstName} ${conn.user.lastName}`) ||
-        searchRegex.test(conn.user.email)
-      );
-    }
-    
-    const total = await Connection.countDocuments(query);
-    
-    res.json({
-      connections,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total
-    });
-    
+        { sender: req.userId },
+        { receiver: req.userId }
+      ],
+      status: 'accepted'
+    })
+    .populate('sender', 'fullName profilePicture professionalType')
+    .populate('receiver', 'fullName profilePicture professionalType')
+    .sort('-createdAt');
+
+    res.json(connections);
   } catch (error) {
     console.error('Get connections error:', error);
-    res.status(500).json({
-      message: 'Server error fetching connections'
-    });
+    res.status(500).json({ message: 'Error fetching connections' });
   }
 });
 
-// Get pending connection requests (received)
-router.get('/requests/received', auth, async (req, res) => {
+// Get pending connection requests
+router.get('/pending-requests', auth, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    
-    const requests = await Connection.find({
-      recipient: req.userId,
+    const pendingRequests = await Connection.find({
+      receiver: req.userId,
       status: 'pending'
     })
-    .populate('requester', 'firstName lastName email userType')
-    .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
-    
-    const total = await Connection.countDocuments({
-      recipient: req.userId,
-      status: 'pending'
-    });
-    
-    res.json({
-      requests,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total
-    });
-    
+    .populate('sender', 'fullName profilePicture professionalType')
+    .sort('-createdAt');
+
+    res.json(pendingRequests);
   } catch (error) {
-    console.error('Get received requests error:', error);
-    res.status(500).json({
-      message: 'Server error fetching received requests'
-    });
+    console.error('Get pending requests error:', error);
+    res.status(500).json({ message: 'Error fetching pending requests' });
   }
 });
 
-// Get sent connection requests
-router.get('/requests/sent', auth, async (req, res) => {
+// Remove connection
+router.delete('/:id', auth, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const connection = await Connection.findById(req.params.id);
     
-    const requests = await Connection.find({
-      requester: req.userId,
-      status: { $in: ['pending', 'cancelled'] }
-    })
-    .populate('recipient', 'firstName lastName email userType')
-    .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
-    
-    const total = await Connection.countDocuments({
-      requester: req.userId,
-      status: { $in: ['pending', 'cancelled'] }
-    });
-    
-    res.json({
-      requests,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total
-    });
-    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    if (connection.sender.toString() !== req.userId && 
+        connection.receiver.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to remove this connection' });
+    }
+
+    await connection.remove();
+    res.json({ message: 'Connection removed successfully' });
   } catch (error) {
-    console.error('Get sent requests error:', error);
-    res.status(500).json({
-      message: 'Server error fetching sent requests'
-    });
+    console.error('Remove connection error:', error);
+    res.status(500).json({ message: 'Error removing connection' });
   }
 });
 
@@ -340,8 +206,8 @@ router.put('/:connectionId', auth, async (req, res) => {
     }
     
     // Check if user is part of this connection
-    const isRequester = connection.requester.toString() === req.userId;
-    const isRecipient = connection.recipient.toString() === req.userId;
+    const isRequester = connection.sender.toString() === req.userId;
+    const isRecipient = connection.receiver.toString() === req.userId;
     
     if (!isRequester && !isRecipient) {
       return res.status(403).json({
@@ -375,52 +241,6 @@ router.put('/:connectionId', auth, async (req, res) => {
   }
 });
 
-// Remove/Block connection
-router.delete('/:connectionId', auth, async (req, res) => {
-  try {
-    const { action = 'remove' } = req.body; // 'remove' or 'block'
-    
-    const connection = await Connection.findById(req.params.connectionId);
-    
-    if (!connection) {
-      return res.status(404).json({
-        message: 'Connection not found'
-      });
-    }
-    
-    // Check if user is part of this connection
-    const isRequester = connection.requester.toString() === req.userId;
-    const isRecipient = connection.recipient.toString() === req.userId;
-    
-    if (!isRequester && !isRecipient) {
-      return res.status(403).json({
-        message: 'Unauthorized to modify this connection'
-      });
-    }
-    
-    if (action === 'block') {
-      connection.status = 'blocked';
-      await connection.save();
-      
-      res.json({
-        message: 'User blocked successfully'
-      });
-    } else {
-      await Connection.findByIdAndDelete(req.params.connectionId);
-      
-      res.json({
-        message: 'Connection removed successfully'
-      });
-    }
-    
-  } catch (error) {
-    console.error('Remove connection error:', error);
-    res.status(500).json({
-      message: 'Server error removing connection'
-    });
-  }
-});
-
 // Get connection analytics
 router.get('/analytics/stats', auth, async (req, res) => {
   try {
@@ -430,20 +250,20 @@ router.get('/analytics/stats', auth, async (req, res) => {
       // Total connections
       Connection.countDocuments({
         $or: [
-          { requester: req.userId, status: 'accepted' },
-          { recipient: req.userId, status: 'accepted' }
+          { sender: req.userId, status: 'accepted' },
+          { receiver: req.userId, status: 'accepted' }
         ]
       }),
       
       // Pending received requests
       Connection.countDocuments({
-        recipient: req.userId,
+        receiver: req.userId,
         status: 'pending'
       }),
       
       // Pending sent requests
       Connection.countDocuments({
-        requester: req.userId,
+        sender: req.userId,
         status: 'pending'
       }),
       
@@ -452,8 +272,8 @@ router.get('/analytics/stats', auth, async (req, res) => {
         {
           $match: {
             $or: [
-              { requester: new mongoose.Types.ObjectId(req.userId), status: 'accepted' },
-              { recipient: new mongoose.Types.ObjectId(req.userId), status: 'accepted' }
+              { sender: new mongoose.Types.ObjectId(req.userId), status: 'accepted' },
+              { receiver: new mongoose.Types.ObjectId(req.userId), status: 'accepted' }
             ]
           }
         },

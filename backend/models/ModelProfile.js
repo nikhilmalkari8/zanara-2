@@ -8,157 +8,108 @@ const modelProfileSchema = new mongoose.Schema({
     unique: true
   },
   
-  // ⭐ MISSING FIELDS THAT YOUR FRONTEND NEEDS ⭐
-  headline: {
-    type: String,
-    maxlength: 200
-  },
-  bio: {
-    type: String,
-    maxlength: 2000
-  },
-  location: {
-    type: String,
-    maxlength: 100
-  },
-  phone: {
-    type: String,
-    maxlength: 20
-  },
-  website: {
-    type: String,
-    maxlength: 200
-  },
-  profilePicture: {
-    type: String // File path for profile picture
-  },
-  coverPhoto: {
-    type: String // File path for cover photo
-  },
+  // Basic Profile Info
+  fullName: { type: String, required: true, trim: true },
+  headline: { type: String, default: 'Professional Model', trim: true },
+  bio: { type: String, maxlength: 2000, trim: true },
+  location: { type: String, required: true, trim: true },
+  phone: { type: String, trim: true },
+  email: { type: String, trim: true },
+  website: { type: String, trim: true },
+  profilePicture: { type: String, trim: true },
+  coverPhoto: { type: String, trim: true },
   
-  // Basic Info (existing)
-  dateOfBirth: {
-    type: Date,
-    required: true
-  },
+  // Personal Information
+  dateOfBirth: { type: Date, required: true },
   gender: {
     type: String,
     enum: ['male', 'female', 'other'],
     required: true
   },
-  nationality: {
-    type: String,
-    required: true
-  },
-  languages: [{
-    type: String
-  }],
+  nationality: { type: String, required: true, trim: true },
+  languages: [{ type: String, trim: true }],
   
-  // Physical Attributes (existing)
-  height: {
-    type: String,
-    required: true
-  },
-  weight: {
-    type: String,
-    required: true
-  },
-  bodyType: {
-    type: String,
-    enum: ['athletic', 'slim', 'average', 'muscular', 'curvy'],
-    required: true
-  },
-  hairColor: {
-    type: String,
-    required: true
-  },
-  eyeColor: {
-    type: String,
-    required: true
-  },
-  skinTone: {
-    type: String,
-    required: true
-  },
+  // Physical Attributes
+  height: { type: String, required: true, trim: true },
+  weight: { type: String, required: true, trim: true },
+  bust: { type: String, trim: true },
+  waist: { type: String, trim: true },
+  hips: { type: String, trim: true },
+  dressSize: { type: String, trim: true },
+  shoeSize: { type: String, trim: true },
+  bodyType: { type: String, trim: true },
+  hairColor: { type: String, trim: true },
+  eyeColor: { type: String, trim: true },
+  skinTone: { type: String, trim: true },
   
-  // Professional Info (existing)
-  experience: {
+  // Professional Information
+  yearsExperience: {
     type: String,
+    enum: ['0-2', '3-5', '6-10', '11-15', '15+'],
     required: true
   },
-  skills: [{
-    type: String
-  }],
-  specializations: [{
-    type: String
-  }],
-  achievements: [{
-    type: String
-  }],
+  modelType: {
+    type: String,
+    enum: ['fashion', 'commercial', 'runway', 'editorial', 'fitness', 'plus-size', 'petite', 'mature'],
+    required: true
+  },
+  experienceLevel: {
+    type: String,
+    enum: ['beginner', 'intermediate', 'experienced', 'professional'],
+    required: true
+  },
+  agencies: { type: String, trim: true },
+  unionMembership: { type: String, trim: true },
   
-  // Portfolio (existing)
-  photos: [{
-    type: String // Will store file paths/URLs
-  }],
-  videos: [{
-    type: String // Will store file paths/URLs
-  }],
+  // Portfolio & Media
+  portfolioWebsite: { type: String, trim: true },
+  photos: [{ type: String, trim: true }],
+  videos: [{ type: String, trim: true }],
   socialMedia: {
-    instagram: String,
-    tiktok: String,
-    youtube: String
+    instagram: { type: String, trim: true },
+    tiktok: { type: String, trim: true },
+    linkedin: { type: String, trim: true },
+    twitter: { type: String, trim: true }
   },
   
-  // Preferences (existing)
-  preferredLocations: [{
-    type: String
-  }],
-  preferredTypes: [{
-    type: String
-  }],
+  // Work Preferences
   availability: {
     type: String,
-    enum: ['full-time', 'part-time', 'freelance', 'weekends-only'],
-    required: true
+    enum: ['full-time', 'part-time', 'project-based', 'seasonal', 'by-appointment'],
+    default: 'project-based'
   },
-  rate: {
-    hourly: Number,
-    daily: Number,
+  travelWillingness: {
+    type: String,
+    enum: ['local-only', 'regional', 'national', 'international', 'flexible'],
+    default: 'local-only'
+  },
+  preferredLocations: [{ type: String, trim: true }],
+  workTypes: [{ type: String, trim: true }],
+  nudityComfort: { type: String, trim: true },
+  
+  // Rate Information
+  rates: {
+    hourly: { type: String, trim: true },
+    halfDay: { type: String, trim: true },
+    fullDay: { type: String, trim: true },
     currency: {
       type: String,
-      default: 'USD'
+      default: 'USD',
+      enum: ['USD', 'EUR', 'GBP']
     }
   },
   
-  // Status (existing)
-  isComplete: {
-    type: Boolean,
-    default: false
-  },
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-
-  // Metrics & Activity (existing)
-  profileViews: {
-    type: Number,
-    default: 0
-  },
-  lastActive: {
-    type: Date,
-    default: Date.now
-  },
-  rating: {
-    type: Number,
-    min: 0,
-    max: 5,
-    default: 0
-  },
-  reviewCount: {
-    type: Number,
-    default: 0
-  },
+  // Special Skills
+  specialSkills: [{ type: String, trim: true }],
+  wardrobe: { type: String, trim: true },
+  props: { type: String, trim: true },
+  
+  // Status & Analytics
+  isComplete: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: false },
+  profileViews: { type: Number, default: 0 },
+  rating: { type: Number, min: 1, max: 5, default: null },
+  reviewCount: { type: Number, default: 0 },
   connections: {
     type: Number,
     default: 0
@@ -166,5 +117,61 @@ const modelProfileSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Virtual: Completion %
+modelProfileSchema.virtual('completionPercentage').get(function () {
+  let completed = 0;
+  const total = 15;
+
+  if (this.fullName?.trim()) completed++;
+  if (this.headline?.trim()) completed++;
+  if (this.bio?.trim()?.length > 20) completed++;
+  if (this.location?.trim()) completed++;
+  if (this.yearsExperience) completed++;
+  if (this.modelType) completed++;
+  if (this.experienceLevel) completed++;
+  if (this.height?.trim()) completed++;
+  if (this.weight?.trim()) completed++;
+  if (this.rates?.hourly || this.rates?.fullDay) completed++;
+  if (this.portfolioWebsite?.trim()) completed++;
+  if (this.socialMedia?.instagram?.trim()) completed++;
+  if (this.photos?.length) completed++;
+  if (this.profilePicture) completed++;
+
+  return Math.round((completed / total) * 100);
+});
+
+// Profile score calculation
+modelProfileSchema.methods.calculateProfileScore = function () {
+  let score = 0;
+
+  score += this.completionPercentage * 0.4;
+  if (this.isVerified) score += 20;
+  if (this.photos?.length) score += Math.min(this.photos.length * 2, 20);
+  
+  const expMap = { '0-2': 5, '3-5': 10, '6-10': 15, '11-15': 20, '15+': 25 };
+  score += expMap[this.yearsExperience] || 0;
+  
+  if (this.workTypes?.length) score += Math.min(this.workTypes.length * 2, 15);
+  if (this.specialSkills?.length) score += Math.min(this.specialSkills.length * 1, 10);
+  if (this.profileViews > 0) score += Math.min(Math.log10(this.profileViews) * 5, 15);
+
+  return Math.min(Math.round(score), 100);
+};
+
+// Indexes
+modelProfileSchema.index({ userId: 1 });
+modelProfileSchema.index({ location: 1 });
+modelProfileSchema.index({ modelType: 1 });
+modelProfileSchema.index({ experienceLevel: 1 });
+modelProfileSchema.index({ isComplete: 1 });
+modelProfileSchema.index({ isVerified: 1 });
+modelProfileSchema.index({ profileViews: -1 });
+modelProfileSchema.index({ createdAt: -1 });
+
+// Compound indexes
+modelProfileSchema.index({ modelType: 1, location: 1 });
+modelProfileSchema.index({ isComplete: 1, isVerified: 1 });
+modelProfileSchema.index({ experienceLevel: 1, modelType: 1 });
 
 module.exports = mongoose.model('ModelProfile', modelProfileSchema);

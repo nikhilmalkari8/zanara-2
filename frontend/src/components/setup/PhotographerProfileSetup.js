@@ -1,5 +1,7 @@
 // src/components/setup/PhotographerProfileSetup.js
 import React, { useState } from 'react';
+import TalentSearch from '../search/TalentSearch';
+import MyConnections from '../connections/MyConnections';
 
 const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -188,7 +190,7 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/complete', {
+      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

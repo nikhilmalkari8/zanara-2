@@ -13,7 +13,7 @@ router.get('/', auth, async (req, res) => {
       type = null
     } = req.query;
     
-    const notifications = await Notification.getUserNotifications(req.user.id, {
+    const notifications = await Notification.getUserNotifications(req.userId, {
       page: parseInt(page),
       limit: parseInt(limit),
       status,
@@ -41,7 +41,7 @@ router.get('/', auth, async (req, res) => {
 // Get unread notification count
 router.get('/unread-count', auth, async (req, res) => {
   try {
-    const count = await Notification.getUnreadCount(req.user.id);
+    const count = await Notification.getUnreadCount(req.userId);
     
     res.json({
       success: true,
@@ -61,7 +61,7 @@ router.put('/mark-read', auth, async (req, res) => {
   try {
     const { notificationIds = [] } = req.body;
     
-    await Notification.markAsRead(req.user.id, notificationIds);
+    await Notification.markAsRead(req.userId, notificationIds);
     
     res.json({
       success: true,
@@ -80,7 +80,7 @@ router.put('/mark-read', auth, async (req, res) => {
 router.put('/:id/read', auth, async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, recipient: req.user.id },
+      { _id: req.params.id, recipient: req.userId },
       { 
         status: 'read',
         readAt: new Date()
@@ -113,7 +113,7 @@ router.delete('/:id', auth, async (req, res) => {
   try {
     const notification = await Notification.findOneAndDelete({
       _id: req.params.id,
-      recipient: req.user.id
+      recipient: req.userId
     });
     
     if (!notification) {
@@ -142,7 +142,7 @@ router.get('/stats', auth, async (req, res) => {
     const mongoose = require('mongoose');
     
     const stats = await Notification.aggregate([
-      { $match: { recipient: new mongoose.Types.ObjectId(req.user.id) } },
+      { $match: { recipient: new mongoose.Types.ObjectId(req.userId) } },
       {
         $group: {
           _id: '$type',
@@ -171,7 +171,7 @@ router.get('/stats', auth, async (req, res) => {
 router.put('/mark-all-read', auth, async (req, res) => {
   try {
     await Notification.updateMany(
-      { recipient: req.user.id, status: 'unread' },
+      { recipient: req.userId, status: 'unread' },
       { 
         status: 'read',
         readAt: new Date()
@@ -196,7 +196,7 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const notification = await Notification.findOne({
       _id: req.params.id,
-      recipient: req.user.id
+      recipient: req.userId
     })
     .populate('sender', 'firstName lastName userType')
     .populate('relatedObjects.opportunity', 'title type')
@@ -243,7 +243,7 @@ router.post('/create', auth, async (req, res) => {
     
     const notification = await Notification.createNotification({
       recipient,
-      sender: req.user.id,
+      sender: req.userId,
       type,
       title,
       message,
@@ -269,7 +269,7 @@ router.post('/create', auth, async (req, res) => {
 router.put('/:id/archive', auth, async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, recipient: req.user.id },
+      { _id: req.params.id, recipient: req.userId },
       { status: 'archived' },
       { new: true }
     );
@@ -309,7 +309,7 @@ router.delete('/bulk-delete', auth, async (req, res) => {
     
     const result = await Notification.deleteMany({
       _id: { $in: notificationIds },
-      recipient: req.user.id
+      recipient: req.userId
     });
     
     res.json({
@@ -341,7 +341,7 @@ router.put('/bulk-mark-read', auth, async (req, res) => {
     const result = await Notification.updateMany(
       {
         _id: { $in: notificationIds },
-        recipient: req.user.id
+        recipient: req.userId
       },
       {
         status: 'read',
@@ -369,7 +369,7 @@ router.get('/type/:type', auth, async (req, res) => {
     const { type } = req.params;
     const { page = 1, limit = 20 } = req.query;
     
-    const notifications = await Notification.getUserNotifications(req.user.id, {
+    const notifications = await Notification.getUserNotifications(req.userId, {
       page: parseInt(page),
       limit: parseInt(limit),
       type

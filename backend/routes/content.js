@@ -98,7 +98,7 @@ router.get('/my', auth, async (req, res) => {
   try {
     const { page = 1, limit = 10, status = 'all' } = req.query;
     
-    let query = { author: req.user.id };
+    let query = { author: req.userId };
     
     if (status !== 'all') {
       query.status = status;
@@ -250,7 +250,7 @@ router.post('/', auth, uploadMiddleware.mixed, async (req, res) => {
     }
 
     const newContent = new Content({
-      author: req.user.id,
+      author: req.userId,
       title,
       content,
       excerpt,
@@ -268,7 +268,7 @@ router.post('/', auth, uploadMiddleware.mixed, async (req, res) => {
     let activityCreated = false;
     if (status === 'published' && visibility !== 'private') {
       try {
-        await ActivityService.createContentActivity(req.user.id, newContent._id, {
+        await ActivityService.createContentActivity(req.userId, newContent._id, {
           title: newContent.title,
           category: newContent.category,
           type: 'content_published',
@@ -312,7 +312,7 @@ router.put('/:id', auth, uploadMiddleware.mixed, async (req, res) => {
     }
 
     // Check ownership
-    if (content.author.toString() !== req.user.id) {
+    if (content.author.toString() !== req.userId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this content'
@@ -374,7 +374,7 @@ router.put('/:id', auth, uploadMiddleware.mixed, async (req, res) => {
 
     if (!wasPublished && status === 'published') {
       try {
-        await ActivityService.createContentActivity(req.user.id, content._id, {
+        await ActivityService.createContentActivity(req.userId, content._id, {
           title: content.title,
           category: content.category,
           type: 'content_published',
@@ -415,7 +415,7 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     // Check ownership
-    if (content.author.toString() !== req.user.id) {
+    if (content.author.toString() !== req.userId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this content'
@@ -460,7 +460,7 @@ router.post('/:id/like', auth, async (req, res) => {
       });
     }
 
-    const userId = req.user.id;
+    const userId = req.userId;
     const likeIndex = content.engagement.likes.findIndex(
       like => like.user.toString() === userId
     );
@@ -478,7 +478,7 @@ router.post('/:id/like', auth, async (req, res) => {
       // Create notification if not self-like
       if (content.author.toString() !== userId) {
         try {
-          await ActivityService.createContentEngagementActivity(userId, content._id, {
+          await ActivityService.createContentEngagementActivity(req.userId, content._id, {
             type: 'content_liked',
             contentTitle: content.title,
             authorId: content.author
@@ -530,7 +530,7 @@ router.post('/:id/comment', auth, async (req, res) => {
     }
 
     content.engagement.comments.push({
-      user: req.user.id,
+      user: req.userId,
       comment: comment.trim(),
       commentedAt: new Date()
     });
@@ -538,9 +538,9 @@ router.post('/:id/comment', auth, async (req, res) => {
     await content.save();
 
     // Create notification if not self-comment
-    if (content.author.toString() !== req.user.id) {
+    if (content.author.toString() !== req.userId) {
       try {
-        await ActivityService.createContentEngagementActivity(req.user.id, content._id, {
+        await ActivityService.createContentEngagementActivity(req.userId, content._id, {
           type: 'content_commented',
           contentTitle: content.title,
           authorId: content.author,

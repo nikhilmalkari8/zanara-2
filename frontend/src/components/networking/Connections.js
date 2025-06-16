@@ -7,6 +7,7 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
   const [sentRequests, setSentRequests] = useState([]);
   const [introductionRequests, setIntroductionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showIntroModal, setShowIntroModal] = useState(false);
@@ -61,6 +62,7 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
 
   const fetchConnectionsData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const token = localStorage.getItem('token');
       
@@ -70,7 +72,9 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
         });
         if (response.ok) {
           const data = await response.json();
-          setConnections(data.connections);
+          setConnections(data.connections || []);
+        } else {
+          throw new Error('Failed to fetch connections');
         }
       } else if (activeTab === 'received') {
         const response = await fetch('http://localhost:8001/api/connections/requests/received', {
@@ -78,7 +82,9 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
         });
         if (response.ok) {
           const data = await response.json();
-          setReceivedRequests(data.requests);
+          setReceivedRequests(data.requests || []);
+        } else {
+          throw new Error('Failed to fetch received requests');
         }
       } else if (activeTab === 'sent') {
         const response = await fetch('http://localhost:8001/api/connections/requests/sent', {
@@ -86,7 +92,9 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
         });
         if (response.ok) {
           const data = await response.json();
-          setSentRequests(data.requests);
+          setSentRequests(data.requests || []);
+        } else {
+          throw new Error('Failed to fetch sent requests');
         }
       } else if (activeTab === 'introductions') {
         const [receivedResponse, sentResponse] = await Promise.all([
@@ -105,13 +113,16 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
           ]);
           
           setIntroductionRequests([
-            ...receivedData.requests.map(req => ({ ...req, type: 'received' })),
-            ...sentData.requests.map(req => ({ ...req, type: 'sent' }))
+            ...(receivedData.requests || []).map(req => ({ ...req, type: 'received' })),
+            ...(sentData.requests || []).map(req => ({ ...req, type: 'sent' }))
           ]);
+        } else {
+          throw new Error('Failed to fetch introduction requests');
         }
       }
     } catch (error) {
       console.error('Error fetching connections data:', error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -1491,40 +1502,32 @@ const Connections = ({ user, onLogout, setCurrentPage }) => {
             }}>
               Loading...
             </div>
+          ) : error ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '200px',
+              color: '#ff6b6b',
+              fontSize: '1.2rem'
+            }}>
+              {error}
+            </div>
           ) : (
             <>
               {activeTab === 'connections' && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h3 style={{ color: 'white', margin: 0 }}>
-                      My Connections ({connections.length})
+                      My Connections ({connections?.length || 0})
                     </h3>
                   </div>
-                  {connections.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                      <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🤝</div>
-                      <h3 style={{ color: 'white', marginBottom: '10px' }}>No connections yet</h3>
-                      <p style={{ color: '#ccc', marginBottom: '20px' }}>
-                        Start building your professional network by connecting with other professionals.
-                      </p>
-                      <button
-                        onClick={() => setShowConnectionModal(true)}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '1rem',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Add Your First Connection
-                      </button>
-                    </div>
-                  ) : (
+                  {connections?.length > 0 ? (
                     renderConnections()
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#ccc', padding: '40px' }}>
+                      No connections yet. Start connecting with other professionals!
+                    </div>
                   )}
                 </>
               )}

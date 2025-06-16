@@ -6,6 +6,7 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
+  const [materials, setMaterials] = useState([]);
 
   const isOwnProfile = user && (
     user._id === targetUser._id || 
@@ -16,7 +17,7 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
 
   useEffect(() => {
     fetchDesignerProfile();
-  }, [profileId]);
+  }, [profileId, fetchDesignerProfile]);
 
   const fetchDesignerProfile = async () => {
     try {
@@ -93,6 +94,54 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
     }
   };
 
+  const handleFileUpload = async (type, files) => {
+    setUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('files', file));
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8001/api/profile/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (type === 'techPacks') {
+          setEditData({ ...editData, techPacks: [...(editData.techPacks || []), ...data.files] });
+        }
+        alert('Files uploaded successfully!');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload files');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleMaterialChange = (index, field, value) => {
+    const updatedMaterials = [...(editData.materials || [])];
+    updatedMaterials[index] = { ...updatedMaterials[index], [field]: value };
+    setEditData({ ...editData, materials: updatedMaterials });
+  };
+
+  const handleRemoveMaterial = (index) => {
+    const updatedMaterials = [...(editData.materials || [])];
+    updatedMaterials.splice(index, 1);
+    setEditData({ ...editData, materials: updatedMaterials });
+  };
+
+  const handleAddMaterial = () => {
+    const newMaterial = { name: '', type: '', supplier: '' };
+    setEditData({ 
+      ...editData, 
+      materials: [...(editData.materials || []), newMaterial] 
+    });
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
@@ -135,6 +184,41 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
       cursor: 'pointer',
       fontWeight: 'bold',
       fontSize: '14px'
+    },
+    techPackCard: {
+      background: 'rgba(255,255,255,0.1)',
+      padding: '15px',
+      borderRadius: '8px',
+      textAlign: 'center',
+      border: '1px solid rgba(255,255,255,0.2)'
+    },
+    materialCard: {
+      background: 'rgba(255,255,255,0.1)',
+      padding: '15px',
+      borderRadius: '8px',
+      border: '1px solid rgba(255,255,255,0.2)'
+    },
+    addButton: {
+      background: 'rgba(255,255,255,0.1)',
+      border: '1px dashed rgba(255,255,255,0.3)',
+      color: '#ddd',
+      padding: '15px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    removeButton: {
+      background: 'rgba(255,0,0,0.2)',
+      border: 'none',
+      color: '#ff6b6b',
+      padding: '5px 10px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '12px'
     }
   };
 
@@ -291,68 +375,111 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
 
             {/* Design Portfolio */}
             <div style={styles.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>👗 Design Portfolio</h2>
-                {isEditing && (
-                  <div>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📚 Design Portfolio</h2>
+              
+              {/* Tech Pack Upload Zone */}
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Tech Packs</h3>
+                {isEditing ? (
+                  <div style={{ border: '2px dashed rgba(255,255,255,0.2)', padding: '20px', borderRadius: '8px' }}>
                     <input
                       type="file"
-                      id="designPortfolio"
-                      accept="image/*"
-                      multiple
-                      onChange={handlePortfolioUpload}
+                      accept=".pdf,.zip,.rar"
+                      onChange={(e) => handleFileUpload('techPacks', e.target.files)}
                       style={{ display: 'none' }}
-                      disabled={uploading}
+                      id="techPackUpload"
                     />
-                    <label htmlFor="designPortfolio" style={{
-                      ...styles.button,
-                      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                      color: 'white',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      display: 'inline-block'
-                    }}>
-                      {uploading ? 'Uploading...' : '+ Add Designs'}
+                    <label
+                      htmlFor="techPackUpload"
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '20px',
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span style={{ fontSize: '24px', marginBottom: '10px', display: 'block' }}>📎</span>
+                      <p style={{ color: '#ddd', marginBottom: '5px' }}>Upload Tech Pack</p>
+                      <p style={{ color: '#999', fontSize: '12px' }}>PDF, ZIP, or RAR files only</p>
                     </label>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                    {currentProfile?.techPacks?.map((pack, index) => (
+                      <div key={index} style={styles.techPackCard}>
+                        <div style={{ fontSize: '24px', marginBottom: '5px' }}>📄</div>
+                        <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '5px' }}>{pack.name}</p>
+                        <a
+                          href={pack.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#f093fb', fontSize: '12px' }}
+                        >
+                          View Tech Pack
+                        </a>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-              
-              {profile?.photos && profile.photos.length > 0 ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: '15px'
-                }}>
-                  {profile.photos.map((photo, index) => (
-                    <div key={index} style={{
-                      aspectRatio: '3/4',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      position: 'relative'
-                    }}>
-                      <img 
-                        src={`http://localhost:8001${typeof photo === 'string' ? photo : photo.url}`}
-                        alt={`Design ${index + 1}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#ddd' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>👗</div>
-                  <p>No design portfolio yet</p>
-                  <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                    Showcase your collections, sketches, tech packs, and finished garments
-                  </p>
-                </div>
-              )}
+
+              {/* Fabric/Material Library */}
+              <div>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Material Library</h3>
+                {isEditing ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
+                    {currentProfile?.materials?.map((material, index) => (
+                      <div key={index} style={styles.materialCard}>
+                        <input
+                          type="text"
+                          value={material.name}
+                          onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
+                          style={styles.input}
+                          placeholder="Material name"
+                        />
+                        <input
+                          type="text"
+                          value={material.type}
+                          onChange={(e) => handleMaterialChange(index, 'type', e.target.value)}
+                          style={styles.input}
+                          placeholder="Type"
+                        />
+                        <input
+                          type="text"
+                          value={material.supplier}
+                          onChange={(e) => handleMaterialChange(index, 'supplier', e.target.value)}
+                          style={styles.input}
+                          placeholder="Supplier"
+                        />
+                        <button
+                          onClick={() => handleRemoveMaterial(index)}
+                          style={styles.removeButton}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={handleAddMaterial}
+                      style={styles.addButton}
+                    >
+                      + Add Material
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                    {currentProfile?.materials?.map((material, index) => (
+                      <div key={index} style={styles.materialCard}>
+                        <h4 style={{ color: 'white', marginBottom: '5px' }}>{material.name}</h4>
+                        <p style={{ color: '#ddd', fontSize: '14px' }}>Type: {material.type}</p>
+                        <p style={{ color: '#ddd', fontSize: '14px' }}>Supplier: {material.supplier}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

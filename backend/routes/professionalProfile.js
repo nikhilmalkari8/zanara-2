@@ -63,6 +63,105 @@ router.post('/complete', auth, async (req, res) => {
     console.log('Creating profile for professional type:', user.professionalType);
     console.log('Profile data received:', JSON.stringify(profileData, null, 2));
     
+    // Add default values and validation based on professional type
+    switch (user.professionalType) {
+      case 'stylist':
+        if (!profileData.serviceModel) {
+          profileData.serviceModel = 'fashion-stylist';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'project-based';
+        }
+        if (!profileData.travelWillingness) {
+          profileData.travelWillingness = 'local-only';
+        }
+        if (profileData.yearsExperience === '2-3') {
+          profileData.yearsExperience = '3-5';
+        }
+        break;
+
+      case 'makeup-artist':
+        if (!profileData.serviceModel) {
+          profileData.serviceModel = 'freelance-makeup-artist';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'project-based';
+        }
+        if (!profileData.travelWillingness) {
+          profileData.travelWillingness = 'local-only';
+        }
+        if (!profileData.makeupTypes || profileData.makeupTypes.length === 0) {
+          profileData.makeupTypes = ['Bridal Makeup'];
+        }
+        break;
+
+      case 'photographer':
+        if (!profileData.serviceModel) {
+          profileData.serviceModel = 'freelance-photographer';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'project-based';
+        }
+        if (!profileData.travelWillingness) {
+          profileData.travelWillingness = 'local-only';
+        }
+        if (!profileData.photographyTypes || profileData.photographyTypes.length === 0) {
+          profileData.photographyTypes = ['Portrait'];
+        }
+        break;
+
+      case 'fashion-designer':
+        if (!profileData.serviceModel) {
+          profileData.serviceModel = 'independent-designer';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'project-based';
+        }
+        if (!profileData.designCategories || profileData.designCategories.length === 0) {
+          profileData.designCategories = ['Ready-to-Wear'];
+        }
+        break;
+
+      case 'model':
+        if (!profileData.modelType) {
+          profileData.modelType = 'fashion';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'project-based';
+        }
+        if (!profileData.travelWillingness) {
+          profileData.travelWillingness = 'local-only';
+        }
+        if (!profileData.experienceLevel) {
+          profileData.experienceLevel = 'beginner';
+        }
+        break;
+
+      case 'brand':
+        if (!profileData.businessType) {
+          profileData.businessType = 'fashion-brand';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'full-time';
+        }
+        if (!profileData.location) {
+          profileData.location = 'Global';
+        }
+        break;
+
+      case 'agency':
+        if (!profileData.agencyType) {
+          profileData.agencyType = 'talent-agency';
+        }
+        if (!profileData.availability) {
+          profileData.availability = 'full-time';
+        }
+        if (!profileData.location) {
+          profileData.location = 'Global';
+        }
+        break;
+    }
+    
     // Get the appropriate model for this professional type
     const ProfileModel = getProfileModel(user.professionalType);
     

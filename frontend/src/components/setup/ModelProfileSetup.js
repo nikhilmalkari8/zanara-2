@@ -63,7 +63,16 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     // Special Skills
     specialSkills: [], // Acting, Dancing, Sports, etc.
     wardrobe: '',
-    props: ''
+    props: '',
+    yearsExperience: '',
+    modelType: '',
+    yearsExperienceOptions: [
+      '0-2',
+      '3-5',
+      '6-10',
+      '11-15',
+      '15+'
+    ]
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,8 +101,21 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   ];
 
   const experienceLevels = [
-    'Beginner (0-1 years)', 'Amateur (1-2 years)', 'Semi-Professional (2-5 years)',
-    'Professional (5+ years)', 'Veteran (10+ years)'
+    'beginner',
+    'intermediate',
+    'experienced',
+    'professional'
+  ];
+
+  const modelTypes = [
+    'fashion',
+    'commercial',
+    'runway',
+    'editorial',
+    'fitness',
+    'plus-size',
+    'petite',
+    'mature'
   ];
 
   const workTypes = [
@@ -136,8 +158,21 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   };
 
   const nextStep = () => {
+    // Validate required fields based on current step
+    if (currentStep === 3) { // Professional Information step
+      if (!profileData.yearsExperience) {
+        setMessage('Please select your years of experience');
+        return;
+      }
+      if (!profileData.modelType) {
+        setMessage('Please select your model type');
+        return;
+      }
+    }
+
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
+      setMessage(''); // Clear any previous error messages
     }
   };
 
@@ -150,6 +185,19 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setMessage('');
+
+    // Validate required fields
+    if (!profileData.yearsExperience) {
+      setMessage('Please select your years of experience');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!profileData.modelType) {
+      setMessage('Please select your model type');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -561,6 +609,32 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
                 />
               </div>
               <div style={styles.formGroup}>
+                <label style={styles.label}>Years of Experience *</label>
+                <select
+                  style={styles.select}
+                  value={profileData.yearsExperience}
+                  onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
+                >
+                  <option value="">Select years of experience</option>
+                  {profileData.yearsExperienceOptions.map(option => (
+                    <option key={option} value={option}>{option} years</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Model Type *</label>
+                <select
+                  style={styles.select}
+                  value={profileData.modelType}
+                  onChange={(e) => handleInputChange('modelType', e.target.value)}
+                >
+                  <option value="">Select model type</option>
+                  {modelTypes.map(type => (
+                    <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.formGroup}>
                 <label style={styles.label}>Experience Level *</label>
                 <select
                   style={styles.select}
@@ -569,7 +643,7 @@ const ModelProfileSetup = ({ user, onLogout, onProfileComplete }) => {
                 >
                   <option value="">Select experience level</option>
                   {experienceLevels.map(level => (
-                    <option key={level} value={level}>{level}</option>
+                    <option key={level} value={level}>{level.charAt(0).toUpperCase() + level.slice(1)}</option>
                   ))}
                 </select>
               </div>

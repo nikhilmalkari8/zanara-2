@@ -16,7 +16,7 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
 
   useEffect(() => {
     fetchPhotographerProfile();
-  }, [profileId]);
+  }, [profileId, fetchPhotographerProfile]);
 
   const fetchPhotographerProfile = async () => {
     try {
@@ -96,6 +96,42 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
     }
   };
 
+  const handleFileUpload = async (type, files) => {
+    setUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('files', file));
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8001/api/profile/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (type === 'behindTheScenes') {
+          setEditData({ 
+            ...editData, 
+            behindTheScenes: [...(editData.behindTheScenes || []), ...data.files.map(file => ({
+              url: file.url,
+              type: file.type,
+              description: '',
+              date: new Date().toISOString().split('T')[0]
+            }))]
+          });
+        }
+        alert('Files uploaded successfully!');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload files');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
@@ -138,6 +174,12 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
       cursor: 'pointer',
       fontWeight: 'bold',
       fontSize: '14px'
+    },
+    btsCard: {
+      background: 'rgba(255,255,255,0.1)',
+      padding: '15px',
+      borderRadius: '8px',
+      border: '1px solid rgba(255,255,255,0.2)'
     }
   };
 
@@ -368,75 +410,71 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
 
             {/* Photography Portfolio */}
             <div style={styles.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>📸 Photography Portfolio</h2>
-                {isEditing && (
-                  <div>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📸 Photography Portfolio</h2>
+              
+              {/* Behind the Scenes */}
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Behind the Scenes</h3>
+                {isEditing ? (
+                  <div style={{ border: '2px dashed rgba(255,255,255,0.2)', padding: '20px', borderRadius: '8px' }}>
                     <input
                       type="file"
-                      id="photographyPortfolio"
-                      accept="image/*"
+                      accept="image/*,video/*"
                       multiple
-                      onChange={handlePortfolioUpload}
+                      onChange={(e) => handleFileUpload('behindTheScenes', e.target.files)}
                       style={{ display: 'none' }}
-                      disabled={uploading}
+                      id="btsUpload"
                     />
                     <label
-                      htmlFor="photographyPortfolio"
+                      htmlFor="btsUpload"
                       style={{
-                        ...styles.button,
-                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                        color: 'white',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        display: 'inline-block'
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '20px',
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
                       }}
                     >
-                      {uploading ? 'Uploading...' : '+ Add Photos'}
+                      <span style={{ fontSize: '24px', marginBottom: '10px', display: 'block' }}>🎥</span>
+                      <p style={{ color: '#ddd', marginBottom: '5px' }}>Upload BTS Content</p>
+                      <p style={{ color: '#999', fontSize: '12px' }}>Images and videos from your shoots</p>
                     </label>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                    {currentProfile?.behindTheScenes?.map((content, index) => (
+                      <div key={index} style={styles.btsCard}>
+                        {content.type === 'video' ? (
+                          <video
+                            src={content.url}
+                            controls
+                            style={{
+                              width: '100%',
+                              borderRadius: '8px',
+                              marginBottom: '10px'
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src={content.url}
+                            alt={`BTS ${index + 1}`}
+                            style={{
+                              width: '100%',
+                              aspectRatio: '16/9',
+                              objectFit: 'cover',
+                              borderRadius: '8px',
+                              marginBottom: '10px'
+                            }}
+                          />
+                        )}
+                        <p style={{ color: '#ddd', fontSize: '14px' }}>{content.description}</p>
+                        <p style={{ color: '#999', fontSize: '12px' }}>{content.date}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-              
-              {profile?.photos && profile.photos.length > 0 ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: '15px'
-                }}>
-                  {profile.photos.map((photo, index) => (
-                    <div 
-                      key={index} 
-                      style={{
-                        aspectRatio: '3/2',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        position: 'relative'
-                      }}
-                    >
-                      <img 
-                        src={`http://localhost:8001${typeof photo === 'string' ? photo : photo.url}`}
-                        alt={`Photography work ${index + 1}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          transition: 'opacity 0.3s ease'
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#ddd' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>📸</div>
-                  <p>No photography portfolio yet</p>
-                  <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                    Showcase your best fashion, commercial, and artistic photography work
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 

@@ -116,8 +116,9 @@ function App() {
           const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
           setCurrentPage(profileSetupPage);
         } else {
-          localStorage.removeItem('token');
-          setCurrentPage('home');
+          // On any other error, redirect to setup page
+          const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
+          setCurrentPage(profileSetupPage);
         }
       } else if (userData.userType === 'hiring') {
         // Check if company profile exists (keep existing logic)
@@ -134,22 +135,20 @@ function App() {
           const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
           setCurrentPage(profileSetupPage);
         } else {
-          localStorage.removeItem('token');
-          setCurrentPage('home');
+          // On any other error, redirect to setup page
+          const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
+          setCurrentPage(profileSetupPage);
         }
       } else {
+        // For unknown user types, redirect to home
         localStorage.removeItem('token');
         setCurrentPage('home');
       }
     } catch (error) {
       console.error('Error checking profile completion:', error);
-      if (userData.userType === 'talent') {
-        const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
-        setCurrentPage(profileSetupPage);
-      } else if (userData.userType === 'hiring') {
-        const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
-        setCurrentPage(profileSetupPage);
-      }
+      // On error, redirect to appropriate setup page based on professional type
+      const profileSetupPage = getProfessionalTypeSetupPage(userData.professionalType);
+      setCurrentPage(profileSetupPage);
     }
   };
 
