@@ -173,7 +173,7 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     setMessage('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/complete', {
+      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
