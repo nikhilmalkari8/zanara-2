@@ -25,6 +25,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
   const [selectedModel, setSelectedModel] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [savedTalent, setSavedTalent] = useState([]);
+  const [apiError, setApiError] = useState(null);
 
   // Constants for filter options
   const genderOptions = [
@@ -73,9 +74,10 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
   ];
 
   // Fetch models based on filters
-  // Fetch models based on filters
   const fetchModels = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
+    
     try {
       // Convert filters to query params
       const queryParams = new URLSearchParams();
@@ -99,7 +101,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
 
       const token = localStorage.getItem('token');
       
-      console.log('Fetching with params:', queryParams.toString()); // Debug log
+      console.log('Fetching with params:', queryParams.toString());
       
       const response = await fetch(`http://localhost:8001/api/profile/browse?${queryParams}`, {
         headers: {
@@ -112,74 +114,22 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
       }
       
       const data = await response.json();
-      console.log('Received data:', data); // Debug log
+      console.log('Received data:', data);
       
       setModels(data.models || []);
       setTotalPages(data.totalPages || 1);
       
     } catch (error) {
       console.error('Error fetching models:', error);
+      setApiError('Unable to load talent profiles. Please check your connection and try again.');
       
-      // Keep the fallback mock data for testing
-      const mockData = {
-        models: generateMockModels(20),
-        totalPages: 5,
-        currentPage: currentPage,
-        total: 100
-      };
-      
-      setModels(mockData.models);
-      setTotalPages(mockData.totalPages);
+      // Set empty results when API fails
+      setModels([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   }, [currentPage, filters]);
-
-  // Generate mock model data for development/testing
-  const generateMockModels = (count) => {
-    const mockModels = [];
-    const cities = ['New York', 'Los Angeles', 'Miami', 'Paris', 'London', 'Milan', 'Tokyo', 'Sydney', 'Berlin', 'Toronto'];
-    const firstNames = ['Emma', 'Olivia', 'Ava', 'Isabella', 'Sophia', 'Mia', 'Charlotte', 'Amelia', 'Harper', 'Evelyn', 'Liam', 'Noah', 'William', 'James', 'Oliver', 'Benjamin', 'Elijah', 'Lucas', 'Mason', 'Logan'];
-    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin'];
-    const hairColors = ['Black', 'Brown', 'Blonde', 'Red', 'Auburn', 'Grey', 'White', 'Platinum', 'Blue', 'Pink'];
-    const eyeColors = ['Brown', 'Blue', 'Green', 'Hazel', 'Grey', 'Amber'];
-    const bodyTypes = ['Athletic', 'Slim', 'Average', 'Muscular', 'Curvy'];
-    const heights = ['5\'8"', '5\'9"', '5\'10"', '5\'11"', '6\'0"', '6\'1"', '6\'2"', '5\'5"', '5\'6"', '5\'7"'];
-    
-    for (let i = 0; i < count; i++) {
-      const gender = Math.random() > 0.5 ? 'female' : 'male';
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      
-      mockModels.push({
-        _id: `model-${i}`,
-        userId: {
-          _id: `user-${i}`,
-          firstName,
-          lastName,
-          email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`
-        },
-        dateOfBirth: new Date(1990 + Math.floor(Math.random() * 15), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28)).toISOString(),
-        gender,
-        height: heights[Math.floor(Math.random() * heights.length)],
-        bodyType: bodyTypes[Math.floor(Math.random() * bodyTypes.length)].toLowerCase(),
-        hairColor: hairColors[Math.floor(Math.random() * hairColors.length)],
-        eyeColor: eyeColors[Math.floor(Math.random() * eyeColors.length)],
-        location: cities[Math.floor(Math.random() * cities.length)],
-        experience: experienceOptions[Math.floor(Math.random() * (experienceOptions.length - 1)) + 1].value,
-        skills: Array.from({ length: Math.floor(Math.random() * 5) + 1 }, () => skillOptions[Math.floor(Math.random() * skillOptions.length)]),
-        availability: availabilityOptions[Math.floor(Math.random() * (availabilityOptions.length - 1)) + 1].value,
-        profileViews: Math.floor(Math.random() * 1000),
-        completionPercentage: Math.floor(Math.random() * 40) + 60,
-        lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)).toISOString(), // Random time in the last week
-        photos: [
-          `https://randomuser.me/api/portraits/${gender === 'female' ? 'women' : 'men'}/${i % 100}.jpg`
-        ]
-      });
-    }
-    
-    return mockModels;
-  };
 
   useEffect(() => {
     fetchModels();
@@ -223,6 +173,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
   };
 
   const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return 'N/A';
     const birthDate = new Date(dateOfBirth);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -234,6 +185,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
   };
   
   const getTimeAgo = (date) => {
+    if (!date) return 'Unknown';
     const now = new Date();
     const lastActive = new Date(date);
     const diffInSeconds = Math.floor((now - lastActive) / 1000);
@@ -370,7 +322,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
               margin: '0 0 5px 0',
               fontWeight: 'bold'
             }}>
-              {model.userId.firstName} {model.userId.lastName}
+              {model.userId?.firstName} {model.userId?.lastName} {model.fullName || 'Name not available'}
             </h3>
 
             {/* Location */}
@@ -396,13 +348,13 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                 <span style={{ color: '#999' }}>Age:</span> {calculateAge(model.dateOfBirth)}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Height:</span> {model.height}
+                <span style={{ color: '#999' }}>Height:</span> {model.height || 'N/A'}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Hair:</span> {model.hairColor}
+                <span style={{ color: '#999' }}>Hair:</span> {model.hairColor || 'N/A'}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Eyes:</span> {model.eyeColor}
+                <span style={{ color: '#999' }}>Eyes:</span> {model.eyeColor || 'N/A'}
               </div>
             </div>
 
@@ -501,7 +453,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
           }}>
             <img 
               src={model.photos && model.photos.length > 0 ? model.photos[0] : 'https://via.placeholder.com/100x100?text=No+Photo'} 
-              alt={`${model.userId.firstName} ${model.userId.lastName}`} 
+              alt={`${model.userId?.firstName || ''} ${model.userId?.lastName || ''}`} 
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
@@ -517,7 +469,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                   margin: '0 0 3px 0',
                   fontWeight: 'bold'
                 }}>
-                  {model.userId.firstName} {model.userId.lastName}
+                  {model.userId?.firstName} {model.userId?.lastName} {model.fullName || 'Name not available'}
                 </h3>
                 <p style={{
                   color: '#ccc',
@@ -562,13 +514,13 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                 <span style={{ color: '#999' }}>Age:</span> {calculateAge(model.dateOfBirth)}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Height:</span> {model.height}
+                <span style={{ color: '#999' }}>Height:</span> {model.height || 'N/A'}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Experience:</span> {model.experience}
+                <span style={{ color: '#999' }}>Experience:</span> {model.experience || 'N/A'}
               </div>
               <div style={{ color: '#ccc', fontSize: '0.9rem' }}>
-                <span style={{ color: '#999' }}>Availability:</span> {model.availability.replace('-', ' ')}
+                <span style={{ color: '#999' }}>Availability:</span> {model.availability?.replace('-', ' ') || 'N/A'}
               </div>
             </div>
 
@@ -594,7 +546,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
 
             {/* Activity */}
             <div style={{ color: '#999', fontSize: '0.8rem', marginTop: '10px' }}>
-              Active {getTimeAgo(model.lastActive)} • {model.profileViews} profile views
+              Active {getTimeAgo(model.lastActive)} • {model.profileViews || 0} profile views
             </div>
           </div>
         </div>
@@ -656,358 +608,34 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
             ✕
           </button>
 
-          {/* Profile Content Scrollable Container */}
+          {/* Profile Content */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             overflow: 'auto',
-            maxHeight: '90vh'
+            maxHeight: '90vh',
+            padding: '30px'
           }}>
-            {/* Header Section */}
-            <div style={{
-              position: 'relative',
-              padding: '30px',
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: '20px',
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)'
-            }}>
-              {/* Profile Image */}
-              <div style={{
-                width: '150px',
-                height: '150px',
-                borderRadius: '15px',
-                overflow: 'hidden',
-                border: '3px solid white'
-              }}>
-                <img 
-                  src={selectedModel.photos && selectedModel.photos.length > 0 ? selectedModel.photos[0] : 'https://via.placeholder.com/150x150?text=No+Photo'} 
-                  alt={`${selectedModel.userId.firstName} ${selectedModel.userId.lastName}`} 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-
-              {/* Basic Info */}
-              <div>
-                <h2 style={{
-                  color: 'white',
-                  fontSize: '2rem',
-                  margin: '0 0 5px 0',
-                  fontWeight: 'bold'
-                }}>
-                  {selectedModel.userId.firstName} {selectedModel.userId.lastName}
-                </h2>
-                <p style={{
-                  color: '#ddd',
-                  fontSize: '1.1rem',
-                  margin: '0 0 5px 0',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
-                  <span style={{ marginRight: '5px' }}>📍</span> 
-                  {selectedModel.location || 'Location not specified'}
-                </p>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                  <button style={{
-                    padding: '8px 20px',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.4)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}>
-                    <span>💬</span> Message
-                  </button>
-                  <button style={{
-                    padding: '8px 20px',
-                    background: savedTalent.includes(selectedModel._id) ? 'rgba(255, 107, 107, 0.3)' : 'rgba(255, 255, 255, 0.2)',
-                    color: savedTalent.includes(selectedModel._id) ? '#ff6b6b' : 'white',
-                    border: `1px solid ${savedTalent.includes(selectedModel._id) ? 'rgba(255, 107, 107, 0.7)' : 'rgba(255, 255, 255, 0.4)'}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSaveTalent(selectedModel._id);
-                  }}
-                  >
-                    <span>{savedTalent.includes(selectedModel._id) ? '❤️' : '🤍'}</span>
-                    {savedTalent.includes(selectedModel._id) ? 'Saved' : 'Save'}
-                  </button>
-                  <button style={{
-                    padding: '8px 20px',
-                    background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}>
-                    <span>📝</span> Invite to Opportunity
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content */}
-            <div style={{
-              padding: '30px',
-              display: 'grid',
-              gridTemplateColumns: '2fr 1fr',
-              gap: '30px'
-            }}>
-              {/* Left Column */}
-              <div>
-                {/* About Section */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>About</h3>
-                  <p style={{ color: '#ccc', lineHeight: '1.6', margin: 0 }}>
-                    {selectedModel.userId.firstName} is a {selectedModel.experience} model based in {selectedModel.location || 'their location'}. 
-                    With a passion for fashion and visual storytelling, they bring creativity and professionalism to every project.
-                  </p>
-                </div>
-
-                {/* Experience */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Experience</h3>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1rem' }}>Fashion Week {2020 + Math.floor(Math.random() * 5)}</h4>
-                    <p style={{ color: '#999', fontSize: '0.9rem', margin: '0 0 5px 0' }}>Runway Model</p>
-                    <p style={{ color: '#ccc', fontSize: '0.9rem', margin: 0 }}>
-                      Walked for multiple designers during Fashion Week.
-                    </p>
-                  </div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1rem' }}>Commercial Campaign</h4>
-                    <p style={{ color: '#999', fontSize: '0.9rem', margin: '0 0 5px 0' }}>Commercial Model</p>
-                    <p style={{ color: '#ccc', fontSize: '0.9rem', margin: 0 }}>
-                      Featured in print and digital advertisements for seasonal collection.
-                    </p>
-                  </div>
-                  <div>
-                    <h4 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1rem' }}>Editorial Shoot</h4>
-                    <p style={{ color: '#999', fontSize: '0.9rem', margin: '0 0 5px 0' }}>Editorial Model</p>
-                    <p style={{ color: '#ccc', fontSize: '0.9rem', margin: 0 }}>
-                      Featured in fashion spread for major publication.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Portfolio Gallery */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Portfolio</h3>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                    gap: '10px'
-                  }}>
-                    {Array.from({ length: 6 }, (_, i) => (
-                      <div key={i} style={{
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        aspectRatio: '3/4',
-                        cursor: 'pointer'
-                      }}>
-                        <img 
-                          src={`https://randomuser.me/api/portraits/${selectedModel.gender === 'female' ? 'women' : 'men'}/${(parseInt(selectedModel._id.slice(-2), 36) + i) % 100}.jpg`} 
-                          alt="Portfolio" 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div>
-                {/* Stats Card */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Stats</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.8rem', color: '#4CAF50', fontWeight: 'bold' }}>{selectedModel.profileViews}</div>
-                      <div style={{ color: '#ccc', fontSize: '0.9rem' }}>Profile Views</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.8rem', color: '#2196F3', fontWeight: 'bold' }}>{Math.floor(Math.random() * 50)}</div>
-                      <div style={{ color: '#ccc', fontSize: '0.9rem' }}>Applications</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.8rem', color: '#FF9800', fontWeight: 'bold' }}>{Math.floor(Math.random() * 100)}</div>
-                      <div style={{ color: '#ccc', fontSize: '0.9rem' }}>Connections</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.8rem', color: '#E91E63', fontWeight: 'bold' }}>
-                        {Math.floor(Math.random() * 5) + 1}.{Math.floor(Math.random() * 9)}
-                      </div>
-                      <div style={{ color: '#ccc', fontSize: '0.9rem' }}>Rating</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Details Card */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Details</h3>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Age:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>{calculateAge(selectedModel.dateOfBirth)}</span>
-                  </div>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Height:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>{selectedModel.height}</span>
-                  </div>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Body Type:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>{selectedModel.bodyType}</span>
-                  </div>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Hair Color:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>{selectedModel.hairColor}</span>
-                  </div>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Eye Color:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>{selectedModel.eyeColor}</span>
-                  </div>
-                  
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Experience:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>
-                      {selectedModel.experience.charAt(0).toUpperCase() + selectedModel.experience.slice(1)}
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>Availability:</span>{' '}
-                    <span style={{ color: 'white', fontSize: '0.9rem' }}>
-                      {selectedModel.availability.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Skills Card */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Skills</h3>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px'
-                  }}>
-                    {selectedModel.skills && selectedModel.skills.map((skill, index) => (
-                      <span key={index} style={{
-                        padding: '5px 12px',
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        color: 'white',
-                        borderRadius: '15px',
-                        fontSize: '0.9rem'
-                      }}>
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Contact Card */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '15px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '25px'
-                }}>
-                  <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '15px' }}>Contact</h3>
-                  <button style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    marginBottom: '10px'
-                  }}>
-                    <span>💼</span> Invite to Opportunity
-                  </button>
-                  <button style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.4)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}>
-                    <span>💬</span> Send Message
-                  </button>
-                </div>
-              </div>
+            <h2 style={{ color: 'white', marginBottom: '20px' }}>
+              {selectedModel.userId?.firstName} {selectedModel.userId?.lastName} {selectedModel.fullName}
+            </h2>
+            
+            <div style={{ color: '#ccc' }}>
+              <p><strong>Location:</strong> {selectedModel.location || 'Not specified'}</p>
+              <p><strong>Experience:</strong> {selectedModel.experience || 'Not specified'}</p>
+              <p><strong>Skills:</strong> {selectedModel.skills?.join(', ') || 'None listed'}</p>
+              
+              {selectedModel.dateOfBirth && (
+                <p><strong>Age:</strong> {calculateAge(selectedModel.dateOfBirth)}</p>
+              )}
+              
+              {selectedModel.height && (
+                <p><strong>Height:</strong> {selectedModel.height}</p>
+              )}
+              
+              {selectedModel.availability && (
+                <p><strong>Availability:</strong> {selectedModel.availability.replace('-', ' ')}</p>
+              )}
             </div>
           </div>
         </div>
@@ -1071,6 +699,36 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
           </div>
         </div>
       </div>
+
+      {/* API Error Message */}
+      {apiError && (
+        <div style={{ maxWidth: '1400px', margin: '0 auto 20px' }}>
+          <div style={{
+            background: 'rgba(255, 107, 107, 0.2)',
+            border: '1px solid rgba(255, 107, 107, 0.5)',
+            borderRadius: '10px',
+            padding: '15px',
+            color: '#ff6b6b',
+            textAlign: 'center'
+          }}>
+            <strong>⚠️ {apiError}</strong>
+            <button 
+              onClick={fetchModels}
+              style={{
+                marginLeft: '15px',
+                padding: '5px 15px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div style={{ maxWidth: '1400px', margin: '0 auto 30px' }}>
@@ -1307,7 +965,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                       type="text"
                       value={filters.heightMin}
                       onChange={(e) => handleFilterChange('heightMin', e.target.value)}
-                      placeholder="Min (e.g. 5'6\"
+                      placeholder="Min (e.g. 5'6\)"
                       style={{ ...inputStyle, flex: 1 }}
                     />
                     <span style={{ color: 'white' }}>-</span>
@@ -1315,7 +973,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                       type="text"
                       value={filters.heightMax}
                       onChange={(e) => handleFilterChange('heightMax', e.target.value)}
-                      placeholder="Max (e.g. 6'0\"
+                      placeholder="Max (e.g. 6'0\)"
                       style={{ ...inputStyle, flex: 1 }}
                     />
                   </div>
@@ -1483,13 +1141,16 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
           }}>
             <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔍</div>
             <h3 style={{ color: 'white', fontSize: '1.5rem', marginBottom: '10px' }}>
-              No models match your search criteria
+              {apiError ? 'Unable to load profiles' : 'No models match your search criteria'}
             </h3>
             <p style={{ color: '#ccc', marginBottom: '20px' }}>
-              Try adjusting your filters or search terms to find more talent.
+              {apiError 
+                ? 'Please check your connection and try again.' 
+                : 'Try adjusting your filters or search terms to find more talent.'
+              }
             </p>
             <button
-              onClick={resetFilters}
+              onClick={apiError ? fetchModels : resetFilters}
               style={{
                 padding: '12px 24px',
                 background: 'rgba(255, 255, 255, 0.2)',
@@ -1500,7 +1161,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage }) => {
                 fontSize: '1rem'
               }}
             >
-              Reset All Filters
+              {apiError ? 'Retry' : 'Reset All Filters'}
             </button>
           </div>
         ) : (

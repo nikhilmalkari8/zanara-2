@@ -750,161 +750,179 @@ router.put('/portfolio', auth, async (req, res) => {
 });
 
 // GET /api/profile/browse - Browse models with filtering and pagination
+// UPDATED: Removed permission restriction - allows both talent and hiring users
+// Replace ONLY the browse endpoint in routes/profile.js with this:
+
 router.get('/browse', auth, async (req, res) => {
-  try {
-    if (req.user.userType !== 'hiring') {
-      return res.status(403).json({
-        message: 'Access denied. Only hiring users can browse models.'
-      });
-    }
-    
-    const {
-      page = 1,
-      limit = 20,
-      search,
-      gender,
-      location,
-      bodyType,
-      hairColor,
-      eyeColor,
-      experience,
-      availability,
-      skills,
-      ageMin,
-      ageMax,
-      heightMin,
-      heightMax,
-      sort = 'newest'
-    } = req.query;
-    
-    let query = { isComplete: true };
-    
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      const matchingUsers = await User.find({
-        $or: [
-          { firstName: searchRegex },
-          { lastName: searchRegex },
-          { email: searchRegex }
-        ]
-      }).select('_id');
-      const matchingUserIds = matchingUsers.map(user => user._id);
-      query.$or = [
-        { userId: { $in: matchingUserIds } },
-        { skills: searchRegex },
-        { specializations: searchRegex },
-        { preferredLocations: searchRegex }
-      ];
-    }
-    
-    if (gender && gender !== 'all') {
-      query.gender = gender;
-    }
-    if (bodyType && bodyType !== 'all') {
-      query.bodyType = bodyType;
-    }
-    if (hairColor) {
-      query.hairColor = { $regex: hairColor, $options: 'i' };
-    }
-    if (eyeColor) {
-      query.eyeColor = { $regex: eyeColor, $options: 'i' };
-    }
-    if (experience && experience !== 'all') {
-      query.experience = { $regex: experience, $options: 'i' };
-    }
-    if (availability && availability !== 'all') {
-      query.availability = availability;
-    }
-    if (skills) {
-      const skillArray = skills.split(',').map(skill => skill.trim());
-      query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
-    }
-    if (location) {
-      query.preferredLocations = { $regex: location, $options: 'i' };
-    }
-    
-    // Fetch all matching profiles first for age and height filters
-    let profiles = await ModelProfile.find(query)
-      .populate('userId', 'firstName lastName email')
-      .lean();
-    
-    if (ageMin || ageMax) {
-      const today = new Date();
-      profiles = profiles.filter(profile => {
-        if (!profile.dateOfBirth) return false;
-        const birthDate = new Date(profile.dateOfBirth);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-          age--;
+    try {
+      // Get user data using userId from auth middleware
+      const userData = await User.findById(req.userId).select('userType professionalType firstName lastName');
+      
+      if (!userData) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      console.log('Browse request from user:', userData.userType, userData.professionalType);
+      
+      const {
+        page = 1,
+        limit = 20,
+        search,
+        gender,
+        location,
+        bodyType,
+        hairColor,
+        eyeColor,
+        experience,
+        availability,
+        skills,
+        ageMin,
+        ageMax,
+        heightMin,
+        heightMax,
+        sort = 'newest'
+      } = req.query;
+      
+      let query = { isComplete: true };
+      
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        const matchingUsers = await User.find({
+          $or: [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { email: searchRegex }
+          ]
+        }).select('_id');
+        const matchingUserIds = matchingUsers.map(user => user._id);
+        query.$or = [
+          { userId: { $in: matchingUserIds } },
+          { skills: searchRegex },
+          { specializations: searchRegex },
+          { preferredLocations: searchRegex }
+        ];
+      }
+      
+      if (gender && gender !== 'all') {
+        query.gender = gender;
+      }
+      if (bodyType && bodyType !== 'all') {
+        query.bodyType = bodyType;
+      }
+      if (hairColor) {
+        query.hairColor = { $regex: hairColor, $options: 'i' };
+      }
+      if (eyeColor) {
+        query.eyeColor = { $regex: eyeColor, $options: 'i' };
+      }
+      if (experience && experience !== 'all') {
+        query.experience = { $regex: experience, $options: 'i' };
+      }
+      if (availability && availability !== 'all') {
+        query.availability = availability;
+      }
+      if (skills) {
+        const skillArray = skills.split(',').map(skill => skill.trim());
+        query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
+      }
+      if (location) {
+        query.preferredLocations = { $regex: location, $options: 'i' };
+      }
+      
+      console.log('Query built:', JSON.stringify(query, null, 2));
+      
+      // Fetch all matching profiles first for age and height filters
+      let profiles = await ModelProfile.find(query)
+        .populate('userId', 'firstName lastName email professionalType')
+        .lean();
+      
+      console.log('Found profiles before filtering:', profiles.length);
+      
+      if (ageMin || ageMax) {
+        const today = new Date();
+        profiles = profiles.filter(profile => {
+          if (!profile.dateOfBirth) return false;
+          const birthDate = new Date(profile.dateOfBirth);
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          let ageMatch = true;
+          if (ageMin) ageMatch = ageMatch && age >= parseInt(ageMin);
+          if (ageMax) ageMatch = ageMatch && age <= parseInt(ageMax);
+          return ageMatch;
+        });
+      }
+      
+      if (heightMin || heightMax) {
+        profiles = profiles.filter(profile => {
+          if (!profile.height) return false;
+          let heightMatch = true;
+          if (heightMin) {
+            heightMatch = heightMatch && profile.height.includes(heightMin.replace(/['"]/g, ''));
+          }
+          if (heightMax) {
+            heightMatch = heightMatch && profile.height.includes(heightMax.replace(/['"]/g, ''));
+          }
+          return heightMatch;
+        });
+      }
+      
+      profiles = profiles.map(profile => ({
+        ...profile,
+        profileViews: Math.floor(Math.random() * 1000) + 50,
+        lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)),
+        completionPercentage: Math.floor(Math.random() * 40) + 60,
+        location: profile.preferredLocations && profile.preferredLocations.length > 0
+          ? profile.preferredLocations[0]
+          : 'Location not specified'
+      }));
+      
+      switch (sort) {
+        case 'newest':
+          profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          break;
+        case 'relevance':
+          profiles.sort((a, b) => b.profileViews - a.profileViews);
+          break;
+        case 'experience':
+          const experienceOrder = { 'professional': 4, 'experienced': 3, 'intermediate': 2, 'beginner': 1 };
+          profiles.sort((a, b) => (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0));
+          break;
+        case 'connections':
+          profiles.sort((a, b) => b.profileViews - a.profileViews);
+          break;
+        default:
+          profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+      
+      const total = profiles.length;
+      const totalPages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + parseInt(limit);
+      const paginatedProfiles = profiles.slice(startIndex, endIndex);
+      
+      console.log('Returning profiles:', paginatedProfiles.length, 'of', total);
+      
+      res.json({
+        models: paginatedProfiles,
+        totalPages,
+        currentPage: parseInt(page),
+        total,
+        hasMore: endIndex < total,
+        searchContext: {
+          searcherType: userData.userType,
+          searcherProfession: userData.professionalType,
+          canContact: true,
+          canInviteToProjects: userData.userType === 'hiring'
         }
-        let ageMatch = true;
-        if (ageMin) ageMatch = ageMatch && age >= parseInt(ageMin);
-        if (ageMax) ageMatch = ageMatch && age <= parseInt(ageMax);
-        return ageMatch;
       });
-    }
-    
-    if (heightMin || heightMax) {
-      profiles = profiles.filter(profile => {
-        if (!profile.height) return false;
-        let heightMatch = true;
-        if (heightMin) {
-          heightMatch = heightMatch && profile.height.includes(heightMin.replace(/['"]/g, ''));
-        }
-        if (heightMax) {
-          heightMatch = heightMatch && profile.height.includes(heightMax.replace(/['"]/g, ''));
-        }
-        return heightMatch;
-      });
-    }
-    
-    profiles = profiles.map(profile => ({
-      ...profile,
-      profileViews: Math.floor(Math.random() * 1000) + 50,
-      lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)),
-      completionPercentage: Math.floor(Math.random() * 40) + 60,
-      location: profile.preferredLocations && profile.preferredLocations.length > 0
-        ? profile.preferredLocations[0]
-        : 'Location not specified'
-    }));
-    
-    switch (sort) {
-      case 'newest':
-        profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        break;
-      case 'relevance':
-        profiles.sort((a, b) => b.profileViews - a.profileViews);
-        break;
-      case 'experience':
-        const experienceOrder = { 'professional': 4, 'experienced': 3, 'intermediate': 2, 'beginner': 1 };
-        profiles.sort((a, b) => (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0));
-        break;
-      case 'connections':
-        profiles.sort((a, b) => b.profileViews - a.profileViews);
-        break;
-      default:
-        profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }
-    
-    const total = profiles.length;
-    const totalPages = Math.ceil(total / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedProfiles = profiles.slice(startIndex, endIndex);
-    
-    res.json({
-      models: paginatedProfiles,
-      totalPages,
-      currentPage: parseInt(page),
-      total,
-      hasMore: endIndex < total
-    });
-  } catch (error) {
-    console.error('Browse models error:', error);
-    res.status(500).json({
-      message: 'Server error while browsing models',
-      error: error.message
+    } catch (error) {
+      console.error('Browse models error:', error);
+      res.status(500).json({
+        message: 'Server error while browsing models',
+        error: error.message
     });
   }
 });

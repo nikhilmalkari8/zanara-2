@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ConnectionRequestModal from '../connections/ConnectionRequestModal';
 
 const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessage }) => {
   const [profile, setProfile] = useState(null);
@@ -9,6 +10,10 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
   const [uploading, setUploading] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(null);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
+  
+  // Connection states
+  const [connectionStatus, setConnectionStatus] = useState('none');
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
 
   // Helper functions to handle schema mismatches
   const ensureArray = (value) => {
@@ -35,6 +40,13 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId]);
 
+  // Check connection status when profile loads (only for other people's profiles)
+  useEffect(() => {
+    if (!isOwnProfile && profileId && profile) {
+      checkConnectionStatus();
+    }
+  }, [profileId, profile]);
+
   const fetchModelProfile = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -53,6 +65,62 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
       setError('Error loading profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check connection status with this user
+  const checkConnectionStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8001/api/connections/status/${profileId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConnectionStatus(data.status || 'none');
+      }
+    } catch (error) {
+      console.error('Error checking connection status:', error);
+      setConnectionStatus('none');
+    }
+  };
+
+  // Handle connect button click
+  const handleConnectClick = () => {
+    setIsConnectionModalOpen(true);
+  };
+
+  // Send connection request
+  const handleSendConnectionRequest = async (message) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8001/api/connections/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          receiverId: profileId,
+          message,
+          receiverType: profile.professionalType || 'model'
+        })
+      });
+
+      if (response.ok) {
+        setConnectionStatus('pending');
+        setIsConnectionModalOpen(false);
+        alert('Connection request sent successfully!');
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to send connection request');
+      }
+    } catch (error) {
+      console.error('Error sending connection request:', error);
+      alert('Error sending connection request');
     }
   };
 
@@ -336,6 +404,11 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
       background: 'rgba(255, 255, 255, 0.1)',
       color: 'white',
       border: '1px solid rgba(255, 255, 255, 0.3)'
+    },
+    disabledButton: {
+      background: '#f0f0f0',
+      color: '#666',
+      cursor: 'default'
     }
   };
 
@@ -370,10 +443,11 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
     user._id === profile._id ||
     user.id === profile._id ||
     user._id === profileId ||
-    user._id === targetUser._id ||
-    user.id === targetUser.id ||
+    user._id === targetUser?._id ||
+    user.id === targetUser?.id ||
     user.id === profileId
   );
+
   // DEBUG: Remove this after fixing
   console.log('DEBUG Profile Check:', {
     'user._id': user?._id,
@@ -381,10 +455,37 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
     'profile.userId': profile?.userId,
     'profile._id': profile?._id,
     'profileId': profileId,
-    'isOwnProfile': isOwnProfile
+    'isOwnProfile': isOwnProfile,
+    'connectionStatus': connectionStatus
   });
 
   const currentProfile = isEditing ? editData : profile;
+
+  // Get button text and styling based on connection status
+  const getConnectionButtonProps = () => {
+    switch (connectionStatus) {
+      case 'pending':
+        return {
+          text: 'Request Sent',
+          disabled: true,
+          style: styles.disabledButton
+        };
+      case 'connected':
+        return {
+          text: 'Connected',
+          disabled: true,
+          style: styles.disabledButton
+        };
+      default:
+        return {
+          text: 'Connect',
+          disabled: false,
+          style: styles.primaryButton
+        };
+    }
+  };
+
+  const connectionButtonProps = getConnectionButtonProps();
 
   return (
     <div style={styles.container}>
@@ -599,10 +700,14 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
             {!isOwnProfile && (
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
-                  onClick={onConnect}
-                  style={{ ...styles.button, ...styles.primaryButton }}
+                  onClick={handleConnectClick}
+                  disabled={connectionButtonProps.disabled}
+                  style={{ 
+                    ...styles.button, 
+                    ...connectionButtonProps.style
+                  }}
                 >
-                  Connect
+                  {connectionButtonProps.text}
                 </button>
                 <button 
                   onClick={onMessage}
@@ -1199,6 +1304,16 @@ const ModelProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessag
             />
           </div>
         </div>
+      )}
+
+      {/* Connection Request Modal */}
+      {isConnectionModalOpen && (
+        <ConnectionRequestModal
+          isOpen={isConnectionModalOpen}
+          onClose={() => setIsConnectionModalOpen(false)}
+          profile={profile}
+          onSendRequest={handleSendConnectionRequest}
+        />
       )}
     </div>
   );

@@ -42,6 +42,12 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       label: '📱 Activity Feed',
       color: '#667eea'
     },
+    // Replace the browse-talent/opportunities logic with this:
+    {
+      key: 'search',
+      label: '🔍 Search',
+      color: '#FF9800'
+    },
     {
       key: 'content-browser',
       label: '📚 Content',

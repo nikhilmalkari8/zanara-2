@@ -34,6 +34,7 @@ import Opportunities from './components/opportunities/Opportunities';
 import CreateOpportunity from './components/opportunities/CreateOpportunity';
 import OpportunityDetail from './components/opportunities/OpportunityDetail';
 import BrowseTalent from './components/opportunities/BrowseTalent';
+import TalentSearch from './components/search/TalentSearch';
 
 // Networking Components
 import Connections from './components/networking/Connections';
@@ -549,6 +550,15 @@ function App() {
             user={user}
             onViewContent={handleViewContent}
           />
+        )}
+
+        {currentPage === 'search' && (
+        <TalentSearch 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+            onViewProfile={handleViewProfile}
+        />
         )}
       </div>
     </div>
