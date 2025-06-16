@@ -29,14 +29,17 @@ const MakeupArtistProfile = ({
   const fetchMakeupArtistProfile = async () => {
     try {
       const token = localStorage.getItem('token');
+      // Use the new professional profile endpoint
       const response = await fetch(
-        `http://localhost:8001/api/profile/model/${profileId}`,
+        `http://localhost:8001/api/professional-profile/${profileId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
         setEditData(data);
+      } else {
+        console.error('Failed to fetch makeup artist profile:', response.status);
       }
     } catch (error) {
       console.error('Error loading makeup artist profile:', error);
@@ -48,8 +51,9 @@ const MakeupArtistProfile = ({
   const handleSaveChanges = async () => {
     try {
       const token = localStorage.getItem('token');
+      // Use the new professional profile update endpoint
       const response = await fetch(
-        'http://localhost:8001/api/profile/update',
+        'http://localhost:8001/api/professional-profile/update',
         {
           method: 'PUT',
           headers: {
@@ -69,6 +73,7 @@ const MakeupArtistProfile = ({
         alert(data.message || 'Failed to update profile');
       }
     } catch (error) {
+      console.error('Error updating profile:', error);
       alert('Error updating profile');
     }
   };
@@ -83,8 +88,9 @@ const MakeupArtistProfile = ({
 
     try {
       const token = localStorage.getItem('token');
+      // Use the new professional profile photos endpoint
       const response = await fetch(
-        'http://localhost:8001/api/profile/photos',
+        'http://localhost:8001/api/professional-profile/photos',
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -98,11 +104,31 @@ const MakeupArtistProfile = ({
         setProfile({ ...profile, photos: updatedPhotos });
         setEditData({ ...editData, photos: updatedPhotos });
         alert(`${files.length} makeup looks uploaded successfully!`);
+      } else {
+        alert('Failed to upload makeup portfolio');
       }
     } catch (error) {
+      console.error('Error uploading photos:', error);
       alert('Failed to upload makeup portfolio');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleArrayInputChange = (field, value) => {
+    const arrayValue = value.split(',').map(item => item.trim()).filter(item => item);
+    setEditData({ ...editData, [field]: arrayValue });
+  };
+
+  const handleInputChange = (field, value) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      setEditData(prev => ({
+        ...prev,
+        [parent]: { ...prev[parent], [child]: value }
+      }));
+    } else {
+      setEditData(prev => ({ ...prev, [field]: value }));
     }
   };
 
@@ -198,15 +224,17 @@ const MakeupArtistProfile = ({
                       onClick={handleSaveChanges}
                       style={{
                         ...styles.button,
-                        background:
-                          'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
                         color: 'white'
                       }}
                     >
                       Save Changes
                     </button>
                     <button
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => {
+                        setEditData(profile);
+                        setIsEditing(false);
+                      }}
                       style={{
                         ...styles.button,
                         background: 'rgba(255, 255, 255, 0.1)',
@@ -222,8 +250,7 @@ const MakeupArtistProfile = ({
                     onClick={() => setIsEditing(true)}
                     style={{
                       ...styles.button,
-                      background:
-                        'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
                       color: 'white'
                     }}
                   >
@@ -256,9 +283,7 @@ const MakeupArtistProfile = ({
                   <input
                     type="text"
                     value={editData.fullName || ''}
-                    onChange={(e) =>
-                      setEditData({ ...editData, fullName: e.target.value })
-                    }
+                    onChange={(e) => handleInputChange('fullName', e.target.value)}
                     style={{
                       ...styles.input,
                       fontSize: '24px',
@@ -269,18 +294,14 @@ const MakeupArtistProfile = ({
                   <input
                     type="text"
                     value={editData.headline || ''}
-                    onChange={(e) =>
-                      setEditData({ ...editData, headline: e.target.value })
-                    }
+                    onChange={(e) => handleInputChange('headline', e.target.value)}
                     style={{ ...styles.input, fontSize: '18px' }}
-                    placeholder="Makeup Specialization (e.g., Beauty & Editorial Makeup Artist)"
+                    placeholder="Professional Headline (e.g., Beauty & Editorial Makeup Artist)"
                   />
                   <input
                     type="text"
                     value={editData.location || ''}
-                    onChange={(e) =>
-                      setEditData({ ...editData, location: e.target.value })
-                    }
+                    onChange={(e) => handleInputChange('location', e.target.value)}
                     style={styles.input}
                     placeholder="📍 Location"
                   />
@@ -295,7 +316,8 @@ const MakeupArtistProfile = ({
                     }}
                   >
                     {currentProfile?.fullName ||
-                      `${targetUser?.firstName} ${targetUser?.lastName}`}
+                      `${targetUser?.firstName} ${targetUser?.lastName}` ||
+                      'Makeup Artist'}
                   </h1>
                   <p
                     style={{
@@ -304,9 +326,7 @@ const MakeupArtistProfile = ({
                       margin: '0 0 15px 0'
                     }}
                   >
-                    💄{' '}
-                    {currentProfile?.headline ||
-                      'Professional Makeup Artist'}
+                    💄 {currentProfile?.headline || 'Professional Makeup Artist'}
                   </p>
                   <div
                     style={{
@@ -323,7 +343,7 @@ const MakeupArtistProfile = ({
                     <span>
                       🔗 {currentProfile?.connectionsCount || 0} connections
                     </span>
-                    {currentProfile?.verified && (
+                    {currentProfile?.isVerified && (
                       <span style={{ color: '#4CAF50' }}>✓ Verified</span>
                     )}
                   </div>
@@ -383,9 +403,7 @@ const MakeupArtistProfile = ({
               {isEditing ? (
                 <textarea
                   value={editData.bio || ''}
-                  onChange={(e) =>
-                    setEditData({ ...editData, bio: e.target.value })
-                  }
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
                   style={{
                     ...styles.input,
                     minHeight: '120px',
@@ -435,8 +453,7 @@ const MakeupArtistProfile = ({
                       htmlFor="makeupPortfolio"
                       style={{
                         ...styles.button,
-                        background:
-                          'linear-gradient(45deg, #4CAF50, #66BB6A)',
+                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
                         color: 'white',
                         fontSize: '12px',
                         cursor: 'pointer',
@@ -453,8 +470,7 @@ const MakeupArtistProfile = ({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns:
-                      'repeat(auto-fill, minmax(200px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                     gap: '15px'
                   }}
                 >
@@ -479,6 +495,9 @@ const MakeupArtistProfile = ({
                           height: '100%',
                           objectFit: 'cover'
                         }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
                       />
                     </div>
                   ))}
@@ -491,32 +510,16 @@ const MakeupArtistProfile = ({
                     color: '#ddd'
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: '48px',
-                      marginBottom: '15px'
-                    }}
-                  >
-                    💄
-                  </div>
+                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>💄</div>
                   <p>No makeup portfolio yet</p>
-                  <p
-                    style={{
-                      fontSize: '14px',
-                      marginTop: '10px'
-                    }}
-                  >
-                    Showcase your best makeup looks, transformations, and
-                    artistry work
+                  <p style={{ fontSize: '14px', marginTop: '10px' }}>
+                    Showcase your best makeup looks, transformations, and artistry work
                   </p>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Right Column */}
-          <div>
-            {/* Makeup Specializations */}
+            {/* Notable Work & Publications */}
             <div style={styles.card}>
               <h2
                 style={{
@@ -525,43 +528,98 @@ const MakeupArtistProfile = ({
                   marginBottom: '15px'
                 }}
               >
-                🎨 Specializations
+                🏆 Notable Work & Publications
+              </h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <textarea
+                    value={editData.notableWork || ''}
+                    onChange={(e) => handleInputChange('notableWork', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '80px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Describe your most notable projects, collaborations, or achievements..."
+                  />
+                  <textarea
+                    value={editData.publicationFeatures || ''}
+                    onChange={(e) => handleInputChange('publicationFeatures', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="List any magazines, blogs, or publications that have featured your work..."
+                  />
+                  <textarea
+                    value={editData.competitions || ''}
+                    onChange={(e) => handleInputChange('competitions', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="List any makeup competitions, contests, or awards you've won..."
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#ddd', lineHeight: '1.6' }}>
+                  {currentProfile?.notableWork && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Notable Work:</h4>
+                      <p>{currentProfile.notableWork}</p>
+                    </div>
+                  )}
+                  {currentProfile?.publicationFeatures && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Publications:</h4>
+                      <p>{currentProfile.publicationFeatures}</p>
+                    </div>
+                  )}
+                  {currentProfile?.competitions && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Awards & Competitions:</h4>
+                      <p>{currentProfile.competitions}</p>
+                    </div>
+                  )}
+                  {!currentProfile?.notableWork && !currentProfile?.publicationFeatures && !currentProfile?.competitions && (
+                    <p style={{ fontStyle: 'italic', color: '#999' }}>
+                      No notable work or publications listed yet.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div>
+            {/* Makeup Types */}
+            <div style={styles.card}>
+              <h2
+                style={{
+                  color: 'white',
+                  fontSize: '1.3rem',
+                  marginBottom: '15px'
+                }}
+              >
+                🎨 Makeup Types
               </h2>
               {isEditing ? (
                 <textarea
-                  value={(editData.specializations || []).join(', ')}
-                  onChange={(e) =>
-                    setEditData({
-                      ...editData,
-                      specializations: e
-                        .target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s)
-                    })
-                  }
+                  value={(editData.makeupTypes || []).join(', ')}
+                  onChange={(e) => handleArrayInputChange('makeupTypes', e.target.value)}
                   style={{
                     ...styles.input,
                     minHeight: '100px',
                     resize: 'vertical'
                   }}
-                  placeholder="Beauty, Editorial, Bridal, Special Effects, Film/TV, Fashion, Theatrical (comma separated)"
+                  placeholder="Bridal Makeup, Editorial Makeup, Beauty Makeup, Special Effects (SFX), Fashion Makeup (comma separated)"
                 />
               ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px'
-                  }}
-                >
-                  {(
-                    currentProfile?.specializations || [
-                      'Beauty Makeup',
-                      'Editorial',
-                      'Bridal'
-                    ]
-                  ).map((spec, index) => (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(currentProfile?.makeupTypes || ['Beauty Makeup', 'Editorial', 'Bridal']).map((type, index) => (
                     <span
                       key={index}
                       style={{
@@ -573,14 +631,14 @@ const MakeupArtistProfile = ({
                         border: '1px solid rgba(240, 147, 251, 0.3)'
                       }}
                     >
-                      {spec}
+                      {type}
                     </span>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Skills & Techniques */}
+            {/* Techniques */}
             <div style={styles.card}>
               <h2
                 style={{
@@ -589,45 +647,22 @@ const MakeupArtistProfile = ({
                   marginBottom: '15px'
                 }}
               >
-                🛠️ Skills & Techniques
+                🛠️ Techniques
               </h2>
               {isEditing ? (
                 <textarea
-                  value={(editData.skills || []).join(', ')}
-                  onChange={(e) =>
-                    setEditData({
-                      ...editData,
-                      skills: e
-                        .target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s)
-                    })
-                  }
+                  value={(editData.techniques || []).join(', ')}
+                  onChange={(e) => handleArrayInputChange('techniques', e.target.value)}
                   style={{
                     ...styles.input,
                     minHeight: '80px',
                     resize: 'vertical'
                   }}
-                  placeholder="Contouring, Color Theory, Airbrush, Prosthetics, Hair Styling, Lash Application (comma separated)"
+                  placeholder="Contouring & Highlighting, Color Correction, Airbrushing, False Lashes, Cut Crease (comma separated)"
                 />
               ) : (
-                <div
-                  style={{
-                    color: '#ddd',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  {(
-                    currentProfile?.skills || [
-                      'Contouring & Highlighting',
-                      'Color Matching',
-                      'Airbrush Makeup',
-                      'Lash Application'
-                    ]
-                  ).map((skill, index) => (
+                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(currentProfile?.techniques || ['Contouring & Highlighting', 'Color Matching', 'Airbrush Makeup', 'Lash Application']).map((technique, index) => (
                     <div
                       key={index}
                       style={{
@@ -637,14 +672,57 @@ const MakeupArtistProfile = ({
                         fontSize: '14px'
                       }}
                     >
-                      • {skill}
+                      • {technique}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Brands & Products */}
+            {/* Client Types */}
+            <div style={styles.card}>
+              <h2
+                style={{
+                  color: 'white',
+                  fontSize: '1.3rem',
+                  marginBottom: '15px'
+                }}
+              >
+                👥 Client Types
+              </h2>
+              {isEditing ? (
+                <textarea
+                  value={(editData.clientTypes || []).join(', ')}
+                  onChange={(e) => handleArrayInputChange('clientTypes', e.target.value)}
+                  style={{
+                    ...styles.input,
+                    minHeight: '80px',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Brides, Models, Actors/Actresses, Musicians/Performers, Corporate Clients (comma separated)"
+                />
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(currentProfile?.clientTypes || ['Brides', 'Models', 'Special Events']).map((clientType, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: '#ddd',
+                        padding: '6px 10px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                      }}
+                    >
+                      {clientType}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Preferred Brands */}
             <div style={styles.card}>
               <h2
                 style={{
@@ -657,17 +735,8 @@ const MakeupArtistProfile = ({
               </h2>
               {isEditing ? (
                 <textarea
-                  value={(editData.preferredLocations || []).join(', ')}
-                  onChange={(e) =>
-                    setEditData({
-                      ...editData,
-                      preferredLocations: e
-                        .target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s)
-                    })
-                  }
+                  value={(editData.preferredBrands || []).join(', ')}
+                  onChange={(e) => handleArrayInputChange('preferredBrands', e.target.value)}
                   style={{
                     ...styles.input,
                     minHeight: '80px',
@@ -676,20 +745,8 @@ const MakeupArtistProfile = ({
                   placeholder="MAC, Urban Decay, Charlotte Tilbury, Fenty Beauty, NARS, Dior (comma separated)"
                 />
               ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px'
-                  }}
-                >
-                  {(
-                    currentProfile?.preferredLocations || [
-                      'MAC Cosmetics',
-                      'Urban Decay',
-                      'Charlotte Tilbury'
-                    ]
-                  ).map((brand, index) => (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(currentProfile?.preferredBrands || ['MAC Cosmetics', 'Urban Decay', 'Charlotte Tilbury']).map((brand, index) => (
                     <span
                       key={index}
                       style={{
@@ -720,24 +777,58 @@ const MakeupArtistProfile = ({
                 🎓 Experience & Training
               </h2>
               {isEditing ? (
-                <textarea
-                  value={editData.experience || ''}
-                  onChange={(e) =>
-                    setEditData({ ...editData, experience: e.target.value })
-                  }
-                  style={{
-                    ...styles.input,
-                    minHeight: '100px',
-                    resize: 'vertical'
-                  }}
-                  placeholder="Makeup school, certifications, notable clients, publications, years of experience..."
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <select
+                    value={editData.yearsExperience || ''}
+                    onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
+                    style={styles.input}
+                  >
+                    <option value="">Select Experience Level</option>
+                    <option value="0-1">0-1 years</option>
+                    <option value="2-3">2-3 years</option>
+                    <option value="4-6">4-6 years</option>
+                    <option value="7-10">7-10 years</option>
+                    <option value="10+">10+ years</option>
+                  </select>
+                  <textarea
+                    value={editData.education || ''}
+                    onChange={(e) => handleInputChange('education', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Education, makeup schools, certifications..."
+                  />
+                  <textarea
+                    value={editData.certifications || ''}
+                    onChange={(e) => handleInputChange('certifications', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Professional certifications, awards, notable achievements..."
+                  />
+                </div>
               ) : (
                 <div style={{ color: '#ddd', lineHeight: '1.6' }}>
-                  <p>
-                    {currentProfile?.experience ||
-                      'Certified makeup artist with extensive training in beauty, editorial, and special effects makeup techniques.'}
-                  </p>
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong style={{ color: 'white' }}>Experience:</strong>{' '}
+                    {currentProfile?.yearsExperience || 'Not specified'}
+                  </div>
+                  {currentProfile?.education && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <strong style={{ color: 'white' }}>Education:</strong>{' '}
+                      {currentProfile.education}
+                    </div>
+                  )}
+                  {currentProfile?.certifications && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Certifications:</strong>{' '}
+                      {currentProfile.certifications}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -754,116 +845,171 @@ const MakeupArtistProfile = ({
                 💰 Services & Rates
               </h2>
               {isEditing ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px'
-                  }}
-                >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input
-                    type="number"
-                    value={editData.rate?.hourly || ''}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        rate: {
-                          ...editData.rate,
-                          hourly: e.target.value
-                        }
-                      })
-                    }
+                    type="text"
+                    value={editData.rates?.bridal || ''}
+                    onChange={(e) => handleInputChange('rates.bridal', e.target.value)}
                     style={styles.input}
-                    placeholder="Hourly Rate (USD)"
+                    placeholder="Bridal Rate (e.g., $250)"
                   />
                   <input
-                    type="number"
-                    value={editData.rate?.daily || ''}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        rate: {
-                          ...editData.rate,
-                          daily: e.target.value
-                        }
-                      })
-                    }
+                    type="text"
+                    value={editData.rates?.photoshoot || ''}
+                    onChange={(e) => handleInputChange('rates.photoshoot', e.target.value)}
                     style={styles.input}
-                    placeholder="Event/Shoot Rate (USD)"
+                    placeholder="Photoshoot Rate (e.g., $150)"
                   />
-                  <textarea
-                    value={(editData.preferredTypes || []).join(', ')}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        preferredTypes: e
-                          .target.value
-                          .split(',')
-                          .map((s) => s.trim())
-                          .filter((s) => s)
-                      })
-                    }
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
-                    placeholder="Bridal Makeup, Photo Shoots, Events, Lessons, Touch-ups (comma separated)"
+                  <input
+                    type="text"
+                    value={editData.rates?.special_event || ''}
+                    onChange={(e) => handleInputChange('rates.special_event', e.target.value)}
+                    style={styles.input}
+                    placeholder="Special Event Rate (e.g., $200)"
+                  />
+                  <input
+                    type="text"
+                    value={editData.rates?.lesson || ''}
+                    onChange={(e) => handleInputChange('rates.lesson', e.target.value)}
+                    style={styles.input}
+                    placeholder="Lesson Rate (e.g., $100)"
                   />
                   <select
                     value={editData.availability || ''}
-                    onChange={(e) =>
-                      setEditData({ ...editData, availability: e.target.value })
-                    }
+                    onChange={(e) => handleInputChange('availability', e.target.value)}
                     style={styles.input}
                   >
                     <option value="">Select Availability</option>
                     <option value="full-time">Available Full Time</option>
                     <option value="freelance">Freelance Projects</option>
-                    <option value="weekends-only">Weekends Only</option>
-                    <option value="events-only">Events Only</option>
-                    <option value="limited">Limited Availability</option>
+                    <option value="by-appointment">By Appointment</option>
                   </select>
                 </div>
               ) : (
-                <div
-                  style={{
-                    color: '#ddd',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  <div>
-                    <strong style={{ color: 'white' }}>Hourly Rate:</strong> $
-                    {currentProfile?.rate?.hourly || 'Contact for rates'}
-                  </div>
-                  <div>
-                    <strong style={{ color: 'white' }}>Event Rate:</strong> $
-                    {currentProfile?.rate?.daily || 'Contact for rates'}
-                  </div>
-                  <div>
-                    <strong style={{ color: 'white' }}>Services:</strong>
-                  </div>
-                  {(currentProfile?.preferredTypes || [
-                    'Bridal Makeup',
-                    'Photo Shoots',
-                    'Special Events'
-                  ]).map((service, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        paddingLeft: '15px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      • {service}
+                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {currentProfile?.rates?.bridal && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Bridal:</strong> {currentProfile.rates.bridal}
                     </div>
-                  ))}
-                  <div style={{ marginTop: '10px' }}>
-                    <strong style={{ color: 'white' }}>Availability:</strong>{' '}
-                    {currentProfile?.availability || 'Contact to discuss'}
+                  )}
+                  {currentProfile?.rates?.photoshoot && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Photoshoot:</strong> {currentProfile.rates.photoshoot}
+                    </div>
+                  )}
+                  {currentProfile?.rates?.special_event && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Special Events:</strong> {currentProfile.rates.special_event}
+                    </div>
+                  )}
+                  {currentProfile?.rates?.lesson && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Lessons:</strong> {currentProfile.rates.lesson}
+                    </div>
+                  )}
+                  {currentProfile?.availability && (
+                    <div style={{ marginTop: '10px' }}>
+                      <strong style={{ color: 'white' }}>Availability:</strong> {currentProfile.availability}
+                    </div>
+                  )}
+                  {(!currentProfile?.rates || Object.keys(currentProfile.rates).length === 0) && (
+                    <div style={{ fontStyle: 'italic', color: '#999' }}>
+                      Contact for rates and availability
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Business Information */}
+            <div style={styles.card}>
+              <h2
+                style={{
+                  color: 'white',
+                  fontSize: '1.3rem',
+                  marginBottom: '15px'
+                }}
+              >
+                🏢 Business Information
+              </h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ color: 'white', fontSize: '14px', marginBottom: '5px' }}>
+                    <input
+                      type="checkbox"
+                      checked={editData.mobileServices || false}
+                      onChange={(e) => handleInputChange('mobileServices', e.target.checked)}
+                      style={{ marginRight: '8px' }}
+                    />
+                    I offer mobile services (travel to clients)
+                  </label>
+                  <textarea
+                    value={editData.studioAccess || ''}
+                    onChange={(e) => handleInputChange('studioAccess', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Describe your studio or workspace access..."
+                  />
+                  <textarea
+                    value={(editData.equipmentOwned || []).join(', ')}
+                    onChange={(e) => handleArrayInputChange('equipmentOwned', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Professional Brush Set, Airbrush System, Ring Light, Makeup Chair (comma separated)"
+                  />
+                  <textarea
+                    value={(editData.workEnvironments || []).join(', ')}
+                    onChange={(e) => handleArrayInputChange('workEnvironments', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Studio, On-location, Client's Home, Wedding Venues, Photo Studios (comma separated)"
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div>
+                    <strong style={{ color: 'white' }}>Mobile Services:</strong>{' '}
+                    {currentProfile?.mobileServices ? 'Yes' : 'No'}
                   </div>
+                  {currentProfile?.studioAccess && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Studio Access:</strong>{' '}
+                      {currentProfile.studioAccess}
+                    </div>
+                  )}
+                  {currentProfile?.equipmentOwned && currentProfile.equipmentOwned.length > 0 && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Equipment:</strong>
+                      <div style={{ marginTop: '5px' }}>
+                        {currentProfile.equipmentOwned.map((equipment, index) => (
+                          <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
+                            • {equipment}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {currentProfile?.workEnvironments && currentProfile.workEnvironments.length > 0 && (
+                    <div>
+                      <strong style={{ color: 'white' }}>Work Environments:</strong>
+                      <div style={{ marginTop: '5px' }}>
+                        {currentProfile.workEnvironments.map((env, index) => (
+                          <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
+                            • {env}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -879,93 +1025,48 @@ const MakeupArtistProfile = ({
               >
                 📞 Contact
               </h2>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '15px'
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {isEditing ? (
                   <>
                     <input
-                      type="email"
-                      value={editData.email || ''}
-                      onChange={(e) =>
-                        setEditData({ ...editData, email: e.target.value })
-                      }
-                      style={styles.input}
-                      placeholder="✉️ Email"
-                    />
-                    <input
                       type="tel"
                       value={editData.phone || ''}
-                      onChange={(e) =>
-                        setEditData({ ...editData, phone: e.target.value })
-                      }
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
                       style={styles.input}
-                      placeholder="📞 Phone"
+                      placeholder="📞 Phone Number"
                     />
                     <input
                       type="url"
-                      value={editData.website || ''}
-                      onChange={(e) =>
-                        setEditData({ ...editData, website: e.target.value })
-                      }
+                      value={editData.portfolioWebsite || ''}
+                      onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
                       style={styles.input}
                       placeholder="🌐 Portfolio Website"
                     />
                   </>
                 ) : (
                   <>
-                    {currentProfile?.email && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}
-                      >
-                        <span style={{ color: '#ccc' }}>✉️</span>
-                        <span style={{ color: 'white' }}>
-                          {currentProfile.email}
-                        </span>
-                      </div>
-                    )}
                     {currentProfile?.phone && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}
-                      >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: '#ccc' }}>📞</span>
-                        <span style={{ color: 'white' }}>
-                          {currentProfile.phone}
-                        </span>
+                        <span style={{ color: 'white' }}>{currentProfile.phone}</span>
                       </div>
                     )}
-                    {currentProfile?.website && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}
-                      >
+                    {currentProfile?.portfolioWebsite && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: '#ccc' }}>🌐</span>
                         <a
-                          href={currentProfile.website}
+                          href={currentProfile.portfolioWebsite}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{
-                            color: '#f093fb',
-                            textDecoration: 'none'
-                          }}
+                          style={{ color: '#f093fb', textDecoration: 'none' }}
                         >
                           Portfolio Website
                         </a>
+                      </div>
+                    )}
+                    {!currentProfile?.phone && !currentProfile?.portfolioWebsite && (
+                      <div style={{ fontStyle: 'italic', color: '#999' }}>
+                        No contact information provided
                       </div>
                     )}
                   </>
@@ -985,76 +1086,51 @@ const MakeupArtistProfile = ({
                 📱 Social Media
               </h2>
               {isEditing ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px'
-                  }}
-                >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input
                     type="text"
                     value={editData.socialMedia?.instagram || ''}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        socialMedia: {
-                          ...editData.socialMedia,
-                          instagram: e.target.value
-                        }
-                      })
-                    }
+                    onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
                     style={styles.input}
                     placeholder="📷 Instagram (@username or URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.tiktok || ''}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        socialMedia: {
-                          ...editData.socialMedia,
-                          tiktok: e.target.value
-                        }
-                      })
-                    }
+                    onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
                     style={styles.input}
                     placeholder="🎵 TikTok (@username or URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.youtube || ''}
-                    onChange={(e) =>
-                      setEditData({
-                        ...editData,
-                        socialMedia: {
-                          ...editData.socialMedia,
-                          youtube: e.target.value
-                        }
-                      })
-                    }
+                    onChange={(e) => handleInputChange('socialMedia.youtube', e.target.value)}
                     style={styles.input}
                     placeholder="🎥 YouTube (Channel URL)"
                   />
+                  <input
+                    type="text"
+                    value={editData.socialMedia?.facebook || ''}
+                    onChange={(e) => handleInputChange('socialMedia.facebook', e.target.value)}
+                    style={styles.input}
+                    placeholder="📘 Facebook (Page URL)"
+                  />
+                  <input
+                    type="text"
+                    value={editData.socialMedia?.blog || ''}
+                    onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
+                    style={styles.input}
+                    placeholder="📝 Blog/Website URL"
+                  />
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px'
-                  }}
-                >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {currentProfile?.socialMedia?.instagram && (
                     <a
                       href={
                         currentProfile.socialMedia.instagram.startsWith('http')
                           ? currentProfile.socialMedia.instagram
-                          : `https://instagram.com/${currentProfile.socialMedia.instagram.replace(
-                              '@',
-                              ''
-                            )}`
+                          : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
                       }
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1075,15 +1151,12 @@ const MakeupArtistProfile = ({
                       href={
                         currentProfile.socialMedia.tiktok.startsWith('http')
                           ? currentProfile.socialMedia.tiktok
-                          : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace(
-                              '@',
-                              ''
-                            )}`
+                          : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
                       }
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        color: '#333',
+                        color: '#000',
                         textDecoration: 'none',
                         display: 'flex',
                         alignItems: 'center',
@@ -1111,13 +1184,106 @@ const MakeupArtistProfile = ({
                       <span>YouTube</span>
                     </a>
                   )}
+                  {currentProfile?.socialMedia?.facebook && (
+                    <a
+                      href={currentProfile.socialMedia.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#1877F2',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>📘</span>
+                      <span>Facebook</span>
+                    </a>
+                  )}
+                  {currentProfile?.socialMedia?.blog && (
+                    <a
+                      href={currentProfile.socialMedia.blog}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#f093fb',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>📝</span>
+                      <span>Blog/Website</span>
+                    </a>
+                  )}
                   {(!currentProfile?.socialMedia ||
                     (!currentProfile.socialMedia.instagram &&
                       !currentProfile.socialMedia.tiktok &&
-                      !currentProfile.socialMedia.youtube)) && (
+                      !currentProfile.socialMedia.youtube &&
+                      !currentProfile.socialMedia.facebook &&
+                      !currentProfile.socialMedia.blog)) && (
                     <span style={{ color: '#999', fontStyle: 'italic' }}>
                       No social media links
                     </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Kit Information */}
+            <div style={styles.card}>
+              <h2
+                style={{
+                  color: 'white',
+                  fontSize: '1.3rem',
+                  marginBottom: '15px'
+                }}
+              >
+                🧰 Kit Information
+              </h2>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <textarea
+                    value={editData.kitInformation || ''}
+                    onChange={(e) => handleInputChange('kitInformation', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '80px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Describe your makeup kit, special tools, and professional equipment..."
+                  />
+                  <textarea
+                    value={editData.hygieneStandards || ''}
+                    onChange={(e) => handleInputChange('hygieneStandards', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      minHeight: '60px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Describe your sanitation practices and safety protocols..."
+                  />
+                </div>
+              ) : (
+                <div style={{ color: '#ddd', lineHeight: '1.6' }}>
+                  {currentProfile?.kitInformation && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Kit Details:</h4>
+                      <p>{currentProfile.kitInformation}</p>
+                    </div>
+                  )}
+                  {currentProfile?.hygieneStandards && (
+                    <div>
+                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Hygiene Standards:</h4>
+                      <p>{currentProfile.hygieneStandards}</p>
+                    </div>
+                  )}
+                  {!currentProfile?.kitInformation && !currentProfile?.hygieneStandards && (
+                    <p style={{ fontStyle: 'italic', color: '#999' }}>
+                      No kit information provided
+                    </p>
                   )}
                 </div>
               )}

@@ -24,6 +24,7 @@ const usersRoutes = require('./routes/users');
 const activityRoutes = require('./routes/activity');
 const notificationRoutes = require('./routes/notifications');
 const contentRoutes = require('./routes/content'); // NEW
+const professionalProfileRoutes = require('./routes/professionalProfile');
 
 // Route middleware
 app.use('/api/auth', authRoutes);
@@ -36,6 +37,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/content', contentRoutes); // NEW
+app.use('/api/professional-profile', professionalProfileRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
