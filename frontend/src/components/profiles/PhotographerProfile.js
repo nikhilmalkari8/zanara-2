@@ -1,27 +1,52 @@
 import React, { useState, useEffect } from 'react';
+import ConnectionRequestModal from '../connections/ConnectionRequestModal';
 
-const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, onMessage }) => {
+const PhotographerProfile = ({ profileId, user, targetUser, profileData, onBack, onConnect, onMessage }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
+  
+  // Connection states
+  const [connectionStatus, setConnectionStatus] = useState('none');
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+
+  // Helper function to ensure arrays
+  const ensureArray = (value) => {
+    if (Array.isArray(value)) return value;
+    return [];
+  };
 
   const isOwnProfile = user && (
-    user._id === targetUser._id || 
-    user.id === targetUser.id ||
+    user._id === targetUser?._id || 
+    user.id === targetUser?.id ||
     user._id === profileId ||
     user.id === profileId
   );
 
   useEffect(() => {
-    fetchPhotographerProfile();
-  }, [profileId, fetchPhotographerProfile]);
+    if (profileData) {
+      setProfile(profileData);
+      setEditData(profileData);
+      setLoading(false);
+    } else {
+      fetchPhotographerProfile();
+    }
+  }, [profileData, profileId]);
+
+  // Check connection status when profile loads (only for other people's profiles)
+  useEffect(() => {
+    if (!isOwnProfile && profileId && profile) {
+      checkConnectionStatus();
+    }
+  }, [profileId, profile, isOwnProfile]);
 
   const fetchPhotographerProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/profile/model/${profileId}`, {
+      const response = await fetch(`http://localhost:8001/api/professional-profile/${profileId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -29,11 +54,70 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
         const data = await response.json();
         setProfile(data);
         setEditData(data);
+      } else {
+        setError('Failed to load profile');
       }
     } catch (error) {
       console.error('Error loading photographer profile:', error);
+      setError('Error loading profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check connection status with this user
+  const checkConnectionStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8001/api/connections/status/${profileId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConnectionStatus(data.status || 'none');
+      }
+    } catch (error) {
+      console.error('Error checking connection status:', error);
+      setConnectionStatus('none');
+    }
+  };
+
+  // Handle connect button click
+  const handleConnectClick = () => {
+    setIsConnectionModalOpen(true);
+  };
+
+  // Send connection request
+  const handleSendConnectionRequest = async (message) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8001/api/connections/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          receiverId: profileId,
+          message,
+          receiverType: profile.professionalType || 'photographer'
+        })
+      });
+
+      if (response.ok) {
+        setConnectionStatus('pending');
+        setIsConnectionModalOpen(false);
+        alert('Connection request sent successfully!');
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to send connection request');
+      }
+    } catch (error) {
+      console.error('Error sending connection request:', error);
+      alert('Error sending connection request');
     }
   };
 
@@ -41,7 +125,7 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:8001/api/profile/update', {
+      const response = await fetch('http://localhost:8001/api/professional-profile/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +158,7 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/photos', {
+      const response = await fetch('http://localhost:8001/api/professional-profile/photos', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -91,42 +175,6 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
     } catch (error) {
       console.error('Portfolio upload error:', error);
       alert('Failed to upload photos');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleFileUpload = async (type, files) => {
-    setUploading(true);
-    const formData = new FormData();
-    Array.from(files).forEach(file => formData.append('files', file));
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (type === 'behindTheScenes') {
-          setEditData({ 
-            ...editData, 
-            behindTheScenes: [...(editData.behindTheScenes || []), ...data.files.map(file => ({
-              url: file.url,
-              type: file.type,
-              description: '',
-              date: new Date().toISOString().split('T')[0]
-            }))]
-          });
-        }
-        alert('Files uploaded successfully!');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload files');
     } finally {
       setUploading(false);
     }
@@ -175,11 +223,19 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
       fontWeight: 'bold',
       fontSize: '14px'
     },
-    btsCard: {
-      background: 'rgba(255,255,255,0.1)',
-      padding: '15px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255,255,255,0.2)'
+    primaryButton: {
+      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
+      color: 'white'
+    },
+    secondaryButton: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: 'white',
+      border: '1px solid rgba(255, 255, 255, 0.3)'
+    },
+    disabledButton: {
+      background: '#f0f0f0',
+      color: '#666',
+      cursor: 'default'
     }
   };
 
@@ -193,19 +249,53 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
     );
   }
 
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={{ textAlign: 'center', marginTop: '50px' }}>
+          <p style={{ color: '#ff6b6b', marginBottom: '20px' }}>{error}</p>
+          <button onClick={onBack} style={{ ...styles.button, ...styles.secondaryButton }}>
+            ← Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentProfile = isEditing ? editData : profile;
+
+  // Get button text and styling based on connection status
+  const getConnectionButtonProps = () => {
+    switch (connectionStatus) {
+      case 'pending':
+        return {
+          text: 'Request Sent',
+          disabled: true,
+          style: styles.disabledButton
+        };
+      case 'connected':
+        return {
+          text: 'Connected',
+          disabled: true,
+          style: styles.disabledButton
+        };
+      default:
+        return {
+          text: 'Connect',
+          disabled: false,
+          style: styles.primaryButton
+        };
+    }
+  };
+
+  const connectionButtonProps = getConnectionButtonProps();
 
   return (
     <div style={styles.container}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* Header */}
         <div style={styles.header}>
-          <button onClick={onBack} style={{
-            ...styles.button,
-            background: 'rgba(255, 255, 255, 0.1)',
-            color: 'white',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}>
+          <button onClick={onBack} style={{ ...styles.button, ...styles.secondaryButton }}>
             ← Back
           </button>
           <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
@@ -216,37 +306,15 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
               <>
                 {isEditing ? (
                   <>
-                    <button
-                      onClick={handleSaveChanges}
-                      style={{
-                        ...styles.button,
-                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                        color: 'white'
-                      }}
-                    >
+                    <button onClick={handleSaveChanges} style={{ ...styles.button, ...styles.primaryButton }}>
                       Save Changes
                     </button>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      style={{
-                        ...styles.button,
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)'
-                      }}
-                    >
+                    <button onClick={() => setIsEditing(false)} style={{ ...styles.button, ...styles.secondaryButton }}>
                       Cancel
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    style={{
-                      ...styles.button,
-                      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                      color: 'white'
-                    }}
-                  >
+                  <button onClick={() => setIsEditing(true)} style={{ ...styles.button, ...styles.primaryButton }}>
                     ✏️ Edit Profile
                   </button>
                 )}
@@ -345,7 +413,7 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
               ) : (
                 <>
                   <h1 style={{ color: 'white', fontSize: '2rem', margin: '0 0 10px 0' }}>
-                    {currentProfile?.fullName || targetUser?.firstName + ' ' + targetUser?.lastName}
+                    {currentProfile?.fullName || `${targetUser?.firstName} ${targetUser?.lastName}`}
                   </h1>
                   <p style={{ color: '#ddd', fontSize: '1.2rem', margin: '0 0 15px 0' }}>
                     📸 {currentProfile?.headline || 'Professional Photographer'}
@@ -362,23 +430,18 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
             {!isOwnProfile && (
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
-                  onClick={onConnect}
-                  style={{
-                    ...styles.button,
-                    background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                    color: 'white'
+                  onClick={handleConnectClick}
+                  disabled={connectionButtonProps.disabled}
+                  style={{ 
+                    ...styles.button, 
+                    ...connectionButtonProps.style
                   }}
                 >
-                  Connect
+                  {connectionButtonProps.text}
                 </button>
                 <button 
                   onClick={onMessage}
-                  style={{
-                    ...styles.button,
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.3)'
-                  }}
+                  style={{ ...styles.button, ...styles.secondaryButton }}
                 >
                   Message
                 </button>
@@ -408,73 +471,71 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
               )}
             </div>
 
-            {/* Photography Portfolio */}
+            {/* Portfolio Section */}
             <div style={styles.card}>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📸 Photography Portfolio</h2>
-              
-              {/* Behind the Scenes */}
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Behind the Scenes</h3>
-                {isEditing ? (
-                  <div style={{ border: '2px dashed rgba(255,255,255,0.2)', padding: '20px', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>📸 Portfolio</h2>
+                {isEditing && (
+                  <div>
                     <input
                       type="file"
-                      accept="image/*,video/*"
+                      id="portfolioPhotos"
+                      accept="image/*"
                       multiple
-                      onChange={(e) => handleFileUpload('behindTheScenes', e.target.files)}
+                      onChange={handlePortfolioUpload}
                       style={{ display: 'none' }}
-                      id="btsUpload"
+                      disabled={uploading}
                     />
                     <label
-                      htmlFor="btsUpload"
+                      htmlFor="portfolioPhotos"
                       style={{
-                        display: 'block',
-                        textAlign: 'center',
-                        padding: '20px',
-                        background: 'rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        cursor: 'pointer'
+                        ...styles.button,
+                        ...styles.primaryButton,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'inline-block'
                       }}
                     >
-                      <span style={{ fontSize: '24px', marginBottom: '10px', display: 'block' }}>🎥</span>
-                      <p style={{ color: '#ddd', marginBottom: '5px' }}>Upload BTS Content</p>
-                      <p style={{ color: '#999', fontSize: '12px' }}>Images and videos from your shoots</p>
+                      {uploading ? 'Uploading...' : '+ Add Photos'}
                     </label>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
-                    {currentProfile?.behindTheScenes?.map((content, index) => (
-                      <div key={index} style={styles.btsCard}>
-                        {content.type === 'video' ? (
-                          <video
-                            src={content.url}
-                            controls
-                            style={{
-                              width: '100%',
-                              borderRadius: '8px',
-                              marginBottom: '10px'
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src={content.url}
-                            alt={`BTS ${index + 1}`}
-                            style={{
-                              width: '100%',
-                              aspectRatio: '16/9',
-                              objectFit: 'cover',
-                              borderRadius: '8px',
-                              marginBottom: '10px'
-                            }}
-                          />
-                        )}
-                        <p style={{ color: '#ddd', fontSize: '14px' }}>{content.description}</p>
-                        <p style={{ color: '#999', fontSize: '12px' }}>{content.date}</p>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
+              
+              {ensureArray(currentProfile?.photos).length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: '15px'
+                }}>
+                  {ensureArray(currentProfile.photos).map((photo, index) => (
+                    <div 
+                      key={index} 
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <img 
+                        src={`http://localhost:8001${typeof photo === 'string' ? photo : photo.url}`}
+                        alt={`Portfolio ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#ddd' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '15px' }}>📸</div>
+                  <p>No portfolio photos yet</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -485,7 +546,7 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
               <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📋 Specializations</h2>
               {isEditing ? (
                 <textarea
-                  value={(editData.specializations || []).join(', ')}
+                  value={ensureArray(editData.specializations).join(', ')}
                   onChange={(e) => setEditData({ 
                     ...editData, 
                     specializations: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
@@ -495,7 +556,10 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
                 />
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(currentProfile?.specializations || ['Fashion Photography', 'Portrait', 'Commercial']).map((spec, index) => (
+                  {(ensureArray(currentProfile?.specializations).length > 0 
+                    ? ensureArray(currentProfile.specializations)
+                    : ['Fashion Photography', 'Portrait', 'Commercial']
+                  ).map((spec, index) => (
                     <span 
                       key={index}
                       style={{
@@ -518,20 +582,21 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
             <div style={styles.card}>
               <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎛️ Equipment & Skills</h2>
               {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <textarea
-                    value={(editData.skills || []).join(', ')}
-                    onChange={(e) => setEditData({ 
-                      ...editData, 
-                      skills: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
-                    })}
-                    style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
-                    placeholder="Canon 5D Mark IV, Studio Lighting, Photoshop, Lightroom, Color Grading (comma separated)"
-                  />
-                </div>
+                <textarea
+                  value={ensureArray(editData.skills).join(', ')}
+                  onChange={(e) => setEditData({ 
+                    ...editData, 
+                    skills: e.target.value.split(',').map(s => s.trim()).filter(s => s) 
+                  })}
+                  style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                  placeholder="Canon 5D Mark IV, Studio Lighting, Photoshop, Lightroom, Color Grading (comma separated)"
+                />
               ) : (
                 <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(currentProfile?.skills || ['Canon 5D Mark IV', 'Studio Lighting', 'Adobe Creative Suite']).map((skill, index) => (
+                  {(ensureArray(currentProfile?.skills).length > 0 
+                    ? ensureArray(currentProfile.skills)
+                    : ['Canon 5D Mark IV', 'Studio Lighting', 'Adobe Creative Suite']
+                  ).map((skill, index) => (
                     <div key={index} style={{ 
                       background: 'rgba(255, 255, 255, 0.05)', 
                       padding: '8px 12px', 
@@ -543,6 +608,62 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Contact Info */}
+            <div style={styles.card}>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📞 Contact</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {isEditing ? (
+                  <>
+                    <input
+                      type="email"
+                      value={editData.email || ''}
+                      onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                      style={styles.input}
+                      placeholder="✉️ Email"
+                    />
+                    <input
+                      type="tel"
+                      value={editData.phone || ''}
+                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                      style={styles.input}
+                      placeholder="📞 Phone"
+                    />
+                    <input
+                      type="url"
+                      value={editData.website || ''}
+                      onChange={(e) => setEditData({ ...editData, website: e.target.value })}
+                      style={styles.input}
+                      placeholder="🌐 Portfolio Website"
+                    />
+                  </>
+                ) : (
+                  <>
+                    {(currentProfile?.email || targetUser?.email) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>✉️</span>
+                        <span style={{ color: 'white' }}>{currentProfile?.email || targetUser?.email}</span>
+                      </div>
+                    )}
+                    {currentProfile?.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>📞</span>
+                        <span style={{ color: 'white' }}>{currentProfile.phone}</span>
+                      </div>
+                    )}
+                    {currentProfile?.website && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#ccc' }}>🌐</span>
+                        <a href={currentProfile.website} target="_blank" rel="noopener noreferrer" 
+                           style={{ color: '#26de81', textDecoration: 'none' }}>
+                          Portfolio Website
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Rates & Availability */}
@@ -590,65 +711,23 @@ const PhotographerProfile = ({ profileId, user, targetUser, onBack, onConnect, o
                 </div>
               )}
             </div>
-
-            {/* Contact Info */}
-            <div style={styles.card}>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📞 Contact</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {isEditing ? (
-                  <>
-                    <input
-                      type="email"
-                      value={editData.email || ''}
-                      onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                      style={styles.input}
-                      placeholder="✉️ Email"
-                    />
-                    <input
-                      type="tel"
-                      value={editData.phone || ''}
-                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                      style={styles.input}
-                      placeholder="📞 Phone"
-                    />
-                    <input
-                      type="url"
-                      value={editData.website || ''}
-                      onChange={(e) => setEditData({ ...editData, website: e.target.value })}
-                      style={styles.input}
-                      placeholder="🌐 Portfolio Website"
-                    />
-                  </>
-                ) : (
-                  <>
-                    {currentProfile?.email && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#ccc' }}>✉️</span>
-                        <span style={{ color: 'white' }}>{currentProfile.email}</span>
-                      </div>
-                    )}
-                    {currentProfile?.phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#ccc' }}>📞</span>
-                        <span style={{ color: 'white' }}>{currentProfile.phone}</span>
-                      </div>
-                    )}
-                    {currentProfile?.website && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#ccc' }}>🌐</span>
-                        <a href={currentProfile.website} target="_blank" rel="noopener noreferrer" 
-                           style={{ color: '#26de81', textDecoration: 'none' }}>
-                          Portfolio Website
-                        </a>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Connection Request Modal */}
+      {isConnectionModalOpen && (
+        <ConnectionRequestModal
+          isOpen={isConnectionModalOpen}
+          onClose={() => setIsConnectionModalOpen(false)}
+          profile={{
+            ...profile,
+            fullName: profile?.fullName || `${targetUser?.firstName} ${targetUser?.lastName}`,
+            professionalType: profile?.professionalType || targetUser?.professionalType
+          }}
+          onSendRequest={handleSendConnectionRequest}
+        />
+      )}
     </div>
   );
 };

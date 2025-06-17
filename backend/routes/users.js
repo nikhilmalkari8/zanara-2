@@ -8,6 +8,27 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+// **NEW ENDPOINT** - Get user by ID (This was missing and causing the 404 error)
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id).select('-password -resetPasswordToken -resetPasswordExpires');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Search users for connections
 router.get('/search', auth, async (req, res) => {
   try {

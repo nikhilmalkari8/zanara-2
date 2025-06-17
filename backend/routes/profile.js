@@ -753,6 +753,8 @@ router.put('/portfolio', auth, async (req, res) => {
 // UPDATED: Removed permission restriction - allows both talent and hiring users
 // Replace ONLY the browse endpoint in routes/profile.js with this:
 
+// Replace the entire browse endpoint in routes/profile.js with this:
+
 router.get('/browse', auth, async (req, res) => {
     try {
       // Get user data using userId from auth middleware
@@ -768,86 +770,180 @@ router.get('/browse', auth, async (req, res) => {
         page = 1,
         limit = 20,
         search,
-        gender,
         location,
-        bodyType,
-        hairColor,
-        eyeColor,
         experience,
         availability,
         skills,
+        sort = 'newest',
+        professionalTypes, // New parameter for professional types
+        // Model-specific filters
+        gender,
+        bodyType,
+        hairColor,
+        eyeColor,
         ageMin,
         ageMax,
         heightMin,
-        heightMax,
-        sort = 'newest'
+        heightMax
       } = req.query;
       
-      let query = { isComplete: true };
+      // Import all profile models
+      const ModelProfile = require('../models/ModelProfile');
+      const PhotographerProfile = require('../models/PhotographerProfile');
+      const FashionDesignerProfile = require('../models/FashionDesignerProfile');
+      const StylistProfile = require('../models/StylistProfile');
+      const MakeupArtistProfile = require('../models/MakeupArtistProfile');
       
-      if (search) {
-        const searchRegex = new RegExp(search, 'i');
-        const matchingUsers = await User.find({
-          $or: [
-            { firstName: searchRegex },
-            { lastName: searchRegex },
-            { email: searchRegex }
-          ]
-        }).select('_id');
-        const matchingUserIds = matchingUsers.map(user => user._id);
-        query.$or = [
-          { userId: { $in: matchingUserIds } },
-          { skills: searchRegex },
-          { specializations: searchRegex },
-          { preferredLocations: searchRegex }
-        ];
+      // Determine which professional types to search
+      const typesToSearch = professionalTypes 
+        ? professionalTypes.split(',').map(type => type.trim())
+        : ['model']; // Default to models if not specified
+      
+      console.log('Searching professional types:', typesToSearch);
+      
+      let allProfiles = [];
+      const breakdown = {};
+      
+      // Search each professional type
+      for (const profType of typesToSearch) {
+        try {
+          let ProfileModel;
+          
+          // Map professional type to model
+          switch (profType) {
+            case 'model':
+              ProfileModel = ModelProfile;
+              break;
+            case 'photographer':
+              ProfileModel = PhotographerProfile;
+              break;
+            case 'fashion-designer':
+              ProfileModel = FashionDesignerProfile;
+              break;
+            case 'stylist':
+              ProfileModel = StylistProfile;
+              break;
+            case 'makeup-artist':
+              ProfileModel = MakeupArtistProfile;
+              break;
+            default:
+              console.log(`Unknown professional type: ${profType}`);
+              continue;
+          }
+          
+          let query = { isComplete: true };
+          
+          // Build search query for this profile type
+          if (search) {
+            const searchRegex = new RegExp(search, 'i');
+            
+            // Find matching users of this professional type
+            const matchingUsers = await User.find({
+              professionalType: profType,
+              $or: [
+                { firstName: searchRegex },
+                { lastName: searchRegex },
+                { email: searchRegex }
+              ]
+            }).select('_id');
+            const matchingUserIds = matchingUsers.map(user => user._id);
+            
+            query.$or = [
+              { userId: { $in: matchingUserIds } },
+              { skills: searchRegex },
+              { specializations: searchRegex }
+            ];
+            
+            // Add profession-specific search fields
+            if (['photographer', 'fashion-designer', 'stylist', 'makeup-artist'].includes(profType)) {
+              query.$or.push({ location: searchRegex });
+            } else if (profType === 'model') {
+              query.$or.push({ preferredLocations: searchRegex });
+            }
+          }
+          
+          // Apply universal filters
+          if (experience && experience !== 'all') {
+            query.experience = { $regex: experience, $options: 'i' };
+          }
+          if (availability && availability !== 'all') {
+            query.availability = availability;
+          }
+          if (skills) {
+            const skillArray = skills.split(',').map(skill => skill.trim());
+            query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
+          }
+          if (location) {
+            if (profType === 'model') {
+              query.preferredLocations = { $regex: location, $options: 'i' };
+            } else {
+              query.location = { $regex: location, $options: 'i' };
+            }
+          }
+          
+          // Apply model-specific filters only if searching models
+          if (profType === 'model') {
+            if (gender && gender !== 'all') {
+              query.gender = gender;
+            }
+            if (bodyType && bodyType !== 'all') {
+              query.bodyType = bodyType;
+            }
+            if (hairColor) {
+              query.hairColor = { $regex: hairColor, $options: 'i' };
+            }
+            if (eyeColor) {
+              query.eyeColor = { $regex: eyeColor, $options: 'i' };
+            }
+          }
+          
+          console.log(`Query for ${profType}:`, JSON.stringify(query, null, 2));
+          
+          // Fetch profiles for this professional type
+          const profiles = await ProfileModel.find(query)
+            .populate('userId', 'firstName lastName email professionalType')
+            .lean();
+          
+          console.log(`Found ${profiles.length} ${profType} profiles`);
+          
+          // Add professional type info to each profile
+          const profilesWithType = profiles.map(profile => ({
+            ...profile,
+            professionalType: profType,
+            displayName: profType.split('-').map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ')
+          }));
+          
+          allProfiles.push(...profilesWithType);
+          breakdown[profType] = profiles.length;
+          
+        } catch (error) {
+          console.error(`Error searching ${profType} profiles:`, error);
+          // Continue with other profile types
+          breakdown[profType] = 0;
+        }
       }
       
-      if (gender && gender !== 'all') {
-        query.gender = gender;
-      }
-      if (bodyType && bodyType !== 'all') {
-        query.bodyType = bodyType;
-      }
-      if (hairColor) {
-        query.hairColor = { $regex: hairColor, $options: 'i' };
-      }
-      if (eyeColor) {
-        query.eyeColor = { $regex: eyeColor, $options: 'i' };
-      }
-      if (experience && experience !== 'all') {
-        query.experience = { $regex: experience, $options: 'i' };
-      }
-      if (availability && availability !== 'all') {
-        query.availability = availability;
-      }
-      if (skills) {
-        const skillArray = skills.split(',').map(skill => skill.trim());
-        query.skills = { $in: skillArray.map(skill => new RegExp(skill, 'i')) };
-      }
-      if (location) {
-        query.preferredLocations = { $regex: location, $options: 'i' };
-      }
+      console.log('Total profiles found across all types:', allProfiles.length);
+      console.log('Breakdown by type:', breakdown);
       
-      console.log('Query built:', JSON.stringify(query, null, 2));
-      
-      // Fetch all matching profiles first for age and height filters
-      let profiles = await ModelProfile.find(query)
-        .populate('userId', 'firstName lastName email professionalType')
-        .lean();
-      
-      console.log('Found profiles before filtering:', profiles.length);
-      
-      if (ageMin || ageMax) {
+      // Apply age filter (mainly for models)
+      if ((ageMin || ageMax) && typesToSearch.includes('model')) {
         const today = new Date();
-        profiles = profiles.filter(profile => {
-          if (!profile.dateOfBirth) return false;
+        allProfiles = allProfiles.filter(profile => {
+          // Only apply age filter to models
+          if (profile.professionalType !== 'model' || !profile.dateOfBirth) {
+            return true;
+          }
+          
           const birthDate = new Date(profile.dateOfBirth);
           let age = today.getFullYear() - birthDate.getFullYear();
           const monthDiff = today.getMonth() - birthDate.getMonth();
           if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
             age--;
           }
+          
           let ageMatch = true;
           if (ageMin) ageMatch = ageMatch && age >= parseInt(ageMin);
           if (ageMax) ageMatch = ageMatch && age <= parseInt(ageMax);
@@ -855,9 +951,14 @@ router.get('/browse', auth, async (req, res) => {
         });
       }
       
-      if (heightMin || heightMax) {
-        profiles = profiles.filter(profile => {
-          if (!profile.height) return false;
+      // Apply height filter (mainly for models)
+      if ((heightMin || heightMax) && typesToSearch.includes('model')) {
+        allProfiles = allProfiles.filter(profile => {
+          // Only apply height filter to models
+          if (profile.professionalType !== 'model' || !profile.height) {
+            return true;
+          }
+          
           let heightMatch = true;
           if (heightMin) {
             heightMatch = heightMatch && profile.height.includes(heightMin.replace(/['"]/g, ''));
@@ -869,48 +970,54 @@ router.get('/browse', auth, async (req, res) => {
         });
       }
       
-      profiles = profiles.map(profile => ({
+      // Add computed display fields
+      allProfiles = allProfiles.map(profile => ({
         ...profile,
         profileViews: Math.floor(Math.random() * 1000) + 50,
         lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)),
         completionPercentage: Math.floor(Math.random() * 40) + 60,
         location: profile.preferredLocations && profile.preferredLocations.length > 0
           ? profile.preferredLocations[0]
-          : 'Location not specified'
+          : profile.location || 'Location not specified'
       }));
       
+      // Sort profiles
       switch (sort) {
         case 'newest':
-          profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          allProfiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           break;
         case 'relevance':
-          profiles.sort((a, b) => b.profileViews - a.profileViews);
+          allProfiles.sort((a, b) => b.profileViews - a.profileViews);
           break;
         case 'experience':
           const experienceOrder = { 'professional': 4, 'experienced': 3, 'intermediate': 2, 'beginner': 1 };
-          profiles.sort((a, b) => (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0));
+          allProfiles.sort((a, b) => (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0));
           break;
-        case 'connections':
-          profiles.sort((a, b) => b.profileViews - a.profileViews);
+        case 'professional-type':
+          allProfiles.sort((a, b) => a.professionalType.localeCompare(b.professionalType));
           break;
         default:
-          profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          allProfiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       }
       
-      const total = profiles.length;
+      // Paginate results
+      const total = allProfiles.length;
       const totalPages = Math.ceil(total / limit);
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + parseInt(limit);
-      const paginatedProfiles = profiles.slice(startIndex, endIndex);
+      const paginatedProfiles = allProfiles.slice(startIndex, endIndex);
       
       console.log('Returning profiles:', paginatedProfiles.length, 'of', total);
       
+      // Return results
       res.json({
-        models: paginatedProfiles,
+        models: paginatedProfiles, // Keep same key for frontend compatibility
         totalPages,
         currentPage: parseInt(page),
         total,
         hasMore: endIndex < total,
+        breakdown, // Breakdown by professional type
+        searchedTypes: typesToSearch, // Which types were searched
         searchContext: {
           searcherType: userData.userType,
           searcherProfession: userData.professionalType,
@@ -919,15 +1026,15 @@ router.get('/browse', auth, async (req, res) => {
         }
       });
     } catch (error) {
-      console.error('Browse models error:', error);
+      console.error('Browse profiles error:', error);
       res.status(500).json({
-        message: 'Server error while browsing models',
+        message: 'Server error while browsing profiles',
         error: error.message
     });
   }
 });
 
-// GET /api/profile/me - Get current user's profile
+// GET /api/prof le/me - Get current user's profile
 router.get('/me', auth, async (req, res) => {
   try {
     const userId = req.userId;

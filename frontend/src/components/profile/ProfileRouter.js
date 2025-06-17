@@ -9,34 +9,69 @@ import AgencyProfile from '../profiles/AgencyProfile';
 
 const ProfileRouter = ({ profileId, user, onBack, onConnect, onMessage }) => {
   const [targetUser, setTargetUser] = useState(null);
+  const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchTargetUser = async () => {
+    const fetchTargetUserAndProfile = async () => {
       try {
         const token = localStorage.getItem('token');
         
         // If profileId matches current user, use current user data
         if (profileId === user?.id || profileId === user?._id) {
           setTargetUser(user);
+          // Fetch current user's professional profile
+          const profileResponse = await fetch(`http://localhost:8001/api/professional-profile/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setProfileData(profileData);
+          }
           setLoading(false);
           return;
         }
 
-        // Otherwise fetch the target user
-        const response = await fetch(`http://localhost:8001/api/users/${profileId}`, {
+        // Otherwise fetch the target user first
+        const userResponse = await fetch(`http://localhost:8001/api/users/${profileId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (response.ok) {
-          const userData = await response.json();
-          setTargetUser(userData);
-        } else {
-          setError('Profile not found');
+        if (!userResponse.ok) {
+          setError('User not found');
+          setLoading(false);
+          return;
         }
+        
+        const userData = await userResponse.json();
+        setTargetUser(userData);
+
+        // Then fetch their professional profile using the correct endpoint
+        const profileResponse = await fetch(`http://localhost:8001/api/professional-profile/${profileId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          setProfileData(profileData);
+        } else {
+          console.warn('Professional profile not found, using basic user data');
+          // Set basic profile data from user info
+          setProfileData({
+            userId: userData._id,
+            fullName: `${userData.firstName} ${userData.lastName}`,
+            email: userData.email,
+            professionalType: userData.professionalType,
+            isComplete: userData.profileComplete || false,
+            bio: userData.bio || '',
+            location: userData.location || ''
+          });
+        }
+        
       } catch (error) {
-        console.error('Error fetching user:', error);
+        console.error('Error fetching user and profile:', error);
         setError('Error loading profile');
       } finally {
         setLoading(false);
@@ -44,7 +79,7 @@ const ProfileRouter = ({ profileId, user, onBack, onConnect, onMessage }) => {
     };
 
     if (profileId) {
-      fetchTargetUser();
+      fetchTargetUserAndProfile();
     } else {
       setError('No profile ID provided');
       setLoading(false);
@@ -99,6 +134,7 @@ const ProfileRouter = ({ profileId, user, onBack, onConnect, onMessage }) => {
     profileId,
     user,
     targetUser,
+    profileData, // Pass the fetched profile data
     onBack,
     onConnect,
     onMessage

@@ -31,9 +31,36 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
     }
   };
 
+  // Function to get the correct dashboard based on user's professional type
+  const getDashboardPage = (userData) => {
+    if (!userData) return 'dashboard';
+    
+    if (userData.userType === 'talent') {
+      const dashboardMapping = {
+        'model': 'model-dashboard',
+        'photographer': 'photographer-dashboard',
+        'fashion-designer': 'designer-dashboard',
+        'stylist': 'stylist-dashboard',
+        'makeup-artist': 'makeup-artist-dashboard'
+      };
+      return dashboardMapping[userData.professionalType] || 'dashboard';
+    } else if (userData.userType === 'hiring') {
+      const dashboardMapping = {
+        'brand': 'brand-dashboard',
+        'agency': 'agency-dashboard'
+      };
+      return dashboardMapping[userData.professionalType] || 'company-dashboard';
+    }
+    
+    return 'dashboard'; // fallback
+  };
+
+  // Get the correct dashboard page for this user
+  const dashboardPage = getDashboardPage(user);
+
   const navigationItems = [
     {
-      key: user?.userType === 'model' ? 'dashboard' : 'company-dashboard',
+      key: dashboardPage,
       label: '🏠 Dashboard',
       color: '#4CAF50'
     },
@@ -42,7 +69,6 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       label: '📱 Activity Feed',
       color: '#667eea'
     },
-    // Replace the browse-talent/opportunities logic with this:
     {
       key: 'search',
       label: '🔍 Search',
@@ -59,10 +85,16 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       color: '#F44336',
       hasNotification: unreadCount > 0
     },
+    // Show both opportunities and browse talent for all users
     {
-      key: user?.userType === 'model' ? 'opportunities' : 'browse-talent',
-      label: user?.userType === 'model' ? '📢 Opportunities' : '👥 Browse Talent',
+      key: 'opportunities',
+      label: '📢 Opportunities',
       color: '#FF9800'
+    },
+    {
+      key: 'browse-talent',
+      label: '👥 Browse Talent',
+      color: '#2196F3'
     },
     {
       key: 'connections',
@@ -98,7 +130,7 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
           fontWeight: 'bold',
           cursor: 'pointer'
         }}
-        onClick={() => setCurrentPage(user.userType === 'model' ? 'dashboard' : 'company-dashboard')}
+        onClick={() => setCurrentPage(dashboardPage)}
       >
         Zanara
       </div>
@@ -146,7 +178,7 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       {/* User Menu */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         <span style={{ color: 'white', fontSize: '14px' }}>
-          👋 {user.firstName}
+          👋 {user.firstName} ({user.professionalType?.replace('-', ' ')})
         </span>
         <button
           onClick={onLogout}

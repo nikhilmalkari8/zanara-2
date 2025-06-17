@@ -485,7 +485,13 @@ function App() {
         )}
         
         {currentPage === 'browse-talent' && (
-          <BrowseTalent user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+          <BrowseTalent 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+            onViewProfile={handleViewProfile}
+            setViewingProfileId={setViewingProfileId}
+          />
         )}
 
         {currentPage === 'connections' && (
