@@ -39,6 +39,7 @@ import TalentSearch from './components/search/TalentSearch';
 // Networking Components
 import Connections from './components/networking/Connections';
 import NetworkVisualization from './components/networking/NetworkVisualization';
+import MyConnections from './components/connections/MyConnections';
 
 // Shared Components
 import ActivityFeed from './components/shared/ActivityFeed';
@@ -564,6 +565,14 @@ function App() {
             onLogout={handleLogout} 
             setCurrentPage={setCurrentPage}
             onViewProfile={handleViewProfile}
+        />
+        )}
+
+        {currentPage === 'connections' && (
+        <MyConnections 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage} 
         />
         )}
       </div>

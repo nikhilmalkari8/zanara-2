@@ -64,16 +64,47 @@ const connectionSchema = new mongoose.Schema({
     default: 0
   },
   
-  // Connection types
+  // FIXED: Connection types with ALL professional types
   senderType: {
     type: String,
-    enum: ['model', 'designer', 'photographer', 'stylist'],
+    enum: [
+      'model', 
+      'photographer', 
+      'fashion-designer', 
+      'stylist', 
+      'makeup-artist', 
+      'brand', 
+      'agency'
+    ],
     required: true
   },
   receiverType: {
     type: String,
-    enum: ['model', 'designer', 'photographer', 'stylist'],
+    enum: [
+      'model', 
+      'photographer', 
+      'fashion-designer', 
+      'stylist', 
+      'makeup-artist', 
+      'brand', 
+      'agency'
+    ],
     required: true
+  },
+  
+  // Optional: Relationship type for categorization
+  relationship: {
+    type: String,
+    enum: [
+      'colleague',
+      'collaborator', 
+      'client',
+      'mentor',
+      'friend',
+      'industry-contact',
+      'other'
+    ],
+    default: 'colleague'
   }
 }, {
   timestamps: true
@@ -83,6 +114,7 @@ const connectionSchema = new mongoose.Schema({
 connectionSchema.index({ sender: 1, receiver: 1 }, { unique: true });
 connectionSchema.index({ status: 1 });
 connectionSchema.index({ createdAt: -1 });
+connectionSchema.index({ senderType: 1, receiverType: 1 });
 
 // Virtual for getting the other user in a connection
 connectionSchema.virtual('otherUser').get(function() {
@@ -153,7 +185,7 @@ connectionSchema.statics.getMutualConnections = async function(userId1, userId2)
   const User = require('./User');
   const mutualUsers = await User.find({
     _id: { $in: mutualIds }
-  }).select('firstName lastName email userType');
+  }).select('firstName lastName email professionalType userType');
   
   return mutualUsers;
 };
@@ -201,5 +233,41 @@ connectionSchema.pre('save', async function(next) {
   }
   next();
 });
+
+// Method to get connection statistics by professional type
+connectionSchema.statics.getConnectionStatsByProfessionalType = async function(userId) {
+  const stats = await this.aggregate([
+    {
+      $match: {
+        $or: [
+          { sender: new mongoose.Types.ObjectId(userId), status: 'accepted' },
+          { receiver: new mongoose.Types.ObjectId(userId), status: 'accepted' }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        otherUserType: {
+          $cond: {
+            if: { $eq: ['$sender', new mongoose.Types.ObjectId(userId)] },
+            then: '$receiverType',
+            else: '$senderType'
+          }
+        }
+      }
+    },
+    {
+      $group: {
+        _id: '$otherUserType',
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $sort: { count: -1 }
+    }
+  ]);
+  
+  return stats;
+};
 
 module.exports = mongoose.model('Connection', connectionSchema);

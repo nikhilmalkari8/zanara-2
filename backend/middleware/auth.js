@@ -1,46 +1,80 @@
+// middleware/auth.js - Complete fixed version
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
     // Get token from header
-    const authHeader = req.header('Authorization');
+    let token = req.header('Authorization');
     
-    if (!authHeader) {
-      return res.status(401).json({ message: 'No token, authorization denied' });
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'No token provided, authorization denied'
+      });
     }
 
-    // Check if it starts with "Bearer "
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Invalid token format' });
+    // Remove Bearer from string if present
+    if (token.startsWith('Bearer ')) {
+      token = token.slice(7, token.length).trimLeft();
     }
 
-    // Extract token
-    const token = authHeader.substring(7); // Remove "Bearer " prefix
-
-    if (!token || token === 'null' || token === 'undefined') {
-      return res.status(401).json({ message: 'No token provided' });
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token format invalid, authorization denied' 
+      });
     }
 
-    // Verify token
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      req.userId = decoded.userId;
+      // Use the same secret as login route (with fallback for consistency)
+      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+      
+      // Verify token
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      // Get user from database (handle both 'id' and 'userId' properties from token)
+      const userId = decoded.id || decoded.userId;
+      const user = await User.findById(userId).select('-password');
+      
+      if (!user) {
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not found, token invalid' 
+        });
+      }
+
+      // Add user info to request object
+      req.user = user;
+      req.userId = user._id.toString();
+      
       next();
     } catch (jwtError) {
-      console.error('JWT Error:', jwtError.message);
+      console.error('JWT verification error:', jwtError.message);
       
-      // Handle specific JWT errors
       if (jwtError.name === 'JsonWebTokenError') {
-        return res.status(401).json({ message: 'Invalid token' });
+        return res.status(401).json({ 
+          success: false,
+          message: 'Invalid token' 
+        });
       } else if (jwtError.name === 'TokenExpiredError') {
-        return res.status(401).json({ message: 'Token expired' });
+        return res.status(401).json({ 
+          success: false,
+          message: 'Token expired' 
+        });
       } else {
-        return res.status(401).json({ message: 'Token verification failed' });
+        return res.status(401).json({ 
+          success: false,
+          message: 'Token verification failed' 
+        });
       }
     }
   } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(500).json({ message: 'Server error in authentication' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error in authentication'
+    });
   }
 };
 

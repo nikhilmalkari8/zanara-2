@@ -180,7 +180,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       
       console.log('Fetching with params:', queryParams.toString());
       
-      const response = await fetch(`http://localhost:8001/api/profile/browse?${queryParams}`, {
+      const response = await fetch(`http://localhost:8001/api/professional-profile/browse?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
