@@ -95,7 +95,8 @@ function App() {
         'brand': 'brand-dashboard',
         'agency': 'agency-dashboard'
       };
-      return dashboardMapping[userData.professionalType] || 'company-dashboard';
+      // Never use 'company-dashboard' - use consistent routes
+      return dashboardMapping[userData.professionalType] || 'agency-dashboard';
     }
     return 'dashboard'; // fallback
   };

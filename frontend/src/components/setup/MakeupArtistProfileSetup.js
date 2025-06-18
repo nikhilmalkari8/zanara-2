@@ -1,10 +1,19 @@
+// src/components/setup/MakeupArtistProfileSetup.js
 import React, { useState } from 'react';
+import { 
+  FormInput, 
+  FormSelect, 
+  FormTextarea, 
+  FormCheckboxGroup,
+  Button,
+  Card,
+  LoadingSpinner,
+  Notification
+} from '../shared';
+import { profileService } from '../../services/api';
 
 const MakeupArtistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  
   const [profileData, setProfileData] = useState({
     // Personal Information
     fullName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
@@ -73,6 +82,12 @@ const MakeupArtistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     bookingAdvance: ''
   });
 
+  // Form validation and state
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
+
   const steps = [
     { number: 1, title: 'Personal Info', icon: '👤' },
     { number: 2, title: 'Professional', icon: '🎓' },
@@ -84,7 +99,7 @@ const MakeupArtistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     { number: 8, title: 'Review', icon: '✅' }
   ];
 
-  // Option lists
+  // Option arrays
   const makeupTypes = [
     'Bridal Makeup', 'Editorial Makeup', 'Fashion Makeup', 'Commercial Makeup',
     'Special Effects (SFX)', 'Theatrical Makeup', 'Film/TV Makeup', 'Beauty Makeup',
@@ -141,641 +156,760 @@ const MakeupArtistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     'Fashion Shows', 'Film Sets', 'Theater', 'Events'
   ];
 
-  // Handlers
+  const yearsExperienceOptions = [
+    { value: '0-1', label: '0-1 years' },
+    { value: '2-3', label: '2-3 years' },
+    { value: '4-6', label: '4-6 years' },
+    { value: '7-10', label: '7-10 years' },
+    { value: '10+', label: '10+ years' }
+  ];
+
+  const availabilityOptions = [
+    { value: 'full-time', label: 'Full Time' },
+    { value: 'part-time', label: 'Part Time' },
+    { value: 'freelance', label: 'Freelance/Project Based' },
+    { value: 'weekends-only', label: 'Weekends Only' },
+    { value: 'seasonal', label: 'Seasonal' }
+  ];
+
+  const travelRadiusOptions = [
+    { value: 'local-only', label: 'Local Only (0-25 miles)' },
+    { value: 'regional', label: 'Regional (25-100 miles)' },
+    { value: 'state-wide', label: 'State-wide' },
+    { value: 'national', label: 'National' },
+    { value: 'international', label: 'International' }
+  ];
+
+  const bookingAdvanceOptions = [
+    { value: 'same-day', label: 'Same Day' },
+    { value: '1-3-days', label: '1-3 Days' },
+    { value: '1-week', label: '1 Week' },
+    { value: '2-weeks', label: '2 Weeks' },
+    { value: '1-month', label: '1 Month+' }
+  ];
+
+  const currencyOptions = [
+    { value: 'USD', label: 'USD' },
+    { value: 'EUR', label: 'EUR' },
+    { value: 'GBP', label: 'GBP' },
+    { value: 'CAD', label: 'CAD' }
+  ];
+
+  // Form handling functions
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setProfileData(prev => ({
         ...prev,
-        [parent]: { ...prev[parent], [child]: value }
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     } else {
-      setProfileData(prev => ({ ...prev, [field]: value }));
+      setProfileData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     }
   };
 
-  const handleToggle = (field, value) => {
+  const handleArrayChange = (field, values) => {
     setProfileData(prev => ({
       ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(v => v !== value)
-        : [...prev[field], value]
+      [field]: values
+    }));
+    
+    // Clear errors when field is edited
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+  };
+
+  const handleBooleanChange = (field) => {
+    setProfileData(prev => ({
+      ...prev,
+      [field]: !prev[field]
     }));
   };
 
-  const handleBoolToggle = (field) => {
-    setProfileData(prev => ({ ...prev, [field]: !prev[field] }));
-  };
-
-  const handleNext = () => {
+  // Navigation functions
+  const nextStep = () => {
+    // Validate current step
+    const currentStepErrors = validateStep(currentStep);
+    
+    if (Object.keys(currentStepErrors).length > 0) {
+      setErrors(currentStepErrors);
+      setMessage('Please fix the errors before proceeding.');
+      setMessageType('error');
+      return;
+    }
+    
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
     }
   };
 
-  const handlePrevious = () => {
+  const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
     }
   };
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    setMessage('');
+  // Validation function for each step
+  const validateStep = (step) => {
+    const stepErrors = {};
     
+    switch (step) {
+      case 1: // Personal Information
+        if (!profileData.fullName || profileData.fullName.trim() === '') {
+          stepErrors.fullName = 'Full name is required';
+        }
+        if (!profileData.email || !/^\S+@\S+\.\S+$/.test(profileData.email)) {
+          stepErrors.email = 'Valid email is required';
+        }
+        if (!profileData.phone) {
+          stepErrors.phone = 'Phone number is required';
+        }
+        if (!profileData.location) {
+          stepErrors.location = 'Location is required';
+        }
+        break;
+      
+      case 2: // Professional Background
+        if (!profileData.headline) {
+          stepErrors.headline = 'Professional headline is required';
+        }
+        if (!profileData.bio) {
+          stepErrors.bio = 'Bio is required';
+        }
+        if (!profileData.yearsExperience) {
+          stepErrors.yearsExperience = 'Years of experience is required';
+        }
+        break;
+      
+      case 3: // Makeup Specializations
+        if (profileData.makeupTypes.length === 0) {
+          stepErrors.makeupTypes = 'Select at least one makeup type';
+        }
+        if (profileData.techniques.length === 0) {
+          stepErrors.techniques = 'Select at least one technique';
+        }
+        if (profileData.clientTypes.length === 0) {
+          stepErrors.clientTypes = 'Select at least one client type';
+        }
+        break;
+      
+      default:
+        // No validation for other steps
+        break;
+    }
+    
+    return stepErrors;
+  };
+
+  // Submit profile
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setMessage('');
+    setMessageType('');
+    
+    // Validate final step
+    const finalErrors = validateStep(3); // Validate key requirements
+    if (Object.keys(finalErrors).length > 0) {
+      setErrors(finalErrors);
+      setMessage('Please fix the errors before submitting.');
+      setMessageType('error');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setMessage('Profile created successfully! Welcome to Zanara.');
+      // Use the profileService to submit the data
+      const response = await profileService.completeProfile(profileData);
+
+      if (response) {
+        setMessage('Makeup artist profile created successfully! Redirecting to dashboard...');
+        setMessageType('success');
         setTimeout(() => {
           onProfileComplete();
         }, 2000);
-      } else {
-        setMessage(data.message || 'Failed to create profile. Please try again.');
       }
     } catch (error) {
-      console.error('Profile creation error:', error);
-      setMessage('Network error. Please try again.');
+      setMessage(error.message || 'Failed to create profile. Please try again.');
+      setMessageType('error');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const renderCurrentStep = () => {
-    const inputStyle = {
-      width: '100%',
-      padding: '12px',
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)',
+      padding: '20px'
+    },
+    setupCard: {
+      maxWidth: '900px',
+      margin: '0 auto',
+      background: 'rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '20px',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      overflow: 'hidden'
+    },
+    header: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      padding: '30px',
+      textAlign: 'center',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+    },
+    stepIndicator: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: '10px',
+      margin: '20px 0',
+      flexWrap: 'wrap'
+    },
+    step: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '8px',
+      borderRadius: '10px',
+      minWidth: '70px',
+      transition: 'all 0.3s ease'
+    },
+    stepActive: {
+      background: 'rgba(255, 255, 255, 0.2)',
+      border: '2px solid rgba(255, 255, 255, 0.5)'
+    },
+    stepCompleted: {
+      background: 'rgba(76, 175, 80, 0.3)',
+      border: '2px solid #4CAF50'
+    },
+    stepUpcoming: {
+      background: 'rgba(255, 255, 255, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    },
+    content: {
+      padding: '40px',
+      color: 'white'
+    },
+    formGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+      gap: '20px',
+      marginBottom: '30px'
+    },
+    navigation: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '30px 40px',
+      borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+    },
+    checkboxContainer: {
+      marginBottom: '25px'
+    },
+    booleanCheckbox: {
+      display: 'flex', 
+      alignItems: 'center', 
+      color: '#fff', 
+      fontSize: '14px', 
+      cursor: 'pointer',
+      padding: '10px',
       borderRadius: '8px',
       border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    };
+      transition: 'all 0.3s ease'
+    }
+  };
 
-    const checkboxContainerStyle = {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '10px',
-      marginTop: '10px'
-    };
-
-    const checkboxLabelStyle = {
-      display: 'flex',
-      alignItems: 'center',
-      color: '#ccc',
-      fontSize: '14px',
-      cursor: 'pointer'
-    };
-
+  const renderStepContent = () => {
     switch (currentStep) {
-      case 1:
+      case 1: // Personal Information
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              👤 Personal Information
-            </h3>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Full Name *</label>
-              <input
-                type="text"
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>👤 Personal Information</h2>
+            <div style={styles.formGrid}>
+              <FormInput
+                label="Full Name"
                 value={profileData.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
-                style={inputStyle}
-                placeholder="Enter your full name"
+                placeholder="Your professional name"
+                error={errors.fullName}
                 required
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Email *</label>
-              <input
+              <FormInput
+                label="Email"
                 type="email"
                 value={profileData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                style={inputStyle}
-                placeholder="Enter your email address"
+                placeholder="professional@email.com"
+                error={errors.email}
                 required
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Phone Number *</label>
-              <input
+              <FormInput
+                label="Phone Number"
                 type="tel"
                 value={profileData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                style={inputStyle}
-                placeholder="Enter your phone number"
+                placeholder="+1 (555) 123-4567"
+                error={errors.phone}
                 required
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Location *</label>
-              <input
-                type="text"
+              <FormInput
+                label="Location"
                 value={profileData.location}
                 onChange={(e) => handleInputChange('location', e.target.value)}
-                style={inputStyle}
                 placeholder="City, State/Country"
+                error={errors.location}
                 required
               />
             </div>
           </div>
         );
 
-      case 2:
+      case 2: // Professional Background
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              🎓 Professional Background
-            </h3>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Professional Headline *</label>
-              <input
-                type="text"
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🎓 Professional Background</h2>
+            <div style={styles.formGrid}>
+              <FormInput
+                label="Professional Headline"
                 value={profileData.headline}
                 onChange={(e) => handleInputChange('headline', e.target.value)}
-                style={inputStyle}
                 placeholder="e.g., Professional Bridal Makeup Artist"
+                error={errors.headline}
                 required
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Years of Experience *</label>
-              <select
+              <FormSelect
+                label="Years of Experience"
                 value={profileData.yearsExperience}
                 onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
-                style={inputStyle}
-                required
-              >
-                <option value="">Select experience level</option>
-                <option value="0-1">0-1 years</option>
-                <option value="2-3">2-3 years</option>
-                <option value="4-6">4-6 years</option>
-                <option value="7-10">7-10 years</option>
-                <option value="10+">10+ years</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>About You *</label>
-              <textarea
-                value={profileData.bio}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                style={inputStyle}
-                rows="5"
-                placeholder="Tell us about your passion for makeup artistry, your style, and what makes you unique..."
+                options={yearsExperienceOptions}
+                placeholder="Select experience level"
+                error={errors.yearsExperience}
                 required
               />
             </div>
+            
+            <FormTextarea
+              label="About You"
+              value={profileData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="Tell us about your passion for makeup artistry, your style, and what makes you unique..."
+              error={errors.bio}
+              required
+            />
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Education & Training</label>
-              <textarea
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Education & Training"
                 value={profileData.education}
                 onChange={(e) => handleInputChange('education', e.target.value)}
-                style={inputStyle}
-                rows="3"
                 placeholder="List your makeup schools, courses, workshops, or relevant education..."
+                minHeight="80px"
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Certifications</label>
-              <textarea
+              <FormTextarea
+                label="Certifications"
                 value={profileData.certifications}
                 onChange={(e) => handleInputChange('certifications', e.target.value)}
-                style={inputStyle}
-                rows="3"
                 placeholder="List any professional certifications or awards..."
+                minHeight="80px"
               />
             </div>
           </div>
         );
 
-      case 3:
+      case 3: // Makeup Specializations
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              💄 Makeup Specializations
-            </h3>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💄 Makeup Specializations</h2>
             
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Makeup Types *</label>
-              <div style={checkboxContainerStyle}>
-                {makeupTypes.map(type => (
-                  <label key={type} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.makeupTypes.includes(type)}
-                      onChange={() => handleToggle('makeupTypes', type)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Makeup Types (Select all that apply)"
+              options={makeupTypes}
+              selectedValues={profileData.makeupTypes}
+              onChange={(values) => handleArrayChange('makeupTypes', values)}
+              error={errors.makeupTypes}
+              columns={3}
+            />
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Techniques *</label>
-              <div style={checkboxContainerStyle}>
-                {techniques.map(technique => (
-                  <label key={technique} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.techniques.includes(technique)}
-                      onChange={() => handleToggle('techniques', technique)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {technique}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Techniques (Select all that apply)"
+              options={techniques}
+              selectedValues={profileData.techniques}
+              onChange={(values) => handleArrayChange('techniques', values)}
+              error={errors.techniques}
+              columns={3}
+            />
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Client Types *</label>
-              <div style={checkboxContainerStyle}>
-                {clientTypes.map(clientType => (
-                  <label key={clientType} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.clientTypes.includes(clientType)}
-                      onChange={() => handleToggle('clientTypes', clientType)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {clientType}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Client Types (Select all that apply)"
+              options={clientTypes}
+              selectedValues={profileData.clientTypes}
+              onChange={(values) => handleArrayChange('clientTypes', values)}
+              error={errors.clientTypes}
+              columns={3}
+            />
           </div>
         );
 
-      case 4:
+      case 4: // Skills & Expertise
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              🎨 Skills & Expertise
-            </h3>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🎨 Skills & Expertise</h2>
             
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Special Skills</label>
-              <div style={checkboxContainerStyle}>
-                {specialSkills.map(skill => (
-                  <label key={skill} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.specialSkills.includes(skill)}
-                      onChange={() => handleToggle('specialSkills', skill)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {skill}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Special Skills"
+              options={specialSkills}
+              selectedValues={profileData.specialSkills}
+              onChange={(values) => handleArrayChange('specialSkills', values)}
+              columns={3}
+            />
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={checkboxLabelStyle}>
+            <div style={styles.checkboxContainer}>
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.colorTheoryExpertise ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.colorTheoryExpertise}
-                  onChange={() => handleBoolToggle('colorTheoryExpertise')}
-                  style={{ marginRight: '8px' }}
+                  onChange={() => handleBooleanChange('colorTheoryExpertise')}
+                  style={{ marginRight: '10px' }}
                 />
                 Color Theory Expert
               </label>
             </div>
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Skin Type Expertise</label>
-              <div style={checkboxContainerStyle}>
-                {skinTypeExpertise.map(skinType => (
-                  <label key={skinType} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.skinTypeExpertise.includes(skinType)}
-                      onChange={() => handleToggle('skinTypeExpertise', skinType)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {skinType}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Skin Type Expertise"
+              options={skinTypeExpertise}
+              selectedValues={profileData.skinTypeExpertise}
+              onChange={(values) => handleArrayChange('skinTypeExpertise', values)}
+              columns={3}
+            />
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Age Group Expertise</label>
-              <div style={checkboxContainerStyle}>
-                {ageGroupExpertise.map(ageGroup => (
-                  <label key={ageGroup} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.ageGroupExpertise.includes(ageGroup)}
-                      onChange={() => handleToggle('ageGroupExpertise', ageGroup)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {ageGroup}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Age Group Expertise"
+              options={ageGroupExpertise}
+              selectedValues={profileData.ageGroupExpertise}
+              onChange={(values) => handleArrayChange('ageGroupExpertise', values)}
+              columns={3}
+            />
           </div>
         );
 
-      case 5:
+      case 5: // Products & Kit Information
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              💎 Products & Kit Information
-            </h3>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💎 Products & Kit Information</h2>
             
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Preferred Brands</label>
-              <div style={checkboxContainerStyle}>
-                {preferredBrands.map(brand => (
-                  <label key={brand} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.preferredBrands.includes(brand)}
-                      onChange={() => handleToggle('preferredBrands', brand)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {brand}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Preferred Brands"
+              options={preferredBrands}
+              selectedValues={profileData.preferredBrands}
+              onChange={(values) => handleArrayChange('preferredBrands', values)}
+              columns={4}
+            />
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Product Types in Your Kit</label>
-              <div style={checkboxContainerStyle}>
-                {productTypes.map(product => (
-                  <label key={product} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.productTypes.includes(product)}
-                      onChange={() => handleToggle('productTypes', product)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {product}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Product Types in Your Kit"
+              options={productTypes}
+              selectedValues={profileData.productTypes}
+              onChange={(values) => handleArrayChange('productTypes', values)}
+              columns={3}
+            />
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Kit Information</label>
-              <textarea
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Kit Information"
                 value={profileData.kitInformation}
                 onChange={(e) => handleInputChange('kitInformation', e.target.value)}
-                style={inputStyle}
-                rows="4"
                 placeholder="Describe your makeup kit, special tools, and professional equipment..."
+                minHeight="100px"
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Hygiene Standards</label>
-              <textarea
+              <FormTextarea
+                label="Hygiene Standards"
                 value={profileData.hygieneStandards}
                 onChange={(e) => handleInputChange('hygieneStandards', e.target.value)}
-                style={inputStyle}
-                rows="4"
                 placeholder="Describe your sanitation practices and safety protocols..."
+                minHeight="100px"
               />
             </div>
           </div>
         );
 
-      case 6:
+      case 6: // Business & Rates
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              💰 Business & Rates
-            </h3>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💰 Business & Rates</h2>
             
-            <div style={{ marginBottom: '25px' }}>
-              <label style={checkboxLabelStyle}>
+            <div style={styles.checkboxContainer}>
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.mobileServices ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.mobileServices}
-                  onChange={() => handleBoolToggle('mobileServices')}
-                  style={{ marginRight: '8px' }}
+                  onChange={() => handleBooleanChange('mobileServices')}
+                  style={{ marginRight: '10px' }}
                 />
                 I offer mobile services (travel to clients)
               </label>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Studio Access</label>
-              <input
-                type="text"
+            <div style={styles.formGrid}>
+              <FormInput
+                label="Studio Access"
                 value={profileData.studioAccess}
                 onChange={(e) => handleInputChange('studioAccess', e.target.value)}
-                style={inputStyle}
                 placeholder="Describe your studio or workspace access..."
+              />
+              <FormSelect
+                label="Availability"
+                value={profileData.availability}
+                onChange={(e) => handleInputChange('availability', e.target.value)}
+                options={availabilityOptions}
+                placeholder="Select availability"
+              />
+              <FormSelect
+                label="Travel Radius"
+                value={profileData.travelRadius}
+                onChange={(e) => handleInputChange('travelRadius', e.target.value)}
+                options={travelRadiusOptions}
+                placeholder="Select travel radius"
+              />
+              <FormSelect
+                label="Booking Advance Notice"
+                value={profileData.bookingAdvance}
+                onChange={(e) => handleInputChange('bookingAdvance', e.target.value)}
+                options={bookingAdvanceOptions}
+                placeholder="Select booking advance"
               />
             </div>
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '10px' }}>Equipment Owned</label>
-              <div style={checkboxContainerStyle}>
-                {equipmentOwned.map(equipment => (
-                  <label key={equipment} style={checkboxLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={profileData.equipmentOwned.includes(equipment)}
-                      onChange={() => handleToggle('equipmentOwned', equipment)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {equipment}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Equipment Owned"
+              options={equipmentOwned}
+              selectedValues={profileData.equipmentOwned}
+              onChange={(values) => handleArrayChange('equipmentOwned', values)}
+              columns={3}
+            />
 
-            <h4 style={{ color: 'white', marginBottom: '15px' }}>Service Rates</h4>
+            <FormCheckboxGroup
+              label="Work Environments"
+              options={workEnvironments}
+              selectedValues={profileData.workEnvironments}
+              onChange={(values) => handleArrayChange('workEnvironments', values)}
+              columns={3}
+            />
+
+            <h4 style={{ color: 'white', marginBottom: '15px', marginTop: '30px' }}>Service Rates</h4>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              {Object.entries(profileData.rates).map(([key, value]) => (
-                key !== 'currency' ? (
-                  <div key={key}>
-                    <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>
-                      {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')} Rate
-                    </label>
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) => handleInputChange(`rates.${key}`, e.target.value)}
-                      style={inputStyle}
-                      placeholder="e.g., $150"
-                    />
-                  </div>
-                ) : null
-              ))}
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Currency</label>
-              <select
+            <div style={styles.formGrid}>
+              <FormInput
+                label="Bridal Rate"
+                type="number"
+                value={profileData.rates.bridal}
+                onChange={(e) => handleInputChange('rates.bridal', e.target.value)}
+                placeholder="150"
+              />
+              <FormInput
+                label="Photoshoot Rate"
+                type="number"
+                value={profileData.rates.photoshoot}
+                onChange={(e) => handleInputChange('rates.photoshoot', e.target.value)}
+                placeholder="100"
+              />
+              <FormInput
+                label="Special Event Rate"
+                type="number"
+                value={profileData.rates.special_event}
+                onChange={(e) => handleInputChange('rates.special_event', e.target.value)}
+                placeholder="75"
+              />
+              <FormInput
+                label="Lesson Rate"
+                type="number"
+                value={profileData.rates.lesson}
+                onChange={(e) => handleInputChange('rates.lesson', e.target.value)}
+                placeholder="50"
+              />
+              <FormInput
+                label="Consultation Rate"
+                type="number"
+                value={profileData.rates.consultation}
+                onChange={(e) => handleInputChange('rates.consultation', e.target.value)}
+                placeholder="40"
+              />
+              <FormSelect
+                label="Currency"
                 value={profileData.rates.currency}
                 onChange={(e) => handleInputChange('rates.currency', e.target.value)}
-                style={inputStyle}
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="CAD">CAD</option>
-              </select>
+                options={currencyOptions}
+                placeholder="Select currency"
+              />
             </div>
           </div>
         );
 
-      case 7:
+      case 7: // Portfolio & Social Media
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              📸 Portfolio & Social Media
-            </h3>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>📸 Portfolio & Social Media</h2>
             
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Portfolio Website</label>
-              <input
+            <div style={styles.formGrid}>
+              <FormInput
+                label="Portfolio Website"
                 type="url"
                 value={profileData.portfolioWebsite}
                 onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                style={inputStyle}
                 placeholder="https://yourportfolio.com"
               />
+              <FormInput
+                label="Instagram"
+                value={profileData.socialMedia.instagram}
+                onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
+                placeholder="@yourusername or full URL"
+              />
+              <FormInput
+                label="YouTube"
+                value={profileData.socialMedia.youtube}
+                onChange={(e) => handleInputChange('socialMedia.youtube', e.target.value)}
+                placeholder="YouTube channel URL"
+              />
+              <FormInput
+                label="TikTok"
+                value={profileData.socialMedia.tiktok}
+                onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
+                placeholder="@yourusername or full URL"
+              />
+              <FormInput
+                label="Facebook"
+                value={profileData.socialMedia.facebook}
+                onChange={(e) => handleInputChange('socialMedia.facebook', e.target.value)}
+                placeholder="Facebook page URL"
+              />
+              <FormInput
+                label="Blog/Website"
+                type="url"
+                value={profileData.socialMedia.blog}
+                onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
+                placeholder="Your blog or website URL"
+              />
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Notable Work</label>
-              <textarea
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Notable Work"
                 value={profileData.notableWork}
                 onChange={(e) => handleInputChange('notableWork', e.target.value)}
-                style={inputStyle}
-                rows="4"
                 placeholder="Describe your most notable projects, collaborations, or achievements..."
+                minHeight="100px"
               />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Publication Features</label>
-              <textarea
+              <FormTextarea
+                label="Publication Features"
                 value={profileData.publicationFeatures}
                 onChange={(e) => handleInputChange('publicationFeatures', e.target.value)}
-                style={inputStyle}
-                rows="3"
                 placeholder="List any magazines, blogs, or publications that have featured your work..."
+                minHeight="100px"
               />
             </div>
 
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Competitions & Awards</label>
-              <textarea
-                value={profileData.competitions}
-                onChange={(e) => handleInputChange('competitions', e.target.value)}
-                style={inputStyle}
-                rows="3"
-                placeholder="List any makeup competitions, contests, or awards you've won..."
-              />
-            </div>
-
-            <h4 style={{ color: 'white', marginBottom: '15px' }}>Social Media</h4>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {Object.entries(profileData.socialMedia).map(([platform, value]) => (
-                <div key={platform}>
-                  <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>
-                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                  </label>
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => handleInputChange(`socialMedia.${platform}`, e.target.value)}
-                    style={inputStyle}
-                    placeholder={`@yourusername or full URL`}
-                  />
-                </div>
-              ))}
-            </div>
+            <FormTextarea
+              label="Competitions & Awards"
+              value={profileData.competitions}
+              onChange={(e) => handleInputChange('competitions', e.target.value)}
+              placeholder="List any makeup competitions, contests, or awards you've won..."
+              minHeight="80px"
+            />
           </div>
         );
 
-      case 8:
+      case 8: // Review & Submit
         return (
           <div>
-            <h3 style={{ color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
-              ✅ Review & Submit
-            </h3>
-            
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              padding: '20px',
-              borderRadius: '10px',
-              marginBottom: '20px'
-            }}>
-              <h4 style={{ color: 'white', marginBottom: '15px' }}>Profile Summary</h4>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', color: '#ccc', fontSize: '14px' }}>
+            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✅ Review & Submit</h2>
+            <Card>
+              <h3 style={{ color: '#4ecdc4', marginBottom: '15px' }}>Makeup Artist Profile Summary</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
                 <div>
-                  <p><strong>Name:</strong> {profileData.fullName}</p>
-                  <p><strong>Location:</strong> {profileData.location}</p>
-                  <p><strong>Experience:</strong> {profileData.yearsExperience || 'Not specified'}</p>
-                  <p><strong>Makeup Types:</strong> {profileData.makeupTypes.length} selected</p>
-                  <p><strong>Techniques:</strong> {profileData.techniques.length} selected</p>
+                  <strong>Name:</strong> {profileData.fullName}<br/>
+                  <strong>Location:</strong> {profileData.location}<br/>
+                  <strong>Experience:</strong> {
+                    yearsExperienceOptions.find(option => option.value === profileData.yearsExperience)?.label || 
+                    profileData.yearsExperience
+                  }<br/>
+                  <strong>Mobile Services:</strong> {profileData.mobileServices ? 'Yes' : 'No'}<br/>
+                  <strong>Color Theory Expert:</strong> {profileData.colorTheoryExpertise ? 'Yes' : 'No'}
                 </div>
                 <div>
-                  <p><strong>Mobile Services:</strong> {profileData.mobileServices ? 'Yes' : 'No'}</p>
-                  <p><strong>Preferred Brands:</strong> {profileData.preferredBrands.length} selected</p>
-                  <p><strong>Equipment:</strong> {profileData.equipmentOwned.length} items</p>
-                  <p><strong>Portfolio:</strong> {profileData.portfolioWebsite || 'Not provided'}</p>
-                  <p><strong>Currency:</strong> {profileData.rates.currency}</p>
+                  <strong>Makeup Types:</strong> {profileData.makeupTypes.slice(0, 3).join(', ')}{profileData.makeupTypes.length > 3 ? '...' : ''}<br/>
+                  <strong>Techniques:</strong> {profileData.techniques.length} techniques<br/>
+                  <strong>Preferred Brands:</strong> {profileData.preferredBrands.length} brands<br/>
+                  <strong>Equipment:</strong> {profileData.equipmentOwned.length} items<br/>
+                  <strong>Portfolio:</strong> {profileData.portfolioWebsite || 'Not provided'}
                 </div>
               </div>
               
               {profileData.bio && (
                 <div style={{ marginTop: '15px' }}>
-                  <p style={{ color: '#ccc', fontSize: '14px' }}>
+                  <p style={{ color: '#ddd', fontSize: '14px' }}>
                     <strong>Bio:</strong> {profileData.bio.slice(0, 200)}
                     {profileData.bio.length > 200 && '...'}
                   </p>
                 </div>
               )}
-            </div>
+            </Card>
             
-            <div style={{ 
-              padding: '15px', 
-              borderRadius: '8px', 
-              background: 'rgba(76, 175, 80, 0.1)', 
-              border: '1px solid rgba(76, 175, 80, 0.3)',
-              color: '#81C784',
-              marginBottom: '20px'
-            }}>
-              <p style={{ margin: 0 }}>
-                📋 Please review all your information above. Once you submit, your profile will be created and you'll be able to start connecting with clients on Zanara.
+            <Card style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
+              <h4 style={{ color: '#FFC107', marginBottom: '10px' }}>💄 Next Steps</h4>
+              <p style={{ margin: 0, color: '#ddd' }}>
+                After submitting your profile, you'll be redirected to your dashboard where you can:
+                <br/>• Upload your makeup portfolio and before/after photos
+                <br/>• Browse and apply for makeup artist opportunities
+                <br/>• Connect with models, photographers, and clients
+                <br/>• Manage your bookings and showcase your artistry
               </p>
-            </div>
+            </Card>
+
+            {message && (
+              <Notification
+                type={messageType}
+                message={message}
+                onClose={() => { setMessage(''); setMessageType(''); }}
+              />
+            )}
           </div>
         );
 
@@ -785,173 +919,103 @@ const MakeupArtistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)',
-      padding: '20px'
-    }}>
-      {/* Header */}
-      <div style={{ maxWidth: '800px', margin: '0 auto 30px' }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          padding: '20px',
-          borderRadius: '15px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div>
-            <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>Setup Your Makeup Artist Profile</h1>
-            <p style={{ color: '#ccc', margin: '5px 0 0 0' }}>Welcome {user?.firstName}! Let's create your professional profile.</p>
+    <div style={styles.container}>
+      <div style={styles.setupCard}>
+        {/* Header */}
+        <div style={styles.header}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>
+              💄 Makeup Artist Setup
+            </h1>
+            <Button 
+              type="secondary"
+              onClick={onLogout}
+            >
+              Logout
+            </Button>
           </div>
-          <button
-            onClick={onLogout}
-            style={{
-              padding: '10px 20px',
-              background: 'rgba(255, 0, 0, 0.2)',
-              color: '#ff6b6b',
-              border: '1px solid rgba(255, 0, 0, 0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            Logout
-          </button>
+          <p style={{ color: '#ddd', fontSize: '1.1rem', margin: 0 }}>
+            Create your professional makeup artist profile to connect with clients and showcase your artistry
+          </p>
         </div>
-      </div>
 
-      {/* Progress Bar */}
-      <div style={{ maxWidth: '800px', margin: '0 auto 30px' }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          padding: '20px',
-          borderRadius: '15px',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-            {steps.map((step, index) => (
-              <div key={step.number} style={{ display: 'flex', alignItems: 'center', minWidth: '120px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '16px',
-                  background: currentStep >= step.number ? '#4ecdc4' : 'rgba(255, 255, 255, 0.2)',
-                  color: 'white'
-                }}>
-                  {step.icon}
-                </div>
-                <div style={{ marginLeft: '10px' }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: currentStep >= step.number ? 'white' : '#ccc',
-                    fontWeight: currentStep === step.number ? 'bold' : 'normal'
-                  }}>
-                    Step {step.number}
-                  </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: currentStep >= step.number ? '#ccc' : '#999'
-                  }}>
-                    {step.title}
-                  </div>
-                </div>
-                {index < steps.length - 1 && (
-                  <div style={{
-                    width: '20px',
-                    height: '2px',
-                    margin: '0 10px',
-                    background: currentStep > step.number ? '#4ecdc4' : 'rgba(255, 255, 255, 0.2)'
-                  }} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Step Content */}
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          padding: '30px',
-          borderRadius: '15px',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          {renderCurrentStep()}
-
-          {message && (
-            <div style={{
-              marginTop: '20px',
-              padding: '15px',
-              borderRadius: '8px',
-              background: message.includes('successfully') 
-                ? 'rgba(76, 175, 80, 0.2)' 
-                : 'rgba(244, 67, 54, 0.2)',
-              border: `1px solid ${message.includes('successfully') ? '#4CAF50' : '#F44336'}`,
-              color: message.includes('successfully') ? '#81C784' : '#EF5350'
-            }}>
-              {message}
-            </div>
-          )}
-
-          {/* Navigation Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '30px' }}>
-            <button
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
+        {/* Step Indicator */}
+        <div style={styles.stepIndicator}>
+          {steps.map(step => (
+            <div
+              key={step.number}
               style={{
-                padding: '12px 24px',
-                background: currentStep === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)',
-                color: currentStep === 1 ? '#666' : 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '8px',
-                cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
+                ...styles.step,
+                ...(step.number === currentStep ? styles.stepActive : 
+                   step.number < currentStep ? styles.stepCompleted : styles.stepUpcoming)
               }}
             >
-              Previous
-            </button>
-            
-            {currentStep === steps.length ? (
-              <button
-                onClick={handleSubmit}
-                disabled={isLoading}
-                style={{
-                  padding: '12px 24px',
-                  background: isLoading ? '#666' : 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                {isLoading ? 'Creating Profile...' : 'Create Makeup Artist Profile'}
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                style={{
-                  padding: '12px 24px',
-                  background: 'linear-gradient(45deg, #4ecdc4, #44a08d)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                Next
-              </button>
-            )}
+              <div style={{ fontSize: '20px', marginBottom: '3px' }}>
+                {step.number < currentStep ? '✅' : step.icon}
+              </div>
+              <div style={{ fontSize: '10px', textAlign: 'center', color: 'white' }}>
+                {step.title}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={styles.content}>
+          {message && currentStep < 8 && (
+            <Notification
+              type={messageType}
+              message={message}
+              onClose={() => { setMessage(''); setMessageType(''); }}
+            />
+          )}
+          
+          {renderStepContent()}
+        </div>
+
+        {/* Navigation */}
+        <div style={styles.navigation}>
+          <Button
+            type="secondary"
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            style={{
+              opacity: currentStep === 1 ? 0.5 : 1,
+              cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            ← Previous
+          </Button>
+
+          <div style={{ color: 'white', fontSize: '14px' }}>
+            Step {currentStep} of {steps.length}
           </div>
+
+          {currentStep < steps.length ? (
+            <Button
+              type="primary"
+              onClick={nextStep}
+            >
+              Next →
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              style={{
+                opacity: isSubmitting ? 0.7 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size={16} style={{ display: 'inline-block', marginRight: '10px' }} />
+                  Creating Profile...
+                </>
+              ) : 'Complete Profile ✨'}
+            </Button>
+          )}
         </div>
       </div>
     </div>

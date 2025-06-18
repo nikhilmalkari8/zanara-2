@@ -11,6 +11,8 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
     description: '',
     type: '',
     
+    targetProfessionalTypes: [],
+
     // Location
     location: {
       type: 'on-location',
@@ -91,10 +93,11 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
 
   const steps = [
     { number: 1, title: 'Basic Details' },
-    { number: 2, title: 'Location & Timeline' },
-    { number: 3, title: 'Compensation' },
-    { number: 4, title: 'Requirements' },
-    { number: 5, title: 'Application Process' }
+    { number: 2, title: 'Target Professionals' }, // NEW STEP
+    { number: 3, title: 'Location & Timeline' },
+    { number: 4, title: 'Compensation' },
+    { number: 5, title: 'Requirements' },
+    { number: 6, title: 'Application Process' }
   ];
 
   const opportunityTypes = [
@@ -145,7 +148,11 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
       if (response.ok) {
         setMessage('Opportunity created successfully! Redirecting...');
         setTimeout(() => {
-          setCurrentPage('company-dashboard');
+          // Redirect to the correct dashboard based on user's professional type
+          const dashboardPage = user.userType === 'hiring' 
+            ? (user.professionalType === 'agency' ? 'agency-dashboard' : 'brand-dashboard')
+            : 'dashboard';
+          setCurrentPage(dashboardPage);
         }, 2000);
       } else {
         setMessage(data.message || 'Failed to create opportunity. Please try again.');
@@ -220,12 +227,14 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
       case 1:
         return <BasicDetailsStep data={opportunityData} updateField={updateNestedField} types={opportunityTypes} />;
       case 2:
-        return <LocationTimelineStep data={opportunityData} updateField={updateNestedField} />;
+        return <TargetProfessionalsStep data={opportunityData} updateField={updateNestedField} addToArray={addToArray} removeFromArray={removeFromArray} />;
       case 3:
-        return <CompensationStep data={opportunityData} updateField={updateNestedField} />;
+        return <LocationTimelineStep data={opportunityData} updateField={updateNestedField} />;
       case 4:
-        return <RequirementsStep data={opportunityData} updateField={updateNestedField} addToArray={addToArray} removeFromArray={removeFromArray} />;
+        return <CompensationStep data={opportunityData} updateField={updateNestedField} />;
       case 5:
+        return <RequirementsStep data={opportunityData} updateField={updateNestedField} addToArray={addToArray} removeFromArray={removeFromArray} />;
+      case 6:
         return <ApplicationProcessStep data={opportunityData} updateField={updateNestedField} addToArray={addToArray} removeFromArray={removeFromArray} />;
       default:
         return null;
@@ -414,6 +423,99 @@ const CreateOpportunity = ({ user, onLogout, setCurrentPage }) => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const TargetProfessionalsStep = ({ data, updateField, addToArray, removeFromArray }) => {
+  const professionalTypes = [
+    { id: 'model', label: 'Models', icon: '👗', description: 'Runway, photoshoot, or commercial models' },
+    { id: 'photographer', label: 'Photographers', icon: '📸', description: 'Fashion, portrait, or commercial photographers' },
+    { id: 'fashion-designer', label: 'Fashion Designers', icon: '✂️', description: 'Clothing and accessory designers' },
+    { id: 'stylist', label: 'Stylists', icon: '👔', description: 'Fashion stylists for shoots, events, or personal styling' },
+    { id: 'makeup-artist', label: 'Makeup Artists', icon: '💄', description: 'Beauty, fashion, or special effects makeup' }
+  ];
+
+  return (
+    <div>
+      <h3 style={{ color: 'white', marginBottom: '20px' }}>Target Professionals</h3>
+      
+      <p style={{ color: '#ccc', marginBottom: '20px', lineHeight: '1.6' }}>
+        Select which types of professionals can apply to this opportunity. Each professional type will see 
+        specialized application fields relevant to their expertise.
+      </p>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+        {professionalTypes.map(type => (
+          <div 
+            key={type.id}
+            onClick={() => {
+              if (data.targetProfessionalTypes.includes(type.id)) {
+                removeFromArray('targetProfessionalTypes', type.id);
+              } else {
+                addToArray('targetProfessionalTypes', type.id);
+              }
+            }}
+            style={{
+              padding: '20px',
+              background: data.targetProfessionalTypes.includes(type.id)
+                ? 'linear-gradient(45deg, rgba(78, 205, 196, 0.4), rgba(78, 205, 196, 0.2))'
+                : 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '10px',
+              border: data.targetProfessionalTypes.includes(type.id)
+                ? '2px solid #4ecdc4'
+                : '1px solid rgba(255, 255, 255, 0.2)',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '24px', marginRight: '10px' }}>{type.icon}</span>
+              <h4 style={{ color: 'white', margin: '0', fontSize: '18px' }}>{type.label}</h4>
+            </div>
+            <p style={{ color: '#ccc', margin: '0', fontSize: '14px' }}>
+              {type.description}
+            </p>
+            {data.targetProfessionalTypes.includes(type.id) && (
+              <div style={{ 
+                marginTop: '10px', 
+                color: '#4ecdc4', 
+                fontSize: '14px', 
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <span style={{ marginRight: '5px' }}>✓</span> Selected
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      
+      {data.targetProfessionalTypes.length === 0 && (
+        <div style={{
+          padding: '15px',
+          background: 'rgba(244, 67, 54, 0.2)',
+          border: '1px solid rgba(244, 67, 54, 0.3)',
+          borderRadius: '8px',
+          color: '#f44336',
+          marginBottom: '20px'
+        }}>
+          Please select at least one professional type that can apply to this opportunity.
+        </div>
+      )}
+      
+      {data.targetProfessionalTypes.length > 0 && (
+        <div style={{
+          padding: '15px',
+          background: 'rgba(76, 175, 80, 0.2)',
+          border: '1px solid rgba(76, 175, 80, 0.3)',
+          borderRadius: '8px',
+          color: '#81c784'
+        }}>
+          You've selected {data.targetProfessionalTypes.length} professional type(s) that can apply to this opportunity.
+        </div>
+      )}
     </div>
   );
 };

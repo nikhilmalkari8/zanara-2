@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Card, 
+  Button, 
+  LoadingSpinner, 
+  EmptyState, 
+  Notification, 
+  MultiImageUploader
+} from '../shared';
+import { profileService, connectionService } from '../../services/api';
 
 const MakeupArtistProfile = ({
   profileId,
@@ -8,119 +17,122 @@ const MakeupArtistProfile = ({
   onConnect,
   onMessage
 }) => {
+  // State management
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('none');
+  const [notification, setNotification] = useState({ message: '', type: '', show: false });
   const [newTutorial, setNewTutorial] = useState({ title: '', description: '', videoUrl: '' });
 
+  // Check if viewing own profile
   const isOwnProfile = user && (
-    user._id === targetUser._id ||
-    user.id === targetUser.id ||
+    user._id === targetUser?._id ||
+    user.id === targetUser?.id ||
     user._id === profileId ||
     user.id === profileId
   );
 
+  // Fetch profile data
   useEffect(() => {
     fetchMakeupArtistProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+    if (!isOwnProfile && profileId) {
+      checkConnectionStatus();
+    }
+  }, [profileId, isOwnProfile]);
 
   const fetchMakeupArtistProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // Use the new professional profile endpoint
-      const response = await fetch(
-        `http://localhost:8001/api/professional-profile/${profileId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-        setEditData(data);
-      } else {
-        console.error('Failed to fetch makeup artist profile:', response.status);
-      }
+      setLoading(true);
+      const data = await profileService.getProfileById(profileId);
+      setProfile(data);
+      setEditData(data);
+      setError(null);
     } catch (error) {
       console.error('Error loading makeup artist profile:', error);
+      setError('Failed to load profile. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveChanges = async () => {
+  // Check connection status with this user
+  const checkConnectionStatus = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // Use the new professional profile update endpoint
-      const response = await fetch(
-        'http://localhost:8001/api/professional-profile/update',
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(editData)
-        }
-      );
-
-      if (response.ok) {
-        await fetchMakeupArtistProfile();
-        setIsEditing(false);
-        alert('Profile updated successfully!');
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to update profile');
-      }
+      const data = await connectionService.getConnectionStatus(profileId);
+      setConnectionStatus(data.status || 'none');
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Error updating profile');
+      console.error('Error checking connection status:', error);
     }
   };
 
-  const handlePortfolioUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    files.forEach((file) => formData.append('portfolioPhotos', file));
-
+  // Handle save changes
+  const handleSaveChanges = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // Use the new professional profile photos endpoint
-      const response = await fetch(
-        'http://localhost:8001/api/professional-profile/photos',
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const updatedPhotos = [...(profile.photos || []), ...data.photos];
-        setProfile({ ...profile, photos: updatedPhotos });
-        setEditData({ ...editData, photos: updatedPhotos });
-        alert(`${files.length} makeup looks uploaded successfully!`);
-      } else {
-        alert('Failed to upload makeup portfolio');
-      }
+      setUploading(true);
+      await profileService.updateProfile(editData);
+      await fetchMakeupArtistProfile();
+      setIsEditing(false);
+      showNotification('Profile updated successfully!', 'success');
     } catch (error) {
-      console.error('Error uploading photos:', error);
-      alert('Failed to upload makeup portfolio');
+      showNotification(error.message || 'Failed to update profile', 'error');
     } finally {
       setUploading(false);
     }
   };
 
+  // Handle portfolio upload
+  const handlePortfolioUpload = async (files) => {
+    if (files.length === 0) return;
+
+    try {
+      setUploading(true);
+      const data = await profileService.uploadPortfolioPhotos(files);
+      const updatedPhotos = [...(profile.photos || []), ...data.photos];
+      setProfile({ ...profile, photos: updatedPhotos });
+      setEditData({ ...editData, photos: updatedPhotos });
+      showNotification(`${files.length} makeup looks uploaded successfully!`, 'success');
+    } catch (error) {
+      showNotification('Failed to upload makeup portfolio', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle connect
+  const handleConnect = async () => {
+    if (connectionStatus !== 'none') return;
+    
+    try {
+      await connectionService.sendConnectionRequest(profileId, 
+        `I'd like to connect with you on Zanara.`, 
+        'makeup-artist');
+      setConnectionStatus('pending');
+      showNotification('Connection request sent!', 'success');
+    } catch (error) {
+      showNotification(error.message || 'Failed to send connection request', 'error');
+    }
+  };
+
+  // Helper function to show notifications
+  const showNotification = (message, type = 'info') => {
+    setNotification({ message, type, show: true });
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 5000);
+  };
+
+  // Handle array input changes
   const handleArrayInputChange = (field, value) => {
     const arrayValue = value.split(',').map(item => item.trim()).filter(item => item);
     setEditData({ ...editData, [field]: arrayValue });
   };
 
+  // Handle nested input changes
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -133,40 +145,52 @@ const MakeupArtistProfile = ({
     }
   };
 
-  const handleAddTutorial = () => {
-    // Implementation of handleAddTutorial function
+  // Tutorial management functions
+  const handleAddTutorial = async () => {
+    if (!newTutorial.title || !newTutorial.videoUrl) {
+      showNotification('Please fill in tutorial title and video URL', 'error');
+      return;
+    }
+
+    try {
+      const updatedTutorials = [...(editData.tutorials || []), newTutorial];
+      setEditData({ ...editData, tutorials: updatedTutorials });
+      setNewTutorial({ title: '', description: '', videoUrl: '' });
+      showNotification('Tutorial added successfully!', 'success');
+    } catch (error) {
+      showNotification('Failed to add tutorial', 'error');
+    }
+  };
+
+  const handleRemoveTutorial = (index) => {
+    const updatedTutorials = [...(editData.tutorials || [])];
+    updatedTutorials.splice(index, 1);
+    setEditData({ ...editData, tutorials: updatedTutorials });
+    showNotification('Tutorial removed', 'success');
   };
 
   const handleShareTutorial = (tutorial) => {
-    // Implementation of handleShareTutorial function
+    if (navigator.share) {
+      navigator.share({
+        title: tutorial.title,
+        text: tutorial.description,
+        url: tutorial.videoUrl,
+      });
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      navigator.clipboard.writeText(tutorial.videoUrl);
+      showNotification('Tutorial link copied to clipboard!', 'success');
+    }
   };
 
+  // UI styles
   const styles = {
     container: {
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', // Makeup artist pink theme
       padding: '20px'
     },
-    header: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '15px',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      padding: '20px',
-      marginBottom: '20px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    },
-    card: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '15px',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      padding: '25px',
-      marginBottom: '20px'
-    },
-    input: {
+    formInput: {
       width: '100%',
       padding: '12px',
       borderRadius: '8px',
@@ -174,256 +198,309 @@ const MakeupArtistProfile = ({
       background: 'rgba(255, 255, 255, 0.1)',
       color: 'white',
       fontSize: '16px',
-      outline: 'none'
+      outline: 'none',
+      marginBottom: '10px'
     },
-    button: {
-      padding: '12px 24px',
+    textarea: {
+      width: '100%',
+      padding: '12px',
       borderRadius: '8px',
-      border: 'none',
-      cursor: 'pointer',
-      fontWeight: 'bold',
-      fontSize: '14px'
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: 'white',
+      fontSize: '16px',
+      outline: 'none',
+      minHeight: '100px',
+      resize: 'vertical',
+      marginBottom: '10px'
+    },
+    badge: {
+      background: 'rgba(240, 147, 251, 0.2)',
+      color: '#f093fb',
+      padding: '8px 12px',
+      borderRadius: '15px',
+      fontSize: '12px',
+      border: '1px solid rgba(240, 147, 251, 0.3)',
+      display: 'inline-block',
+      margin: '5px'
+    },
+    skillItem: {
+      background: 'rgba(255, 255, 255, 0.05)', 
+      padding: '8px 12px', 
+      borderRadius: '8px',
+      fontSize: '14px',
+      marginBottom: '8px'
     },
     tutorialCard: {
       background: 'rgba(255,255,255,0.1)',
       padding: '20px',
       borderRadius: '12px',
-      border: '1px solid rgba(255,255,255,0.2)'
+      border: '1px solid rgba(255,255,255,0.2)',
+      marginBottom: '15px'
+    },
+    coverPhoto: {
+      height: '250px',
+      width: '100%',
+      background: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: '15px 15px 0 0',
+      overflow: 'hidden',
+      position: 'relative'
+    },
+    profilePicture: {
+      width: '120px',
+      height: '120px',
+      borderRadius: '50%',
+      border: '4px solid white',
+      position: 'absolute',
+      bottom: '-60px',
+      left: '25px',
+      background: 'rgba(255, 255, 255, 0.2)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '48px',
+      color: 'white',
+      overflow: 'hidden'
+    },
+    portfolioGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+      gap: '15px',
+      marginTop: '20px'
+    },
+    portfolioItem: {
+      borderRadius: '8px',
+      overflow: 'hidden',
+      aspectRatio: '1',
+      background: 'rgba(255, 255, 255, 0.1)'
+    },
+    contactItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      marginBottom: '10px'
     }
   };
 
+  // Show loading state
   if (loading) {
     return (
       <div style={styles.container}>
-        <div
-          style={{
-            textAlign: 'center',
-            color: 'white',
-            fontSize: '18px',
-            marginTop: '50px'
-          }}
-        >
-          Loading makeup artist profile...
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '60vh' 
+        }}>
+          <LoadingSpinner size={60} />
+          <p style={{ color: 'white', marginTop: '20px', fontSize: '18px' }}>
+            Loading makeup artist profile...
+          </p>
         </div>
       </div>
     );
   }
 
+  // Show error state
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <Card>
+            <EmptyState
+              icon="❌"
+              title="Error Loading Profile"
+              description={error}
+              actionButton={
+                <Button type="primary" onClick={onBack}>
+                  Go Back
+                </Button>
+              }
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Get the current profile data (edited or original)
   const currentProfile = isEditing ? editData : profile;
+
+  // Get connection button text and status
+  const getConnectionButton = () => {
+    switch (connectionStatus) {
+      case 'pending':
+        return <Button type="secondary" disabled>Request Sent</Button>;
+      case 'accepted':
+        return <Button type="secondary" disabled>Connected</Button>;
+      default:
+        return <Button type="primary" onClick={handleConnect}>Connect</Button>;
+    }
+  };
 
   return (
     <div style={styles.container}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={styles.header}>
-          <button
-            onClick={onBack}
-            style={{
-              ...styles.button,
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}
-          >
-            ← Back
-          </button>
-          <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
-            💄 Makeup Artist Profile
-          </h1>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {isOwnProfile && (
-              <>
-                {isEditing ? (
-                  <>
-                    <button
-                      onClick={handleSaveChanges}
-                      style={{
-                        ...styles.button,
-                        background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                        color: 'white'
-                      }}
+        {/* Notification */}
+        {notification.show && (
+          <Notification
+            type={notification.type}
+            message={notification.message}
+            onClose={() => setNotification(prev => ({ ...prev, show: false }))}
+          />
+        )}
+
+        {/* Header with navigation */}
+        <Card style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button type="secondary" onClick={onBack}>
+              ← Back
+            </Button>
+            <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
+              💄 Makeup Artist Profile
+            </h1>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {isOwnProfile && (
+                <>
+                  {isEditing ? (
+                    <>
+                      <Button 
+                        type="primary" 
+                        onClick={handleSaveChanges}
+                        disabled={uploading}
+                      >
+                        {uploading ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                      <Button 
+                        type="secondary" 
+                        onClick={() => setIsEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button 
+                      type="primary" 
+                      onClick={() => setIsEditing(true)}
                     >
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditData(profile);
-                        setIsEditing(false);
-                      }}
-                      style={{
-                        ...styles.button,
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    style={{
-                      ...styles.button,
-                      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                      color: 'white'
-                    }}
-                  >
-                    ✏️ Edit Profile
-                  </button>
-                )}
-              </>
+                      ✏️ Edit Profile
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Cover Photo and Profile Picture */}
+        <div style={{ position: 'relative', marginBottom: '70px' }}>
+          <div style={styles.coverPhoto}>
+            {currentProfile?.coverPhoto ? (
+              <img 
+                src={`http://localhost:8001${currentProfile.coverPhoto}`} 
+                alt="Cover" 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{ 
+                width: '100%', 
+                height: '100%', 
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255, 255, 255, 0.2)',
+                fontSize: '24px'
+              }}>
+                Makeup Artist
+              </div>
+            )}
+          </div>
+          
+          <div style={styles.profilePicture}>
+            {currentProfile?.profilePicture ? (
+              <img 
+                src={`http://localhost:8001${currentProfile.profilePicture}`} 
+                alt={currentProfile.fullName} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              '💄'
             )}
           </div>
         </div>
 
         {/* Profile Header */}
-        <div style={styles.card}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start'
-            }}
-          >
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
               {isEditing ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '15px'
-                  }}
-                >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <input
                     type="text"
                     value={editData.fullName || ''}
                     onChange={(e) => handleInputChange('fullName', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      fontSize: '24px',
-                      fontWeight: 'bold'
-                    }}
+                    style={{ ...styles.formInput, fontSize: '24px', fontWeight: 'bold' }}
                     placeholder="Full Name"
                   />
                   <input
                     type="text"
                     value={editData.headline || ''}
                     onChange={(e) => handleInputChange('headline', e.target.value)}
-                    style={{ ...styles.input, fontSize: '18px' }}
+                    style={{ ...styles.formInput, fontSize: '18px' }}
                     placeholder="Professional Headline (e.g., Beauty & Editorial Makeup Artist)"
                   />
                   <input
                     type="text"
                     value={editData.location || ''}
                     onChange={(e) => handleInputChange('location', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="📍 Location"
                   />
                 </div>
               ) : (
                 <>
-                  <h1
-                    style={{
-                      color: 'white',
-                      fontSize: '2rem',
-                      margin: '0 0 10px 0'
-                    }}
-                  >
-                    {currentProfile?.fullName ||
-                      `${targetUser?.firstName} ${targetUser?.lastName}` ||
-                      'Makeup Artist'}
+                  <h1 style={{ color: 'white', fontSize: '2rem', margin: '0 0 10px 0' }}>
+                    {currentProfile?.fullName || 
+                     `${targetUser?.firstName} ${targetUser?.lastName}` || 
+                     'Makeup Artist'}
                   </h1>
-                  <p
-                    style={{
-                      color: '#ddd',
-                      fontSize: '1.2rem',
-                      margin: '0 0 15px 0'
-                    }}
-                  >
+                  <p style={{ color: '#ddd', fontSize: '1.2rem', margin: '0 0 15px 0' }}>
                     💄 {currentProfile?.headline || 'Professional Makeup Artist'}
                   </p>
-                  <div
-                    style={{
-                      color: '#ccc',
-                      fontSize: '14px',
-                      display: 'flex',
-                      gap: '20px',
-                      flexWrap: 'wrap'
-                    }}
-                  >
-                    <span>
-                      📍 {currentProfile?.location || 'Location not set'}
-                    </span>
-                    <span>
-                      🔗 {currentProfile?.connectionsCount || 0} connections
-                    </span>
-                    {currentProfile?.isVerified && (
-                      <span style={{ color: '#4CAF50' }}>✓ Verified</span>
-                    )}
+                  <div style={{ color: '#ccc', fontSize: '14px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                    <span>📍 {currentProfile?.location || 'Location not set'}</span>
+                    <span>🔗 {currentProfile?.connectionsCount || 0} connections</span>
+                    {currentProfile?.isVerified && <span style={{ color: '#4CAF50' }}>✓ Verified</span>}
                   </div>
-                </>  
+                </>
               )}
             </div>
-
+            
             {!isOwnProfile && (
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={onConnect}
-                  style={{
-                    ...styles.button,
-                    background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-                    color: 'white'
-                  }}
-                >
-                  Connect
-                </button>
-                <button
-                  onClick={onMessage}
-                  style={{
-                    ...styles.button,
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.3)'
-                  }}
-                >
+                {getConnectionButton()}
+                <Button type="secondary" onClick={onMessage}>
                   Message
-                </button>
+                </Button>
               </div>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Main Content Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 1fr',
-            gap: '20px'
-          }}
-        >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
           {/* Left Column */}
           <div>
             {/* About Section */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                ✨ About
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>✨ About</h2>
               {isEditing ? (
                 <textarea
                   value={editData.bio || ''}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
-                  style={{
-                    ...styles.input,
-                    minHeight: '120px',
-                    resize: 'vertical'
-                  }}
+                  style={styles.textarea}
                   placeholder="Describe your makeup artistry style, experience, and passion for beauty..."
                 />
               ) : (
@@ -432,357 +509,335 @@ const MakeupArtistProfile = ({
                     'Professional makeup artist specializing in beauty, fashion, and special effects makeup with a passion for enhancing natural beauty and creating stunning transformations.'}
                 </p>
               )}
-            </div>
+            </Card>
 
             {/* Makeup Portfolio */}
-            <div style={styles.card}>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>💄 Makeup Portfolio</h2>
+            <Card>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>💄 Makeup Portfolio</h2>
+                {isEditing && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    id="portfolio-upload"
+                    style={{ display: 'none' }}
+                    onChange={(e) => handlePortfolioUpload(e.target.files)}
+                  />
+                )}
+                {isEditing && (
+                  <label htmlFor="portfolio-upload">
+                    <Button type="secondary" style={{ cursor: 'pointer' }}>
+                      {uploading ? 'Uploading...' : '+ Add Photos'}
+                    </Button>
+                  </label>
+                )}
+              </div>
+
+              {/* Portfolio grid */}
+              {currentProfile?.photos && currentProfile.photos.length > 0 ? (
+                <div style={styles.portfolioGrid}>
+                  {currentProfile.photos.map((photo, index) => (
+                    <div key={index} style={styles.portfolioItem}>
+                      <img 
+                        src={`http://localhost:8001${photo}`} 
+                        alt={`Makeup Look ${index + 1}`} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon="💄"
+                  title="No Portfolio Photos"
+                  description={isEditing ? "Upload photos to showcase your makeup looks" : "This makeup artist hasn't uploaded any portfolio photos yet"}
+                  actionButton={isEditing && (
+                    <label htmlFor="portfolio-upload">
+                      <Button type="primary" style={{ cursor: 'pointer' }}>
+                        Add Photos
+                      </Button>
+                    </label>
+                  )}
+                />
+              )}
+            </Card>
+
+            {/* Tutorials & Tips */}
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎥 Tutorials & Tips</h2>
               
-              {/* Tutorial Integration */}
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '10px' }}>Tutorials & Tips</h3>
-                {isEditing ? (
-                  <div>
-                    <div style={{ marginBottom: '15px' }}>
-                      <label style={{ display: 'block', color: '#ccc', marginBottom: '5px' }}>Add New Tutorial</label>
-                      <div style={{ display: 'grid', gap: '10px' }}>
-                        <input
-                          type="text"
-                          value={newTutorial.title}
-                          onChange={(e) => setNewTutorial({ ...newTutorial, title: e.target.value })}
-                          style={styles.input}
-                          placeholder="Tutorial Title"
-                        />
-                        <textarea
-                          value={newTutorial.description}
-                          onChange={(e) => setNewTutorial({ ...newTutorial, description: e.target.value })}
-                          style={{ ...styles.input, minHeight: '80px' }}
-                          placeholder="Brief description of the tutorial"
-                        />
-                        <input
-                          type="text"
-                          value={newTutorial.videoUrl}
-                          onChange={(e) => setNewTutorial({ ...newTutorial, videoUrl: e.target.value })}
-                          style={styles.input}
-                          placeholder="Video URL (YouTube/Vimeo)"
-                        />
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            onClick={handleAddTutorial}
-                            style={styles.button}
-                          >
-                            Add Tutorial
-                          </button>
-                          <button
-                            onClick={() => setNewTutorial({ title: '', description: '', videoUrl: '' })}
-                            style={{ ...styles.button, background: 'rgba(255,255,255,0.1)' }}
-                          >
-                            Clear
-                          </button>
-                        </div>
+              {isEditing ? (
+                <div>
+                  {/* Add New Tutorial Form */}
+                  <div style={{ marginBottom: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                    <h4 style={{ color: 'white', marginBottom: '10px' }}>Add New Tutorial</h4>
+                    <div style={{ display: 'grid', gap: '10px' }}>
+                      <input
+                        type="text"
+                        value={newTutorial.title}
+                        onChange={(e) => setNewTutorial({ ...newTutorial, title: e.target.value })}
+                        style={styles.formInput}
+                        placeholder="Tutorial Title"
+                      />
+                      <textarea
+                        value={newTutorial.description}
+                        onChange={(e) => setNewTutorial({ ...newTutorial, description: e.target.value })}
+                        style={{ ...styles.formInput, minHeight: '80px' }}
+                        placeholder="Brief description of the tutorial"
+                      />
+                      <input
+                        type="text"
+                        value={newTutorial.videoUrl}
+                        onChange={(e) => setNewTutorial({ ...newTutorial, videoUrl: e.target.value })}
+                        style={styles.formInput}
+                        placeholder="Video URL (YouTube/Vimeo)"
+                      />
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <Button type="primary" onClick={handleAddTutorial}>
+                          Add Tutorial
+                        </Button>
+                        <Button 
+                          type="secondary" 
+                          onClick={() => setNewTutorial({ title: '', description: '', videoUrl: '' })}
+                        >
+                          Clear
+                        </Button>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                    {currentProfile?.tutorials?.map((tutorial, index) => (
-                      <div key={index} style={styles.tutorialCard}>
-                        <div style={{ position: 'relative', paddingBottom: '56.25%', marginBottom: '15px' }}>
-                          <iframe
-                            src={tutorial.videoUrl}
-                            title={`Tutorial: ${tutorial.title}`}
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            style={{ width: '100%', aspectRatio: '16/9', borderRadius: '8px' }}
-                          />
+
+                  {/* Existing Tutorials */}
+                  {(editData.tutorials || []).map((tutorial, index) => (
+                    <div key={index} style={styles.tutorialCard}>
+                      <h4 style={{ color: 'white', marginBottom: '10px' }}>{tutorial.title}</h4>
+                      <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '10px' }}>{tutorial.description}</p>
+                      <p style={{ color: '#ccc', fontSize: '12px', marginBottom: '10px' }}>{tutorial.videoUrl}</p>
+                      <Button 
+                        type="danger" 
+                        onClick={() => handleRemoveTutorial(index)}
+                        size="small"
+                      >
+                        Remove Tutorial
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {currentProfile?.tutorials && currentProfile.tutorials.length > 0 ? (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                      {currentProfile.tutorials.map((tutorial, index) => (
+                        <div key={index} style={styles.tutorialCard}>
+                          <div style={{ position: 'relative', paddingBottom: '56.25%', marginBottom: '15px' }}>
+                            <iframe
+                              src={tutorial.videoUrl}
+                              title={`Tutorial: ${tutorial.title}`}
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              style={{ 
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%', 
+                                height: '100%', 
+                                borderRadius: '8px' 
+                              }}
+                            />
+                          </div>
+                          <h4 style={{ color: 'white', marginBottom: '10px' }}>{tutorial.title}</h4>
+                          <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '15px' }}>{tutorial.description}</p>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <Button
+                              type="primary"
+                              onClick={() => window.open(tutorial.videoUrl, '_blank')}
+                            >
+                              Watch Tutorial
+                            </Button>
+                            <Button
+                              type="secondary"
+                              onClick={() => handleShareTutorial(tutorial)}
+                            >
+                              Share
+                            </Button>
+                          </div>
                         </div>
-                        <h4 style={{ color: 'white', marginBottom: '10px' }}>{tutorial.title}</h4>
-                        <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '15px' }}>{tutorial.description}</p>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            onClick={() => window.open(tutorial.videoUrl, '_blank')}
-                            style={styles.button}
-                          >
-                            Watch Tutorial
-                          </button>
-                          <button
-                            onClick={() => handleShareTutorial(tutorial)}
-                            style={{ ...styles.button, background: 'rgba(255,255,255,0.1)' }}
-                          >
-                            Share
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon="🎥"
+                      title="No Tutorials"
+                      description={isEditing ? "Add tutorials to showcase your techniques" : "No tutorials have been added yet"}
+                    />
+                  )}
+                </>
+              )}
+            </Card>
 
             {/* Notable Work & Publications */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🏆 Notable Work & Publications
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🏆 Notable Work & Publications</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <textarea
                     value={editData.notableWork || ''}
                     onChange={(e) => handleInputChange('notableWork', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '80px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Describe your most notable projects, collaborations, or achievements..."
                   />
                   <textarea
                     value={editData.publicationFeatures || ''}
                     onChange={(e) => handleInputChange('publicationFeatures', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="List any magazines, blogs, or publications that have featured your work..."
                   />
                   <textarea
                     value={editData.competitions || ''}
                     onChange={(e) => handleInputChange('competitions', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="List any makeup competitions, contests, or awards you've won..."
                   />
                 </div>
               ) : (
-                <div style={{ color: '#ddd', lineHeight: '1.6' }}>
-                  {currentProfile?.notableWork && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Notable Work:</h4>
-                      <p>{currentProfile.notableWork}</p>
+                <>
+                  {(currentProfile?.notableWork || currentProfile?.publicationFeatures || currentProfile?.competitions) ? (
+                    <div style={{ color: '#ddd', lineHeight: '1.6' }}>
+                      {currentProfile?.notableWork && (
+                        <div style={{ marginBottom: '15px' }}>
+                          <h4 style={{ color: 'white', marginBottom: '8px' }}>Notable Work:</h4>
+                          <p>{currentProfile.notableWork}</p>
+                        </div>
+                      )}
+                      {currentProfile?.publicationFeatures && (
+                        <div style={{ marginBottom: '15px' }}>
+                          <h4 style={{ color: 'white', marginBottom: '8px' }}>Publications:</h4>
+                          <p>{currentProfile.publicationFeatures}</p>
+                        </div>
+                      )}
+                      {currentProfile?.competitions && (
+                        <div style={{ marginBottom: '15px' }}>
+                          <h4 style={{ color: 'white', marginBottom: '8px' }}>Awards & Competitions:</h4>
+                          <p>{currentProfile.competitions}</p>
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <EmptyState
+                      icon="🏆"
+                      title="No Notable Work Listed"
+                      description={isEditing ? "Add your achievements and publications" : "No notable work or publications listed yet"}
+                    />
                   )}
-                  {currentProfile?.publicationFeatures && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Publications:</h4>
-                      <p>{currentProfile.publicationFeatures}</p>
-                    </div>
-                  )}
-                  {currentProfile?.competitions && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Awards & Competitions:</h4>
-                      <p>{currentProfile.competitions}</p>
-                    </div>
-                  )}
-                  {!currentProfile?.notableWork && !currentProfile?.publicationFeatures && !currentProfile?.competitions && (
-                    <p style={{ fontStyle: 'italic', color: '#999' }}>
-                      No notable work or publications listed yet.
-                    </p>
-                  )}
-                </div>
+                </>
               )}
-            </div>
+            </Card>
           </div>
 
           {/* Right Column */}
           <div>
             {/* Makeup Types */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🎨 Makeup Types
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎨 Makeup Types</h2>
               {isEditing ? (
                 <textarea
                   value={(editData.makeupTypes || []).join(', ')}
                   onChange={(e) => handleArrayInputChange('makeupTypes', e.target.value)}
-                  style={{
-                    ...styles.input,
-                    minHeight: '100px',
-                    resize: 'vertical'
-                  }}
+                  style={styles.textarea}
                   placeholder="Bridal Makeup, Editorial Makeup, Beauty Makeup, Special Effects (SFX), Fashion Makeup (comma separated)"
                 />
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(currentProfile?.makeupTypes || ['Beauty Makeup', 'Editorial', 'Bridal']).map((type, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        background: 'rgba(240, 147, 251, 0.2)',
-                        color: '#f093fb',
-                        padding: '8px 12px',
-                        borderRadius: '15px',
-                        fontSize: '12px',
-                        border: '1px solid rgba(240, 147, 251, 0.3)'
-                      }}
-                    >
+                  {(currentProfile?.makeupTypes?.length > 0 
+                    ? currentProfile.makeupTypes 
+                    : ['Beauty Makeup', 'Editorial', 'Bridal']).map((type, index) => (
+                    <span key={index} style={styles.badge}>
                       {type}
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Techniques */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🛠️ Techniques
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🛠️ Techniques</h2>
               {isEditing ? (
                 <textarea
                   value={(editData.techniques || []).join(', ')}
                   onChange={(e) => handleArrayInputChange('techniques', e.target.value)}
-                  style={{
-                    ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
-                  }}
+                  style={styles.textarea}
                   placeholder="Contouring & Highlighting, Color Correction, Airbrushing, False Lashes, Cut Crease (comma separated)"
                 />
               ) : (
                 <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(currentProfile?.techniques || ['Contouring & Highlighting', 'Color Matching', 'Airbrush Makeup', 'Lash Application']).map((technique, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    >
+                  {(currentProfile?.techniques?.length > 0
+                    ? currentProfile.techniques
+                    : ['Contouring & Highlighting', 'Color Matching', 'Airbrush Makeup', 'Lash Application']).map((technique, index) => (
+                    <div key={index} style={styles.skillItem}>
                       • {technique}
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Client Types */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                👥 Client Types
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>👥 Client Types</h2>
               {isEditing ? (
                 <textarea
                   value={(editData.clientTypes || []).join(', ')}
                   onChange={(e) => handleArrayInputChange('clientTypes', e.target.value)}
-                  style={{
-                    ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
-                  }}
+                  style={styles.textarea}
                   placeholder="Brides, Models, Actors/Actresses, Musicians/Performers, Corporate Clients (comma separated)"
                 />
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(currentProfile?.clientTypes || ['Brides', 'Models', 'Special Events']).map((clientType, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: '#ddd',
-                        padding: '6px 10px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
-                      }}
-                    >
+                  {(currentProfile?.clientTypes?.length > 0 
+                    ? currentProfile.clientTypes 
+                    : ['Brides', 'Models', 'Special Events']).map((clientType, index) => (
+                    <span key={index} style={styles.badge}>
                       {clientType}
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Preferred Brands */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                💎 Preferred Brands
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>💎 Preferred Brands</h2>
               {isEditing ? (
                 <textarea
                   value={(editData.preferredBrands || []).join(', ')}
                   onChange={(e) => handleArrayInputChange('preferredBrands', e.target.value)}
-                  style={{
-                    ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
-                  }}
+                  style={styles.textarea}
                   placeholder="MAC, Urban Decay, Charlotte Tilbury, Fenty Beauty, NARS, Dior (comma separated)"
                 />
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(currentProfile?.preferredBrands || ['MAC Cosmetics', 'Urban Decay', 'Charlotte Tilbury']).map((brand, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: '#ddd',
-                        padding: '6px 10px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
-                      }}
-                    >
+                  {(currentProfile?.preferredBrands?.length > 0 
+                    ? currentProfile.preferredBrands 
+                    : ['MAC Cosmetics', 'Urban Decay', 'Charlotte Tilbury']).map((brand, index) => (
+                    <span key={index} style={styles.badge}>
                       {brand}
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Experience & Training */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🎓 Experience & Training
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎓 Experience & Training</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <select
                     value={editData.yearsExperience || ''}
                     onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                   >
                     <option value="">Select Experience Level</option>
                     <option value="0-1">0-1 years</option>
@@ -794,21 +849,13 @@ const MakeupArtistProfile = ({
                   <textarea
                     value={editData.education || ''}
                     onChange={(e) => handleInputChange('education', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Education, makeup schools, certifications..."
                   />
                   <textarea
                     value={editData.certifications || ''}
                     onChange={(e) => handleInputChange('certifications', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Professional certifications, awards, notable achievements..."
                   />
                 </div>
@@ -830,55 +877,54 @@ const MakeupArtistProfile = ({
                       {currentProfile.certifications}
                     </div>
                   )}
+                  {!currentProfile?.yearsExperience && !currentProfile?.education && !currentProfile?.certifications && (
+                    <EmptyState
+                      icon="🎓"
+                      title="No Experience Listed"
+                      description="Experience and training information hasn't been added yet"
+                    />
+                  )}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Services & Rates */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                💰 Services & Rates
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>💰 Services & Rates</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input
                     type="text"
                     value={editData.rates?.bridal || ''}
                     onChange={(e) => handleInputChange('rates.bridal', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="Bridal Rate (e.g., $250)"
                   />
                   <input
                     type="text"
                     value={editData.rates?.photoshoot || ''}
                     onChange={(e) => handleInputChange('rates.photoshoot', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="Photoshoot Rate (e.g., $150)"
                   />
                   <input
                     type="text"
                     value={editData.rates?.special_event || ''}
                     onChange={(e) => handleInputChange('rates.special_event', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="Special Event Rate (e.g., $200)"
                   />
                   <input
                     type="text"
                     value={editData.rates?.lesson || ''}
                     onChange={(e) => handleInputChange('rates.lesson', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="Lesson Rate (e.g., $100)"
                   />
                   <select
                     value={editData.availability || ''}
                     onChange={(e) => handleInputChange('availability', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                   >
                     <option value="">Select Availability</option>
                     <option value="full-time">Available Full Time</option>
@@ -887,55 +933,52 @@ const MakeupArtistProfile = ({
                   </select>
                 </div>
               ) : (
-                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {currentProfile?.rates?.bridal && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Bridal:</strong> {currentProfile.rates.bridal}
+                <>
+                  {(currentProfile?.rates && Object.keys(currentProfile.rates).length > 0) || currentProfile?.availability ? (
+                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {currentProfile?.rates?.bridal && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Bridal:</strong> {currentProfile.rates.bridal}
+                        </div>
+                      )}
+                      {currentProfile?.rates?.photoshoot && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Photoshoot:</strong> {currentProfile.rates.photoshoot}
+                        </div>
+                      )}
+                      {currentProfile?.rates?.special_event && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Special Events:</strong> {currentProfile.rates.special_event}
+                        </div>
+                      )}
+                      {currentProfile?.rates?.lesson && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Lessons:</strong> {currentProfile.rates.lesson}
+                        </div>
+                      )}
+                      {currentProfile?.availability && (
+                        <div style={{ marginTop: '10px' }}>
+                          <strong style={{ color: 'white' }}>Availability:</strong> {currentProfile.availability}
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <EmptyState
+                      icon="💰"
+                      title="No Rates Listed"
+                      description="Contact for rates and availability"
+                    />
                   )}
-                  {currentProfile?.rates?.photoshoot && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Photoshoot:</strong> {currentProfile.rates.photoshoot}
-                    </div>
-                  )}
-                  {currentProfile?.rates?.special_event && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Special Events:</strong> {currentProfile.rates.special_event}
-                    </div>
-                  )}
-                  {currentProfile?.rates?.lesson && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Lessons:</strong> {currentProfile.rates.lesson}
-                    </div>
-                  )}
-                  {currentProfile?.availability && (
-                    <div style={{ marginTop: '10px' }}>
-                      <strong style={{ color: 'white' }}>Availability:</strong> {currentProfile.availability}
-                    </div>
-                  )}
-                  {(!currentProfile?.rates || Object.keys(currentProfile.rates).length === 0) && (
-                    <div style={{ fontStyle: 'italic', color: '#999' }}>
-                      Contact for rates and availability
-                    </div>
-                  )}
-                </div>
+                </>
               )}
-            </div>
+            </Card>
 
             {/* Business Information */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🏢 Business Information
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🏢 Business Information</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ color: 'white', fontSize: '14px', marginBottom: '5px' }}>
+                  <label style={{ color: 'white', fontSize: '14px', marginBottom: '5px', display: 'flex', alignItems: 'center' }}>
                     <input
                       type="checkbox"
                       checked={editData.mobileServices || false}
@@ -947,113 +990,118 @@ const MakeupArtistProfile = ({
                   <textarea
                     value={editData.studioAccess || ''}
                     onChange={(e) => handleInputChange('studioAccess', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Describe your studio or workspace access..."
                   />
                   <textarea
                     value={(editData.equipmentOwned || []).join(', ')}
                     onChange={(e) => handleArrayInputChange('equipmentOwned', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Professional Brush Set, Airbrush System, Ring Light, Makeup Chair (comma separated)"
                   />
                   <textarea
                     value={(editData.workEnvironments || []).join(', ')}
                     onChange={(e) => handleArrayInputChange('workEnvironments', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Studio, On-location, Client's Home, Wedding Venues, Photo Studios (comma separated)"
                   />
                 </div>
               ) : (
-                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div>
-                    <strong style={{ color: 'white' }}>Mobile Services:</strong>{' '}
-                    {currentProfile?.mobileServices ? 'Yes' : 'No'}
-                  </div>
-                  {currentProfile?.studioAccess && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Studio Access:</strong>{' '}
-                      {currentProfile.studioAccess}
-                    </div>
-                  )}
-                  {currentProfile?.equipmentOwned && currentProfile.equipmentOwned.length > 0 && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Equipment:</strong>
-                      <div style={{ marginTop: '5px' }}>
-                        {currentProfile.equipmentOwned.map((equipment, index) => (
-                          <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
-                            • {equipment}
-                          </div>
-                        ))}
+                <>
+                  {(currentProfile?.mobileServices !== undefined || currentProfile?.studioAccess || 
+                    (currentProfile?.equipmentOwned && currentProfile.equipmentOwned.length > 0) || 
+                    (currentProfile?.workEnvironments && currentProfile.workEnvironments.length > 0)) ? (
+                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div>
+                        <strong style={{ color: 'white' }}>Mobile Services:</strong>{' '}
+                        {currentProfile?.mobileServices ? 'Yes' : 'No'}
                       </div>
-                    </div>
-                  )}
-                  {currentProfile?.workEnvironments && currentProfile.workEnvironments.length > 0 && (
-                    <div>
-                      <strong style={{ color: 'white' }}>Work Environments:</strong>
-                      <div style={{ marginTop: '5px' }}>
-                        {currentProfile.workEnvironments.map((env, index) => (
-                          <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
-                            • {env}
+                      {currentProfile?.studioAccess && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Studio Access:</strong>{' '}
+                          {currentProfile.studioAccess}
+                        </div>
+                      )}
+                      {currentProfile?.equipmentOwned && currentProfile.equipmentOwned.length > 0 && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Equipment:</strong>
+                          <div style={{ marginTop: '5px' }}>
+                            {currentProfile.equipmentOwned.map((equipment, index) => (
+                              <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
+                                • {equipment}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      )}
+                      {currentProfile?.workEnvironments && currentProfile.workEnvironments.length > 0 && (
+                        <div>
+                          <strong style={{ color: 'white' }}>Work Environments:</strong>
+                          <div style={{ marginTop: '5px' }}>
+                            {currentProfile.workEnvironments.map((env, index) => (
+                              <div key={index} style={{ paddingLeft: '15px', fontSize: '14px' }}>
+                                • {env}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <EmptyState
+                      icon="🏢"
+                      title="No Business Information"
+                      description="Business details haven't been provided yet"
+                    />
                   )}
-                </div>
+                </>
               )}
-            </div>
+            </Card>
 
             {/* Contact Info */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                📞 Contact
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📞 Contact</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {isEditing ? (
                   <>
                     <input
+                      type="email"
+                      value={editData.email || ''}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      style={styles.formInput}
+                      placeholder="✉️ Email"
+                    />
+                    <input
                       type="tel"
                       value={editData.phone || ''}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
-                      style={styles.input}
+                      style={styles.formInput}
                       placeholder="📞 Phone Number"
                     />
                     <input
                       type="url"
                       value={editData.portfolioWebsite || ''}
                       onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                      style={styles.input}
+                      style={styles.formInput}
                       placeholder="🌐 Portfolio Website"
                     />
                   </>
                 ) : (
                   <>
+                    {currentProfile?.email && (
+                      <div style={styles.contactItem}>
+                        <span style={{ color: '#ccc' }}>✉️</span>
+                        <span style={{ color: 'white' }}>{currentProfile.email}</span>
+                      </div>
+                    )}
                     {currentProfile?.phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={styles.contactItem}>
                         <span style={{ color: '#ccc' }}>📞</span>
                         <span style={{ color: 'white' }}>{currentProfile.phone}</span>
                       </div>
                     )}
                     {currentProfile?.portfolioWebsite && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={styles.contactItem}>
                         <span style={{ color: '#ccc' }}>🌐</span>
                         <a
                           href={currentProfile.portfolioWebsite}
@@ -1065,230 +1113,213 @@ const MakeupArtistProfile = ({
                         </a>
                       </div>
                     )}
-                    {!currentProfile?.phone && !currentProfile?.portfolioWebsite && (
-                      <div style={{ fontStyle: 'italic', color: '#999' }}>
-                        No contact information provided
-                      </div>
+                    {!currentProfile?.email && !currentProfile?.phone && !currentProfile?.portfolioWebsite && (
+                      <EmptyState
+                        icon="📞"
+                        title="No Contact Info"
+                        description="Contact information hasn't been provided yet"
+                      />
                     )}
                   </>
                 )}
               </div>
-            </div>
+            </Card>
 
             {/* Social Media */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                📱 Social Media
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📱 Social Media</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input
                     type="text"
                     value={editData.socialMedia?.instagram || ''}
                     onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="📷 Instagram (@username or URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.tiktok || ''}
                     onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="🎵 TikTok (@username or URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.youtube || ''}
                     onChange={(e) => handleInputChange('socialMedia.youtube', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="🎥 YouTube (Channel URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.facebook || ''}
                     onChange={(e) => handleInputChange('socialMedia.facebook', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="📘 Facebook (Page URL)"
                   />
                   <input
                     type="text"
                     value={editData.socialMedia?.blog || ''}
                     onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
-                    style={styles.input}
+                    style={styles.formInput}
                     placeholder="📝 Blog/Website URL"
                   />
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {currentProfile?.socialMedia?.instagram && (
-                    <a
-                      href={
-                        currentProfile.socialMedia.instagram.startsWith('http')
-                          ? currentProfile.socialMedia.instagram
-                          : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#E4405F',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <span>📷</span>
-                      <span>Instagram</span>
-                    </a>
+                <>
+                  {(currentProfile?.socialMedia && Object.values(currentProfile.socialMedia).some(val => val)) ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {currentProfile?.socialMedia?.instagram && (
+                        <a
+                          href={
+                            currentProfile.socialMedia.instagram.startsWith('http')
+                              ? currentProfile.socialMedia.instagram
+                              : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#E4405F',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <span>📷</span>
+                          <span>Instagram</span>
+                        </a>
+                      )}
+                      {currentProfile?.socialMedia?.tiktok && (
+                        <a
+                          href={
+                            currentProfile.socialMedia.tiktok.startsWith('http')
+                              ? currentProfile.socialMedia.tiktok
+                              : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#000',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <span>🎵</span>
+                          <span>TikTok</span>
+                        </a>
+                      )}
+                      {currentProfile?.socialMedia?.youtube && (
+                        <a
+                          href={currentProfile.socialMedia.youtube}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#FF0000',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <span>🎥</span>
+                          <span>YouTube</span>
+                        </a>
+                      )}
+                      {currentProfile?.socialMedia?.facebook && (
+                        <a
+                          href={currentProfile.socialMedia.facebook}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#1877F2',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <span>📘</span>
+                          <span>Facebook</span>
+                        </a>
+                      )}
+                      {currentProfile?.socialMedia?.blog && (
+                        <a
+                          href={currentProfile.socialMedia.blog}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#f093fb',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <span>📝</span>
+                          <span>Blog/Website</span>
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon="📱"
+                      title="No Social Media Links"
+                      description="Social media profiles haven't been added yet"
+                    />
                   )}
-                  {currentProfile?.socialMedia?.tiktok && (
-                    <a
-                      href={
-                        currentProfile.socialMedia.tiktok.startsWith('http')
-                          ? currentProfile.socialMedia.tiktok
-                          : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#000',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <span>🎵</span>
-                      <span>TikTok</span>
-                    </a>
-                  )}
-                  {currentProfile?.socialMedia?.youtube && (
-                    <a
-                      href={currentProfile.socialMedia.youtube}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#FF0000',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <span>🎥</span>
-                      <span>YouTube</span>
-                    </a>
-                  )}
-                  {currentProfile?.socialMedia?.facebook && (
-                    <a
-                      href={currentProfile.socialMedia.facebook}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#1877F2',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <span>📘</span>
-                      <span>Facebook</span>
-                    </a>
-                  )}
-                  {currentProfile?.socialMedia?.blog && (
-                    <a
-                      href={currentProfile.socialMedia.blog}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#f093fb',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <span>📝</span>
-                      <span>Blog/Website</span>
-                    </a>
-                  )}
-                  {(!currentProfile?.socialMedia ||
-                    (!currentProfile.socialMedia.instagram &&
-                      !currentProfile.socialMedia.tiktok &&
-                      !currentProfile.socialMedia.youtube &&
-                      !currentProfile.socialMedia.facebook &&
-                      !currentProfile.socialMedia.blog)) && (
-                    <span style={{ color: '#999', fontStyle: 'italic' }}>
-                      No social media links
-                    </span>
-                  )}
-                </div>
+                </>
               )}
-            </div>
+            </Card>
 
             {/* Kit Information */}
-            <div style={styles.card}>
-              <h2
-                style={{
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  marginBottom: '15px'
-                }}
-              >
-                🧰 Kit Information
-              </h2>
+            <Card>
+              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🧰 Kit Information</h2>
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <textarea
                     value={editData.kitInformation || ''}
                     onChange={(e) => handleInputChange('kitInformation', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '80px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Describe your makeup kit, special tools, and professional equipment..."
                   />
                   <textarea
                     value={editData.hygieneStandards || ''}
                     onChange={(e) => handleInputChange('hygieneStandards', e.target.value)}
-                    style={{
-                      ...styles.input,
-                      minHeight: '60px',
-                      resize: 'vertical'
-                    }}
+                    style={styles.textarea}
                     placeholder="Describe your sanitation practices and safety protocols..."
                   />
                 </div>
               ) : (
-                <div style={{ color: '#ddd', lineHeight: '1.6' }}>
-                  {currentProfile?.kitInformation && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Kit Details:</h4>
-                      <p>{currentProfile.kitInformation}</p>
+                <>
+                  {(currentProfile?.kitInformation || currentProfile?.hygieneStandards) ? (
+                    <div style={{ color: '#ddd', lineHeight: '1.6' }}>
+                      {currentProfile?.kitInformation && (
+                        <div style={{ marginBottom: '15px' }}>
+                          <h4 style={{ color: 'white', marginBottom: '8px' }}>Kit Details:</h4>
+                          <p>{currentProfile.kitInformation}</p>
+                        </div>
+                      )}
+                      {currentProfile?.hygieneStandards && (
+                        <div>
+                          <h4 style={{ color: 'white', marginBottom: '8px' }}>Hygiene Standards:</h4>
+                          <p>{currentProfile.hygieneStandards}</p>
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <EmptyState
+                      icon="🧰"
+                      title="No Kit Information"
+                      description="Kit details and hygiene standards haven't been provided yet"
+                    />
                   )}
-                  {currentProfile?.hygieneStandards && (
-                    <div>
-                      <h4 style={{ color: 'white', marginBottom: '8px' }}>Hygiene Standards:</h4>
-                      <p>{currentProfile.hygieneStandards}</p>
-                    </div>
-                  )}
-                  {!currentProfile?.kitInformation && !currentProfile?.hygieneStandards && (
-                    <p style={{ fontStyle: 'italic', color: '#999' }}>
-                      No kit information provided
-                    </p>
-                  )}
-                </div>
+                </>
               )}
-            </div>
+            </Card>
           </div>
         </div>
       </div>

@@ -1,5 +1,16 @@
 // src/components/setup/StylistProfileSetup.js
 import React, { useState } from 'react';
+import { 
+  FormInput, 
+  FormSelect, 
+  FormTextarea, 
+  FormCheckboxGroup,
+  Button,
+  Card,
+  LoadingSpinner,
+  Notification
+} from '../shared';
+import { profileService } from '../../services/api';
 
 const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -70,8 +81,11 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     collaborationStyle: ''
   });
 
+  // Form validation and state
+  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
 
   const steps = [
     { number: 1, title: 'Personal Info', icon: '👤' },
@@ -83,6 +97,7 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     { number: 7, title: 'Review & Submit', icon: '✅' }
   ];
 
+  // Option arrays
   const stylingTypes = [
     'Editorial Styling', 'Personal Styling', 'Commercial Styling',
     'Celebrity Styling', 'Wardrobe Consulting', 'E-commerce Styling',
@@ -133,6 +148,38 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     'Fashion Weeks', 'Trade Shows', 'Red Carpet Events'
   ];
 
+  const yearsExperienceOptions = [
+    { value: '0-1', label: '0-1 years (New Stylist)' },
+    { value: '2-3', label: '2-3 years (Developing)' },
+    { value: '4-6', label: '4-6 years (Experienced)' },
+    { value: '7-10', label: '7-10 years (Senior Stylist)' },
+    { value: '10+', label: '10+ years (Master Stylist)' }
+  ];
+
+  const availabilityOptions = [
+    { value: 'full-time', label: 'Full Time' },
+    { value: 'part-time', label: 'Part Time' },
+    { value: 'freelance', label: 'Freelance/Project Based' },
+    { value: 'weekends-only', label: 'Weekends Only' },
+    { value: 'seasonal', label: 'Seasonal' }
+  ];
+
+  const travelWillingnessOptions = [
+    { value: 'local-only', label: 'Local Only (0-50 miles)' },
+    { value: 'regional', label: 'Regional (50-200 miles)' },
+    { value: 'national', label: 'National' },
+    { value: 'international', label: 'International' },
+    { value: 'anywhere', label: 'Travel Anywhere' }
+  ];
+
+  const currencyOptions = [
+    { value: 'USD', label: 'USD' },
+    { value: 'EUR', label: 'EUR' },
+    { value: 'GBP', label: 'GBP' },
+    { value: 'CAD', label: 'CAD' }
+  ];
+
+  // Form handling functions
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -143,53 +190,172 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           [child]: value
         }
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     } else {
       setProfileData(prev => ({
         ...prev,
         [field]: value
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     }
   };
 
-  const handleArrayToggle = (field, value) => {
+  const handleArrayChange = (field, values) => {
     setProfileData(prev => ({
       ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
+      [field]: values
+    }));
+    
+    // Clear errors when field is edited
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+  };
+
+  const handleBooleanChange = (field) => {
+    setProfileData(prev => ({
+      ...prev,
+      [field]: !prev[field]
     }));
   };
 
+  // Navigation functions
   const nextStep = () => {
-    if (currentStep < steps.length) setCurrentStep(currentStep + 1);
+    // Validate current step
+    const currentStepErrors = validateStep(currentStep);
+    
+    if (Object.keys(currentStepErrors).length > 0) {
+      setErrors(currentStepErrors);
+      setMessage('Please fix the errors before proceeding.');
+      setMessageType('error');
+      return;
+    }
+    
+    if (currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
+    }
   };
 
   const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
+    }
   };
 
+  // Validation function for each step
+  const validateStep = (step) => {
+    const stepErrors = {};
+    
+    switch (step) {
+      case 1: // Personal Information
+        if (!profileData.fullName || profileData.fullName.trim() === '') {
+          stepErrors.fullName = 'Full name is required';
+        }
+        if (!profileData.email || !/^\S+@\S+\.\S+$/.test(profileData.email)) {
+          stepErrors.email = 'Valid email is required';
+        }
+        if (!profileData.phone) {
+          stepErrors.phone = 'Phone number is required';
+        }
+        if (!profileData.location) {
+          stepErrors.location = 'Location is required';
+        }
+        break;
+      
+      case 2: // Professional Background
+        if (!profileData.headline) {
+          stepErrors.headline = 'Professional headline is required';
+        }
+        if (!profileData.bio) {
+          stepErrors.bio = 'Bio is required';
+        }
+        if (!profileData.yearsExperience) {
+          stepErrors.yearsExperience = 'Years of experience is required';
+        }
+        break;
+      
+      case 3: // Styling Specializations
+        if (profileData.stylingTypes.length === 0) {
+          stepErrors.stylingTypes = 'Select at least one styling type';
+        }
+        if (profileData.clientTypes.length === 0) {
+          stepErrors.clientTypes = 'Select at least one client type';
+        }
+        break;
+      
+      case 4: // Services & Expertise
+        if (profileData.servicesOffered.length === 0) {
+          stepErrors.servicesOffered = 'Select at least one service offered';
+        }
+        break;
+      
+      case 6: // Portfolio & Social
+        if (!profileData.portfolioWebsite) {
+          stepErrors.portfolioWebsite = 'Portfolio website is required';
+        }
+        break;
+      
+      default:
+        // No validation for other steps
+        break;
+    }
+    
+    return stepErrors;
+  };
+
+  // Submit profile
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setMessage('');
+    setMessageType('');
+    
+    // Validate final step
+    const finalErrors = validateStep(6); // Validate key requirements
+    if (Object.keys(finalErrors).length > 0) {
+      setErrors(finalErrors);
+      setMessage('Please fix the errors before submitting.');
+      setMessageType('error');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-      });
-      const data = await response.json();
-      if (response.ok) {
+      // Use the profileService to submit the data
+      const response = await profileService.completeProfile(profileData);
+
+      if (response) {
         setMessage('Stylist profile created successfully! Redirecting to dashboard...');
-        setTimeout(onProfileComplete, 2000);
-      } else {
-        setMessage(data.message || 'Failed to create profile');
+        setMessageType('success');
+        setTimeout(() => {
+          onProfileComplete();
+        }, 2000);
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      setMessage(error.message || 'Failed to create profile. Please try again.');
+      setMessageType('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -255,66 +421,6 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
       gap: '20px',
       marginBottom: '30px'
     },
-    formGroup: {
-      marginBottom: '20px'
-    },
-    label: {
-      display: 'block',
-      marginBottom: '8px',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      color: '#fff'
-    },
-    input: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    select: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    textarea: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none',
-      minHeight: '100px',
-      resize: 'vertical'
-    },
-    checkboxGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '10px',
-      marginTop: '10px'
-    },
-    checkbox: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '8px',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      transition: 'background 0.2s ease'
-    },
-    checkboxChecked: {
-      background: 'rgba(76, 175, 80, 0.2)'
-    },
     navigation: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -322,294 +428,221 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
       padding: '30px 40px',
       borderTop: '1px solid rgba(255, 255, 255, 0.1)'
     },
-    button: {
-      padding: '12px 24px',
-      borderRadius: '8px',
-      border: 'none',
+    checkboxContainer: {
+      marginBottom: '25px'
+    },
+    booleanCheckbox: {
+      display: 'flex', 
+      alignItems: 'center', 
+      color: '#fff', 
+      fontSize: '14px', 
       cursor: 'pointer',
-      fontWeight: 'bold',
-      fontSize: '16px',
+      padding: '10px',
+      borderRadius: '8px',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
       transition: 'all 0.3s ease'
-    },
-    primaryButton: {
-      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-      color: 'white'
-    },
-    secondaryButton: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      border: '1px solid rgba(255, 255, 255, 0.3)'
     }
   };
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 1:
+      case 1: // Personal Information
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>👤 Personal Information</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Full Name *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.fullName}
-                  onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  placeholder="Your professional name"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email *</label>
-                <input
-                  type="email"
-                  style={styles.input}
-                  value={profileData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="professional@email.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Phone Number *</label>
-                <input
-                  type="tel"
-                  style={styles.input}
-                  value={profileData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Location *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="City, State/Country"
-                />
-              </div>
+              <FormInput
+                label="Full Name"
+                value={profileData.fullName}
+                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                placeholder="Your professional name"
+                error={errors.fullName}
+                required
+              />
+              <FormInput
+                label="Email"
+                type="email"
+                value={profileData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="professional@email.com"
+                error={errors.email}
+                required
+              />
+              <FormInput
+                label="Phone Number"
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                error={errors.phone}
+                required
+              />
+              <FormInput
+                label="Location"
+                value={profileData.location}
+                onChange={(e) => handleInputChange('location', e.target.value)}
+                placeholder="City, State/Country"
+                error={errors.location}
+                required
+              />
             </div>
           </div>
         );
 
-      case 2:
+      case 2: // Professional Background
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🎓 Professional Background</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Professional Headline *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.headline}
-                  onChange={(e) => handleInputChange('headline', e.target.value)}
-                  placeholder="e.g., Editorial & Personal Fashion Stylist"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Years of Experience *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.yearsExperience}
-                  onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
-                >
-                  <option value="">Select experience level</option>
-                  <option value="0-1">0-1 years (New Stylist)</option>
-                  <option value="2-3">2-3 years (Developing)</option>
-                  <option value="4-6">4-6 years (Experienced)</option>
-                  <option value="7-10">7-10 years (Senior Stylist)</option>
-                  <option value="10+">10+ years (Master Stylist)</option>
-                </select>
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>About Your Styling Approach *</label>
-              <textarea
-                style={styles.textarea}
-                value={profileData.bio}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                placeholder="Describe your styling philosophy, approach to fashion, and what makes your work unique."
+              <FormInput
+                label="Professional Headline"
+                value={profileData.headline}
+                onChange={(e) => handleInputChange('headline', e.target.value)}
+                placeholder="e.g., Editorial & Personal Fashion Stylist"
+                error={errors.headline}
+                required
+              />
+              <FormSelect
+                label="Years of Experience"
+                value={profileData.yearsExperience}
+                onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
+                options={yearsExperienceOptions}
+                placeholder="Select experience level"
+                error={errors.yearsExperience}
+                required
               />
             </div>
+            
+            <FormTextarea
+              label="About Your Styling Approach"
+              value={profileData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="Describe your styling philosophy, approach to fashion, and what makes your work unique."
+              error={errors.bio}
+              required
+            />
+
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Education & Training</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.education}
-                  onChange={(e) => handleInputChange('education', e.target.value)}
-                  placeholder="Fashion school, styling courses, workshops"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Certifications</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.certifications}
-                  onChange={(e) => handleInputChange('certifications', e.target.value)}
-                  placeholder="Color analysis certification, etc."
-                />
-              </div>
+              <FormTextarea
+                label="Education & Training"
+                value={profileData.education}
+                onChange={(e) => handleInputChange('education', e.target.value)}
+                placeholder="Fashion school, styling courses, workshops"
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Certifications"
+                value={profileData.certifications}
+                onChange={(e) => handleInputChange('certifications', e.target.value)}
+                placeholder="Color analysis certification, etc."
+                minHeight="80px"
+              />
             </div>
           </div>
         );
 
-      case 3:
+      case 3: // Styling Specializations
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>👗 Styling Specializations</h2>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Styling Types (Select all that apply) *</label>
-              <div style={styles.checkboxGrid}>
-                {stylingTypes.map(type => (
-                  <div
-                    key={type}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.stylingTypes.includes(type) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('stylingTypes', type)}
-                  >
-                    <input type="checkbox" checked={profileData.stylingTypes.includes(type)} readOnly />
-                    <span>{type}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Client Types *</label>
-              <div style={styles.checkboxGrid}>
-                {clientTypes.map(client => (
-                  <div
-                    key={client}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.clientTypes.includes(client) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('clientTypes', client)}
-                  >
-                    <input type="checkbox" checked={profileData.clientTypes.includes(client)} readOnly />
-                    <span>{client}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Fashion Categories</label>
-              <div style={styles.checkboxGrid}>
-                {fashionCategories.map(cat => (
-                  <div
-                    key={cat}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.fashionCategories.includes(cat) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('fashionCategories', cat)}
-                  >
-                    <input type="checkbox" checked={profileData.fashionCategories.includes(cat)} readOnly />
-                    <span>{cat}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Style Aesthetics</label>
-              <div style={styles.checkboxGrid}>
-                {styleAesthetics.map(aesthetic => (
-                  <div
-                    key={aesthetic}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.styleAesthetics.includes(aesthetic) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('styleAesthetics', aesthetic)}
-                  >
-                    <input type="checkbox" checked={profileData.styleAesthetics.includes(aesthetic)} readOnly />
-                    <span>{aesthetic}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            
+            <FormCheckboxGroup
+              label="Styling Types (Select all that apply)"
+              options={stylingTypes}
+              selectedValues={profileData.stylingTypes}
+              onChange={(values) => handleArrayChange('stylingTypes', values)}
+              error={errors.stylingTypes}
+              columns={3}
+            />
+
+            <FormCheckboxGroup
+              label="Client Types (Select all that apply)"
+              options={clientTypes}
+              selectedValues={profileData.clientTypes}
+              onChange={(values) => handleArrayChange('clientTypes', values)}
+              error={errors.clientTypes}
+              columns={3}
+            />
+
+            <FormCheckboxGroup
+              label="Fashion Categories"
+              options={fashionCategories}
+              selectedValues={profileData.fashionCategories}
+              onChange={(values) => handleArrayChange('fashionCategories', values)}
+              columns={3}
+            />
+
+            <FormCheckboxGroup
+              label="Style Aesthetics"
+              options={styleAesthetics}
+              selectedValues={profileData.styleAesthetics}
+              onChange={(values) => handleArrayChange('styleAesthetics', values)}
+              columns={3}
+            />
           </div>
         );
 
-      case 4:
+      case 4: // Services & Expertise
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💼 Services & Expertise</h2>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Services Offered *</label>
-              <div style={styles.checkboxGrid}>
-                {servicesOffered.map(svc => (
-                  <div
-                    key={svc}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.servicesOffered.includes(svc) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('servicesOffered', svc)}
-                  >
-                    <input type="checkbox" checked={profileData.servicesOffered.includes(svc)} readOnly />
-                    <span>{svc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Designer & Brand Knowledge</label>
-              <div style={styles.checkboxGrid}>
-                {designerKnowledge.map(know => (
-                  <div
-                    key={know}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.designerKnowledge.includes(know) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('designerKnowledge', know)}
-                  >
-                    <input type="checkbox" checked={profileData.designerKnowledge.includes(know)} readOnly />
-                    <span>{know}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            
+            <FormCheckboxGroup
+              label="Services Offered (Select all that apply)"
+              options={servicesOffered}
+              selectedValues={profileData.servicesOffered}
+              onChange={(values) => handleArrayChange('servicesOffered', values)}
+              error={errors.servicesOffered}
+              columns={3}
+            />
+
+            <FormCheckboxGroup
+              label="Designer & Brand Knowledge"
+              options={designerKnowledge}
+              selectedValues={profileData.designerKnowledge}
+              onChange={(values) => handleArrayChange('designerKnowledge', values)}
+              columns={3}
+            />
+
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Brand Relationships</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.brandRelationships}
-                  onChange={(e) => handleInputChange('brandRelationships', e.target.value)}
-                  placeholder="PR contacts, showroom access, etc."
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Trend Forecasting Experience</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.trendForecasting}
-                  onChange={(e) => handleInputChange('trendForecasting', e.target.value)}
-                  placeholder="Experience predicting fashion trends"
-                />
-              </div>
+              <FormTextarea
+                label="Brand Relationships"
+                value={profileData.brandRelationships}
+                onChange={(e) => handleInputChange('brandRelationships', e.target.value)}
+                placeholder="PR contacts, showroom access, etc."
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Trend Forecasting Experience"
+                value={profileData.trendForecasting}
+                onChange={(e) => handleInputChange('trendForecasting', e.target.value)}
+                placeholder="Experience predicting fashion trends"
+                minHeight="80px"
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label style={styles.label}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.colorAnalysis ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.colorAnalysis}
-                  onChange={(e) => handleInputChange('colorAnalysis', e.target.checked)}
+                  onChange={() => handleBooleanChange('colorAnalysis')}
                   style={{ marginRight: '10px' }}
                 />
                 I offer professional color analysis services
               </label>
-              <label style={styles.label}>
+              
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.bodyTypeExpertise ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.bodyTypeExpertise}
-                  onChange={(e) => handleInputChange('bodyTypeExpertise', e.target.checked)}
+                  onChange={() => handleBooleanChange('bodyTypeExpertise')}
                   style={{ marginRight: '10px' }}
                 />
                 I specialize in body type consultation
@@ -618,96 +651,132 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           </div>
         );
 
-      case 5:
+      case 5: // Business & Rates
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💰 Business & Rates</h2>
+            
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Initial Consultation (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.consultation}
-                  onChange={(e) => handleInputChange('rates.consultation', e.target.value)}
-                  placeholder="150"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Personal Styling Session (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.personalStyling}
-                  onChange={(e) => handleInputChange('rates.personalStyling', e.target.value)}
-                  placeholder="400"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Editorial Day Rate (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.editorialDay}
-                  onChange={(e) => handleInputChange('rates.editorialDay', e.target.value)}
-                  placeholder="800"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Shopping Service Hourly (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.shoppingHourly}
-                  onChange={(e) => handleInputChange('rates.shoppingHourly', e.target.value)}
-                  placeholder="100"
-                />
-              </div>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Package Deals</label>
-              <textarea
-                style={styles.textarea}
-                value={profileData.rates.packageDeals}
-                onChange={(e) => handleInputChange('rates.packageDeals', e.target.value)}
-                placeholder="e.g., 'Wardrobe Overhaul: $2500 includes consultation, shopping, 3 sessions'"
+              <FormInput
+                label="Initial Consultation Rate"
+                type="number"
+                value={profileData.rates.consultation}
+                onChange={(e) => handleInputChange('rates.consultation', e.target.value)}
+                placeholder="150"
+              />
+              <FormInput
+                label="Personal Styling Session Rate"
+                type="number"
+                value={profileData.rates.personalStyling}
+                onChange={(e) => handleInputChange('rates.personalStyling', e.target.value)}
+                placeholder="400"
+              />
+              <FormInput
+                label="Editorial Day Rate"
+                type="number"
+                value={profileData.rates.editorialDay}
+                onChange={(e) => handleInputChange('rates.editorialDay', e.target.value)}
+                placeholder="800"
+              />
+              <FormInput
+                label="Shopping Service Hourly Rate"
+                type="number"
+                value={profileData.rates.shoppingHourly}
+                onChange={(e) => handleInputChange('rates.shoppingHourly', e.target.value)}
+                placeholder="100"
+              />
+              <FormSelect
+                label="Currency"
+                value={profileData.rates.currency}
+                onChange={(e) => handleInputChange('rates.currency', e.target.value)}
+                options={currencyOptions}
+                placeholder="Select currency"
               />
             </div>
+
+            <FormTextarea
+              label="Package Deals"
+              value={profileData.rates.packageDeals}
+              onChange={(e) => handleInputChange('rates.packageDeals', e.target.value)}
+              placeholder="e.g., 'Wardrobe Overhaul: $2500 includes consultation, shopping, 3 sessions'"
+              minHeight="80px"
+            />
+
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Consultation Process</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.consultationProcess}
-                  onChange={(e) => handleInputChange('consultationProcess', e.target.value)}
-                  placeholder="Describe what clients can expect"
-                />
-              </div>
+              <FormTextarea
+                label="Consultation Process"
+                value={profileData.consultationProcess}
+                onChange={(e) => handleInputChange('consultationProcess', e.target.value)}
+                placeholder="Describe what clients can expect during consultations"
+                minHeight="100px"
+              />
+              <FormSelect
+                label="Availability"
+                value={profileData.availability}
+                onChange={(e) => handleInputChange('availability', e.target.value)}
+                options={availabilityOptions}
+                placeholder="Select availability"
+              />
+              <FormSelect
+                label="Travel Willingness"
+                value={profileData.travelWillingness}
+                onChange={(e) => handleInputChange('travelWillingness', e.target.value)}
+                options={travelWillingnessOptions}
+                placeholder="Select travel preference"
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label style={styles.label}>
+
+            <FormCheckboxGroup
+              label="Work Environments"
+              options={workEnvironments}
+              selectedValues={profileData.workEnvironments}
+              onChange={(values) => handleArrayChange('workEnvironments', values)}
+              columns={3}
+            />
+
+            <FormTextarea
+              label="Collaboration Style"
+              value={profileData.collaborationStyle}
+              onChange={(e) => handleInputChange('collaborationStyle', e.target.value)}
+              placeholder="Describe your working style and approach to collaborating with clients and teams"
+              minHeight="80px"
+            />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '25px' }}>
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.shoppingServices ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.shoppingServices}
-                  onChange={(e) => handleInputChange('shoppingServices', e.target.checked)}
+                  onChange={() => handleBooleanChange('shoppingServices')}
                   style={{ marginRight: '10px' }}
                 />
                 I offer personal shopping services
               </label>
-              <label style={styles.label}>
+              
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.wardrobeAudit ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.wardrobeAudit}
-                  onChange={(e) => handleInputChange('wardrobeAudit', e.target.checked)}
+                  onChange={() => handleBooleanChange('wardrobeAudit')}
                   style={{ marginRight: '10px' }}
                 />
                 I provide wardrobe audit services
               </label>
-              <label style={styles.label}>
+              
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.closetOrganization ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.closetOrganization}
-                  onChange={(e) => handleInputChange('closetOrganization', e.target.checked)}
+                  onChange={() => handleBooleanChange('closetOrganization')}
                   style={{ marginRight: '10px' }}
                 />
                 I offer closet organization services
@@ -716,117 +785,141 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           </div>
         );
 
-      case 6:
+      case 6: // Portfolio & Social Media
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>📸 Portfolio & Social Media</h2>
+            
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Portfolio Website *</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.portfolioWebsite}
-                  onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                  placeholder="https://yourportfolio.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Instagram</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.instagram}
-                  onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
-                  placeholder="@yourstyling"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Pinterest</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.pinterest}
-                  onChange={(e) => handleInputChange('socialMedia.pinterest', e.target.value)}
-                  placeholder="Pinterest URL"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>LinkedIn</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.linkedin}
-                  onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
-                  placeholder="LinkedIn URL"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Blog/Website</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.blog}
-                  onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
-                  placeholder="Blog URL"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>TikTok</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.tiktok}
-                  onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
-                  placeholder="@yourtiktok"
-                />
-              </div>
+              <FormInput
+                label="Portfolio Website"
+                type="url"
+                value={profileData.portfolioWebsite}
+                onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
+                placeholder="https://yourportfolio.com"
+                error={errors.portfolioWebsite}
+                required
+              />
+              <FormInput
+                label="Instagram"
+                value={profileData.socialMedia.instagram}
+                onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
+                placeholder="@yourstyling"
+              />
+              <FormInput
+                label="Pinterest"
+                value={profileData.socialMedia.pinterest}
+                onChange={(e) => handleInputChange('socialMedia.pinterest', e.target.value)}
+                placeholder="Pinterest URL"
+              />
+              <FormInput
+                label="LinkedIn"
+                type="url"
+                value={profileData.socialMedia.linkedin}
+                onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
+                placeholder="LinkedIn URL"
+              />
+              <FormInput
+                label="Blog/Website"
+                type="url"
+                value={profileData.socialMedia.blog}
+                onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
+                placeholder="Blog URL"
+              />
+              <FormInput
+                label="TikTok"
+                value={profileData.socialMedia.tiktok}
+                onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
+                placeholder="@yourtiktok"
+              />
+            </div>
+
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Editorial Work"
+                value={profileData.editorialWork}
+                onChange={(e) => handleInputChange('editorialWork', e.target.value)}
+                placeholder="Describe your editorial styling work, publications, campaigns"
+                minHeight="100px"
+              />
+              <FormTextarea
+                label="Brand Collaborations"
+                value={profileData.brandCollaborations}
+                onChange={(e) => handleInputChange('brandCollaborations', e.target.value)}
+                placeholder="Notable brand partnerships and collaborations"
+                minHeight="100px"
+              />
+              <FormTextarea
+                label="Celebrity Clients"
+                value={profileData.celebrityClients}
+                onChange={(e) => handleInputChange('celebrityClients', e.target.value)}
+                placeholder="High-profile clients you've worked with (if comfortable sharing)"
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Publications"
+                value={profileData.publications}
+                onChange={(e) => handleInputChange('publications', e.target.value)}
+                placeholder="Magazines, blogs, websites where your work has been featured"
+                minHeight="80px"
+              />
             </div>
           </div>
         );
 
-      case 7:
+      case 7: // Review & Submit
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✅ Review & Submit</h2>
-            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
+            <Card>
               <h3 style={{ color: '#a55eea', marginBottom: '15px' }}>Stylist Profile Summary</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px,1fr))', gap: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
                 <div>
                   <strong>Name:</strong> {profileData.fullName}<br/>
                   <strong>Location:</strong> {profileData.location}<br/>
-                  <strong>Experience:</strong> {profileData.yearsExperience}<br/>
-                  <strong>Specializations:</strong> {profileData.stylingTypes.length} types
+                  <strong>Experience:</strong> {
+                    yearsExperienceOptions.find(option => option.value === profileData.yearsExperience)?.label || 
+                    profileData.yearsExperience
+                  }<br/>
+                  <strong>Color Analysis:</strong> {profileData.colorAnalysis ? 'Yes' : 'No'}<br/>
+                  <strong>Body Type Expertise:</strong> {profileData.bodyTypeExpertise ? 'Yes' : 'No'}
                 </div>
                 <div>
-                  <strong>Client Types:</strong> {profileData.clientTypes.slice(0,3).join(', ')}{profileData.clientTypes.length >3 ? '...' : ''}<br/>
+                  <strong>Specializations:</strong> {profileData.stylingTypes.slice(0, 3).join(', ')}{profileData.stylingTypes.length > 3 ? '...' : ''}<br/>
+                  <strong>Client Types:</strong> {profileData.clientTypes.slice(0, 3).join(', ')}{profileData.clientTypes.length > 3 ? '...' : ''}<br/>
                   <strong>Services:</strong> {profileData.servicesOffered.length} offerings<br/>
                   <strong>Consultation Rate:</strong> ${profileData.rates.consultation || 'TBD'}<br/>
-                  <strong>Travel:</strong> {profileData.travelWillingness || 'TBD'}
+                  <strong>Portfolio:</strong> {profileData.portfolioWebsite || 'Not provided'}
                 </div>
               </div>
-            </div>
-            <div style={{ background: 'rgba(255,193,7,0.1)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255,193,7,0.3)', marginBottom: '30px' }}>
+              
+              {profileData.bio && (
+                <div style={{ marginTop: '15px' }}>
+                  <p style={{ color: '#ddd', fontSize: '14px' }}>
+                    <strong>Bio:</strong> {profileData.bio.slice(0, 200)}
+                    {profileData.bio.length > 200 && '...'}
+                  </p>
+                </div>
+              )}
+            </Card>
+            
+            <Card style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
               <h4 style={{ color: '#FFC107', marginBottom: '10px' }}>👗 Next Steps</h4>
               <p style={{ margin: 0, color: '#ddd' }}>
-                After submitting, you can:<br/>
-                • Upload portfolio & before/after photos<br/>
-                • Browse & apply for projects<br/>
-                • Connect with models, photographers & brands<br/>
-                • Manage your bookings & consultations
+                After submitting your profile, you'll be redirected to your dashboard where you can:
+                <br/>• Upload portfolio photos and before/after styling examples
+                <br/>• Browse and apply for styling projects
+                <br/>• Connect with models, photographers, and brands
+                <br/>• Manage your bookings and client consultations
               </p>
-            </div>
+            </Card>
+
             {message && (
-              <div style={{
-                padding: '15px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                background: message.includes('success') ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)',
-                border: `1px solid ${message.includes('success') ? '#4CAF50' : '#F44336'}`,
-                color: message.includes('success') ? '#81C784' : '#EF5350'
-              }}>
-                {message}
-              </div>
+              <Notification
+                type={messageType}
+                message={message}
+                onClose={() => { setMessage(''); setMessageType(''); }}
+              />
             )}
           </div>
         );
@@ -842,15 +935,21 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
         {/* Header */}
         <div style={styles.header}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>👗 Fashion Stylist Setup</h1>
-            <button onClick={onLogout} style={{ ...styles.button, ...styles.secondaryButton }}>
+            <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>
+              👗 Fashion Stylist Setup
+            </h1>
+            <Button 
+              type="secondary"
+              onClick={onLogout}
+            >
               Logout
-            </button>
+            </Button>
           </div>
           <p style={{ color: '#ddd', fontSize: '1.1rem', margin: 0 }}>
             Create your professional styling profile to connect with clients, models, and fashion brands
           </p>
         </div>
+
         {/* Step Indicator */}
         <div style={styles.stepIndicator}>
           {steps.map(step => (
@@ -858,11 +957,8 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
               key={step.number}
               style={{
                 ...styles.step,
-                ...(step.number === currentStep
-                  ? styles.stepActive
-                  : step.number < currentStep
-                  ? styles.stepCompleted
-                  : styles.stepUpcoming)
+                ...(step.number === currentStep ? styles.stepActive : 
+                   step.number < currentStep ? styles.stepCompleted : styles.stepUpcoming)
               }}
             >
               <div style={{ fontSize: '24px', marginBottom: '5px' }}>
@@ -874,42 +970,62 @@ const StylistProfileSetup = ({ user, onLogout, onProfileComplete }) => {
             </div>
           ))}
         </div>
+
         {/* Content */}
-        <div style={styles.content}>{renderStepContent()}</div>
+        <div style={styles.content}>
+          {message && currentStep < 7 && (
+            <Notification
+              type={messageType}
+              message={message}
+              onClose={() => { setMessage(''); setMessageType(''); }}
+            />
+          )}
+          
+          {renderStepContent()}
+        </div>
+
         {/* Navigation */}
         <div style={styles.navigation}>
-          <button
+          <Button
+            type="secondary"
             onClick={prevStep}
             disabled={currentStep === 1}
             style={{
-              ...styles.button,
-              ...styles.secondaryButton,
               opacity: currentStep === 1 ? 0.5 : 1,
               cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
             }}
           >
             ← Previous
-          </button>
+          </Button>
+
           <div style={{ color: 'white', fontSize: '14px' }}>
             Step {currentStep} of {steps.length}
           </div>
+
           {currentStep < steps.length ? (
-            <button onClick={nextStep} style={{ ...styles.button, ...styles.primaryButton }}>
+            <Button
+              type="primary"
+              onClick={nextStep}
+            >
               Next →
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              type="primary"
               onClick={handleSubmit}
               disabled={isSubmitting}
               style={{
-                ...styles.button,
-                ...styles.primaryButton,
                 opacity: isSubmitting ? 0.7 : 1,
                 cursor: isSubmitting ? 'not-allowed' : 'pointer'
               }}
             >
-              {isSubmitting ? 'Creating Profile...' : 'Complete Profile ✨'}
-            </button>
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size={16} style={{ display: 'inline-block', marginRight: '10px' }} />
+                  Creating Profile...
+                </>
+              ) : 'Complete Profile ✨'}
+            </Button>
           )}
         </div>
       </div>

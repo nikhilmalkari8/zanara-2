@@ -51,9 +51,18 @@ const companySchema = new mongoose.Schema({
     type: String,
     validate: {
       validator: function(v) {
-        return !v || /^https?:\/\/.+/.test(v);
+        if (!v) return true; // Allow empty/null values
+        // Updated regex to handle URLs without protocol
+        return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i.test(v);
       },
       message: 'Website must be a valid URL'
+    },
+    set: function(v) {
+      // Automatically add https:// if no protocol is provided
+      if (v && !v.match(/^https?:\/\//)) {
+        return 'https://' + v;
+      }
+      return v;
     }
   },
 
@@ -78,7 +87,13 @@ const companySchema = new mongoose.Schema({
   },
   companySize: {
     type: String,
-    enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+']
+    enum: [
+      '1-5',        // Updated to match frontend
+      '6-15',       // Added this value
+      '16-50',      // Updated to match frontend  
+      '51+',        // Updated to match frontend
+      '1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'  // Keep existing values for backward compatibility
+    ]
   },
   registrationNumber: {
     type: String,
@@ -138,8 +153,73 @@ const companySchema = new mongoose.Schema({
   }],
   clientTypes: [{
     type: String,
-    enum: ['fashion-models', 'commercial-models', 'plus-size-models', 'fitness-models', 
-           'child-models', 'senior-models', 'alternative-models', 'runway-models']
+    enum: [
+      // Updated to match frontend values exactly
+      'Fashion Brands',
+      'Beauty Brands', 
+      'Advertising Agencies',
+      'Photographers',
+      'Fashion Magazines',
+      'E-commerce Companies',
+      'Luxury Brands',
+      'Retail Companies',
+      'Casting Directors',
+      'Production Companies',
+      'Event Planners',
+      'PR Agencies',
+      // Keep existing values for backward compatibility
+      'fashion-models', 'commercial-models', 'plus-size-models', 'fitness-models', 
+      'child-models', 'senior-models', 'alternative-models', 'runway-models'
+    ]
+  }],
+
+  // Agency-specific fields (for agencies)
+  agencyType: {
+    type: String,
+    enum: [
+      'Full-Service Modeling Agency',
+      'Fashion Modeling Agency', 
+      'Commercial Modeling Agency',
+      'Talent Management Agency',
+      'Casting Agency',
+      'Boutique Agency',
+      'Plus-Size Modeling Agency',
+      'Child Modeling Agency',
+      'Fitness Modeling Agency',
+      'Hand/Parts Modeling Agency'
+    ]
+  },
+  licenseNumber: {
+    type: String,
+    sparse: true
+  },
+  agencyServices: [{
+    type: String,
+    enum: [
+      'Model Representation', 'Talent Scouting', 'Career Development',
+      'Portfolio Development', 'Casting Services', 'Event Planning',
+      'Brand Partnerships', 'Social Media Management', 'PR Services',
+      'Training & Workshops', 'Contract Negotiation', 'International Placements'
+    ]
+  }],
+  talentTypes: [{
+    type: String,
+    enum: [
+      'Fashion Models', 'Commercial Models', 'Runway Models',
+      'Print Models', 'Plus-Size Models', 'Petite Models',
+      'Fitness Models', 'Hand Models', 'Child Models',
+      'Senior Models', 'Alternative Models', 'Influencers',
+      'Actors', 'Dancers', 'Musicians', 'Voice Talent'
+    ]
+  }],
+  industryFocus: [{
+    type: String,
+    enum: [
+      'High Fashion', 'Commercial Fashion', 'Beauty & Cosmetics',
+      'Fitness & Athletic', 'Lifestyle', 'Luxury Brands',
+      'E-commerce', 'Advertising', 'Editorial', 'Catalog',
+      'Automotive', 'Technology', 'Food & Beverage', 'Travel'
+    ]
   }],
 
   // Portfolio & Work

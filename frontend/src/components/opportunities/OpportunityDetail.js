@@ -99,55 +99,58 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
     }
   }, [fetchApplications, user, opportunity, isOwner]);
 
-  const handleApply = async () => {
-    if (!user) {
-      setCurrentPage('login');
-      return;
-    }
+  // Update handling in OpportunityDetail.js to check for valid professional type
 
-    if (user.userType !== 'model') {
-      setMessage('Only models can apply to opportunities');
-      return;
-    }
+const handleApply = async () => {
+  if (!user) {
+    setCurrentPage('login');
+    return;
+  }
 
-    setApplying(true);
-    setMessage('');
+  // Check if user's professional type is eligible to apply
+  if (!opportunity.targetProfessionalTypes?.includes(user.professionalType)) {
+    setMessage(`This opportunity is not open to ${user.professionalType.replace('-', ' ')}s. It's only available for ${opportunity.targetProfessionalTypes?.map(t => t.replace('-', ' ')).join(', ')}.`);
+    return;
+  }
 
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8001/api/opportunities/${opportunityId}/apply`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(applicationData)
+  setApplying(true);
+  setMessage('');
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`http://localhost:8001/api/opportunities/${opportunityId}/apply`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(applicationData)
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setMessage('Application submitted successfully!');
+      setUserApplication({
+        hasApplied: true,
+        canApply: false,
+        application: {
+          status: 'pending',
+          appliedAt: new Date().toISOString(),
+          coverLetter: applicationData.coverLetter
+        }
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage('Application submitted successfully!');
-        setUserApplication({
-          hasApplied: true,
-          canApply: false,
-          application: {
-            status: 'pending',
-            appliedAt: new Date().toISOString(),
-            coverLetter: applicationData.coverLetter
-          }
-        });
-        // Refresh the opportunity to get updated application count
-        fetchOpportunity();
-      } else {
-        setMessage(data.message || 'Failed to submit application');
-      }
-    } catch (error) {
-      setMessage('Error submitting application. Please try again.');
-    } finally {
-      setApplying(false);
+      // Refresh the opportunity to get updated application count
+      fetchOpportunity();
+    } else {
+      setMessage(data.message || 'Failed to submit application');
     }
-  };
+  } catch (error) {
+    setMessage('Error submitting application. Please try again.');
+  } finally {
+    setApplying(false);
+  }
+};
 
   const updateApplicationStatus = async (applicationId, status, notes = '') => {
     try {
@@ -380,11 +383,12 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
               </div>
 
               {/* Title and Type */}
+              {/* Title and Type */}
               <h1 style={{ color: 'white', fontSize: '2.5rem', margin: '0 0 15px 0', lineHeight: '1.2' }}>
                 {opportunity.title}
               </h1>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
                 <span style={{
                   padding: '6px 16px',
                   background: 'rgba(255, 255, 255, 0.2)',
@@ -408,6 +412,27 @@ const OpportunityDetail = ({ opportunityId, user, onLogout, setCurrentPage }) =>
                   {getCompensationDisplay(opportunity.compensation)}
                 </span>
               </div>
+
+              {/* Target Professional Types */}
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ color: '#ccc', fontSize: '0.9rem', margin: '0 0 8px 0' }}>Open to:</p>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {(opportunity.targetProfessionalTypes || ['model']).map(type => (
+                    <span key={type} style={{
+                      padding: '4px 12px',
+                      background: user?.professionalType === type ? 'rgba(78, 205, 196, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                      color: user?.professionalType === type ? '#4ecdc4' : '#ccc',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      border: user?.professionalType === type ? '1px solid #4ecdc4' : 'none'
+                    }}>
+                      {type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      {user?.professionalType === type && <span style={{ marginLeft: '4px' }}>✓</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
 
               {/* Key Info Grid */}
               <div style={{

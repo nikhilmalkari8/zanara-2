@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
   const [unreadCount, setUnreadCount] = useState(0);
-
+  
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
@@ -20,9 +20,7 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
       const data = await response.json();
-      
       if (data.success) {
         setUnreadCount(data.data.count);
       }
@@ -49,7 +47,8 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
         'brand': 'brand-dashboard',
         'agency': 'agency-dashboard'
       };
-      return dashboardMapping[userData.professionalType] || 'company-dashboard';
+      // Make sure we never route to 'company-dashboard' - use the same mapping as App.js
+      return dashboardMapping[userData.professionalType] || 'agency-dashboard';
     }
     
     return 'dashboard'; // fallback
@@ -106,43 +105,41 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
   if (!user) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        background: 'rgba(0, 0, 0, 0.9)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        padding: '15px 20px',
-        zIndex: 1000,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}
-    >
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '12px 24px',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      borderBottom: '3px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+    }}>
       {/* Logo/Brand */}
-      <div
+      <div 
+        onClick={() => setCurrentPage(dashboardPage)}
         style={{
-          color: 'white',
           fontSize: '24px',
           fontWeight: 'bold',
-          cursor: 'pointer'
+          color: 'white',
+          cursor: 'pointer',
+          textShadow: '2px 2px 4px rgba(0, 0, 0, 0.3)'
         }}
-        onClick={() => setCurrentPage(dashboardPage)}
       >
         Zanara
       </div>
 
       {/* Navigation Items */}
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center'
+      }}>
         {navigationItems.map(item => (
           <button
             key={item.key}
             onClick={() => setCurrentPage(item.key)}
             style={{
-              background: currentPage === item.key 
+              background: currentPage === item.key
                 ? `linear-gradient(45deg, ${item.color}, ${item.color}88)`
                 : 'rgba(255, 255, 255, 0.1)',
               color: 'white',
@@ -158,38 +155,45 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
           >
             {item.label}
             {item.hasNotification && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  width: '12px',
-                  height: '12px',
-                  background: '#F44336',
-                  borderRadius: '50%',
-                  border: '2px solid rgba(0, 0, 0, 0.9)'
-                }}
-              />
+              <div style={{
+                position: 'absolute',
+                top: '-5px',
+                right: '-5px',
+                background: '#ff4444',
+                borderRadius: '50%',
+                width: '12px',
+                height: '12px',
+                animation: 'pulse 2s infinite'
+              }} />
             )}
           </button>
         ))}
       </div>
 
       {/* User Menu */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <span style={{ color: 'white', fontSize: '14px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px'
+      }}>
+        <span style={{
+          color: 'white',
+          fontSize: '14px',
+          textShadow: '1px 1px 2px rgba(0, 0, 0, 0.3)'
+        }}>
           👋 {user.firstName} ({user.professionalType?.replace('-', ' ')})
         </span>
         <button
           onClick={onLogout}
           style={{
-            background: 'linear-gradient(45deg, #F44336, #FF6B6B)',
+            background: 'rgba(255, 255, 255, 0.2)',
             color: 'white',
             border: 'none',
-            borderRadius: '20px',
+            borderRadius: '15px',
             padding: '8px 16px',
             cursor: 'pointer',
-            fontSize: '14px'
+            fontSize: '14px',
+            transition: 'all 0.3s ease'
           }}
         >
           Logout

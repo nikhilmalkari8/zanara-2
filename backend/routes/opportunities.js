@@ -343,60 +343,106 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // Apply to opportunity
+// Update to the apply endpoint in opportunities.js route file
+
+// Apply to opportunity
 router.post('/:id/apply', auth, async (req, res) => {
-  try {
-    const opportunity = await Opportunity.findById(req.params.id);
-
-    if (!opportunity) {
-      return res.status(404).json({
-        message: 'Opportunity not found'
+    try {
+      const opportunity = await Opportunity.findById(req.params.id);
+  
+      if (!opportunity) {
+        return res.status(404).json({
+          message: 'Opportunity not found'
+        });
+      }
+  
+      // Get user data to check professional type
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(404).json({
+          message: 'User not found'
+        });
+      }
+  
+      // Check if user's professional type is among the target types
+      const userProfessionalType = user.professionalType;
+      if (!opportunity.targetProfessionalTypes.includes(userProfessionalType)) {
+        return res.status(400).json({
+          message: `This opportunity is not open to ${userProfessionalType.replace('-', ' ')}s. It's only available for ${opportunity.targetProfessionalTypes.map(t => t.replace('-', ' ')).join(', ')}.`
+        });
+      }
+  
+      // Check for appropriate profile based on professional type
+      let profileModel;
+      let profileQuery = { userId: req.userId };
+  
+      switch (userProfessionalType) {
+        case 'model':
+          profileModel = require('../models/ModelProfile');
+          break;
+        case 'photographer':
+          profileModel = require('../models/PhotographerProfile');
+          break;
+        case 'fashion-designer':
+          profileModel = require('../models/FashionDesignerProfile');
+          break;
+        case 'stylist':
+          profileModel = require('../models/StylistProfile');
+          break;
+        case 'makeup-artist':
+          profileModel = require('../models/MakeupArtistProfile');
+          break;
+        default:
+          return res.status(400).json({
+            message: 'Invalid professional type'
+          });
+      }
+  
+      // Check if user has appropriate professional profile
+      const profile = await profileModel.findOne(profileQuery);
+      if (!profile) {
+        return res.status(400).json({
+          message: `You must complete your ${userProfessionalType.replace('-', ' ')} profile before applying to opportunities`
+        });
+      }
+  
+      // Check if can apply
+      if (!opportunity.canUserApply(req.userId)) {
+        return res.status(400).json({
+          message: 'You cannot apply to this opportunity'
+        });
+      }
+  
+      // Create application
+      const application = {
+        applicant: req.userId,
+        coverLetter: req.body.coverLetter || '',
+        customAnswers: req.body.customAnswers || [],
+        portfolioUrls: req.body.portfolioUrls || [],
+        professionalType: userProfessionalType // Track the professional type that applied
+      };
+  
+      opportunity.applications.push(application);
+      await opportunity.save();
+  
+      // Get company owner for notification
+      const company = await Company.findById(opportunity.company);
+      
+      // Create activity for application
+      await ActivityService.createApplicationActivity(
+        req.userId,
+        opportunity._id,
+        company.owner
+      );
+  
+      res.json({
+        message: 'Application submitted successfully'
       });
-    }
-
-    // Check if user has model profile
-    const modelProfile = await ModelProfile.findOne({ userId: req.userId });
-    if (!modelProfile) {
-      return res.status(400).json({
-        message: 'You must complete your model profile before applying to opportunities'
-      });
-    }
-
-    // Check if can apply
-    if (!opportunity.canUserApply(req.userId)) {
-      return res.status(400).json({
-        message: 'You cannot apply to this opportunity'
-      });
-    }
-
-    // Create application
-    const application = {
-      applicant: req.userId,
-      coverLetter: req.body.coverLetter || '',
-      customAnswers: req.body.customAnswers || [],
-      portfolioUrls: req.body.portfolioUrls || []
-    };
-
-    opportunity.applications.push(application);
-    await opportunity.save();
-
-    // Get company owner for notification
-    const company = await Company.findById(opportunity.company);
-    
-    // Create activity for application
-    await ActivityService.createApplicationActivity(
-      req.userId,
-      opportunity._id,
-      company.owner
-    );
-
-    res.json({
-      message: 'Application submitted successfully'
-    });
-
-  } catch (error) {
-    console.error('Apply to opportunity error:', error);
-    res.status(500).json({
-      message: 'Server error submitting application'
+  
+    } catch (error) {
+      console.error('Apply to opportunity error:', error);
+      res.status(500).json({
+        message: 'Server error submitting application'
     });
   }
 });

@@ -1,7 +1,16 @@
 // src/components/setup/PhotographerProfileSetup.js
 import React, { useState } from 'react';
-import TalentSearch from '../search/TalentSearch';
-import MyConnections from '../connections/MyConnections';
+import { 
+  FormInput, 
+  FormSelect, 
+  FormTextarea, 
+  FormCheckboxGroup,
+  Button,
+  Card,
+  LoadingSpinner,
+  Notification
+} from '../shared';
+import { profileService } from '../../services/api';
 
 const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -74,8 +83,11 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     notableClients: ''
   });
 
+  // Form validation and state
+  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
 
   const steps = [
     { number: 1, title: 'Personal Info', icon: '👤' },
@@ -88,6 +100,7 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     { number: 8, title: 'Review & Submit', icon: '✅' }
   ];
 
+  // Option arrays
   const photographyTypes = [
     'Fashion Photography', 'Portrait Photography', 'Commercial Photography',
     'Beauty Photography', 'Editorial Photography', 'Product Photography',
@@ -145,6 +158,52 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     'HDR Photography', 'Focus Stacking', 'Panoramic Photography'
   ];
 
+  const yearsExperienceOptions = [
+    { value: '0-1', label: '0-1 years (Beginner)' },
+    { value: '2-3', label: '2-3 years (Developing)' },
+    { value: '4-6', label: '4-6 years (Experienced)' },
+    { value: '7-10', label: '7-10 years (Professional)' },
+    { value: '10+', label: '10+ years (Expert)' }
+  ];
+
+  const studioAccessOptions = [
+    { value: 'own-studio', label: 'I own my studio' },
+    { value: 'rent-studio', label: 'I rent studio space' },
+    { value: 'partner-studios', label: 'I have partner studios' },
+    { value: 'location-only', label: 'Location shoots only' },
+    { value: 'client-studio', label: 'I work in client studios' }
+  ];
+
+  const travelRadiusOptions = [
+    { value: 'local-30', label: 'Local only (30 miles)' },
+    { value: 'regional-100', label: 'Regional (100 miles)' },
+    { value: 'state-wide', label: 'State-wide' },
+    { value: 'national', label: 'National' },
+    { value: 'international', label: 'International' }
+  ];
+
+  const availabilityOptions = [
+    { value: 'full-time', label: 'Full Time' },
+    { value: 'part-time', label: 'Part Time' },
+    { value: 'freelance', label: 'Freelance/Project Based' },
+    { value: 'weekends-only', label: 'Weekends Only' },
+    { value: 'seasonal', label: 'Seasonal' }
+  ];
+
+  const preferredProjectOptions = [
+    'Fashion Editorials', 'Commercial Campaigns', 'Portrait Sessions',
+    'Product Photography', 'Event Coverage', 'Brand Content',
+    'Social Media Content', 'Lookbooks', 'E-commerce', 'Art Projects'
+  ];
+
+  const currencyOptions = [
+    { value: 'USD', label: 'USD' },
+    { value: 'EUR', label: 'EUR' },
+    { value: 'GBP', label: 'GBP' },
+    { value: 'CAD', label: 'CAD' }
+  ];
+
+  // Form handling functions
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -155,62 +214,191 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           [child]: value
         }
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     } else {
       setProfileData(prev => ({
         ...prev,
         [field]: value
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     }
   };
 
-  const handleArrayToggle = (field, value) => {
+  const handleArrayChange = (field, values) => {
     setProfileData(prev => ({
       ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
+      [field]: values
+    }));
+    
+    // Clear errors when field is edited
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+  };
+
+  const handlePackagesChange = (value) => {
+    const packages = value.split('\n').filter(p => p.trim());
+    setProfileData(prev => ({
+      ...prev,
+      packagesOffered: packages
     }));
   };
 
+  // Navigation functions
   const nextStep = () => {
+    // Validate current step
+    const currentStepErrors = validateStep(currentStep);
+    
+    if (Object.keys(currentStepErrors).length > 0) {
+      setErrors(currentStepErrors);
+      setMessage('Please fix the errors before proceeding.');
+      setMessageType('error');
+      return;
+    }
+    
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      setMessage('');
+      setMessageType('');
+      window.scrollTo(0, 0);
     }
   };
 
+  // Validation function for each step
+  const validateStep = (step) => {
+    const stepErrors = {};
+    
+    switch (step) {
+      case 1: // Personal Information
+        if (!profileData.fullName || profileData.fullName.trim() === '') {
+          stepErrors.fullName = 'Full name is required';
+        }
+        if (!profileData.email || !/^\S+@\S+\.\S+$/.test(profileData.email)) {
+          stepErrors.email = 'Valid email is required';
+        }
+        if (!profileData.phone) {
+          stepErrors.phone = 'Phone number is required';
+        }
+        if (!profileData.location) {
+          stepErrors.location = 'Location is required';
+        }
+        break;
+      
+      case 2: // Professional Background
+        if (!profileData.headline) {
+          stepErrors.headline = 'Professional headline is required';
+        }
+        if (!profileData.bio) {
+          stepErrors.bio = 'Bio is required';
+        }
+        if (!profileData.yearsExperience) {
+          stepErrors.yearsExperience = 'Years of experience is required';
+        }
+        break;
+      
+      case 3: // Photography Specializations
+        if (profileData.photographyTypes.length === 0) {
+          stepErrors.photographyTypes = 'Select at least one photography type';
+        }
+        if (profileData.styles.length === 0) {
+          stepErrors.styles = 'Select at least one photography style';
+        }
+        if (profileData.clientTypes.length === 0) {
+          stepErrors.clientTypes = 'Select at least one client type';
+        }
+        break;
+      
+      case 4: // Equipment & Skills
+        if (profileData.cameraEquipment.length === 0) {
+          stepErrors.cameraEquipment = 'Select at least one camera';
+        }
+        if (profileData.lensCollection.length === 0) {
+          stepErrors.lensCollection = 'Select at least one lens type';
+        }
+        if (profileData.lightingEquipment.length === 0) {
+          stepErrors.lightingEquipment = 'Select at least one lighting option';
+        }
+        break;
+      
+      case 5: // Business Setup
+        if (!profileData.studioAccess) {
+          stepErrors.studioAccess = 'Studio access information is required';
+        }
+        if (!profileData.travelRadius) {
+          stepErrors.travelRadius = 'Travel radius is required';
+        }
+        break;
+      
+      case 7: // Portfolio & Social
+        if (!profileData.portfolioWebsite) {
+          stepErrors.portfolioWebsite = 'Portfolio website is required';
+        }
+        break;
+      
+      default:
+        // No validation for other steps
+        break;
+    }
+    
+    return stepErrors;
+  };
+
+  // Submit profile
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setMessage('');
+    setMessageType('');
+    
+    // Validate final step
+    const finalErrors = validateStep(7); // Validate key requirements
+    if (Object.keys(finalErrors).length > 0) {
+      setErrors(finalErrors);
+      setMessage('Please fix the errors before submitting.');
+      setMessageType('error');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-      });
+      // Use the profileService to submit the data
+      const response = await profileService.completeProfile(profileData);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response) {
         setMessage('Photography profile created successfully! Redirecting to dashboard...');
+        setMessageType('success');
         setTimeout(() => {
           onProfileComplete();
         }, 2000);
-      } else {
-        setMessage(data.message || 'Failed to create profile');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      setMessage(error.message || 'Failed to create profile. Please try again.');
+      setMessageType('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -276,66 +464,6 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
       gap: '20px',
       marginBottom: '30px'
     },
-    formGroup: {
-      marginBottom: '20px'
-    },
-    label: {
-      display: 'block',
-      marginBottom: '8px',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      color: '#fff'
-    },
-    input: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    select: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    textarea: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none',
-      minHeight: '100px',
-      resize: 'vertical'
-    },
-    checkboxGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '10px',
-      marginTop: '10px'
-    },
-    checkbox: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '8px',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      transition: 'background 0.2s ease'
-    },
-    checkboxChecked: {
-      background: 'rgba(76, 175, 80, 0.2)'
-    },
     navigation: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -343,23 +471,19 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
       padding: '30px 40px',
       borderTop: '1px solid rgba(255, 255, 255, 0.1)'
     },
-    button: {
-      padding: '12px 24px',
-      borderRadius: '8px',
-      border: 'none',
+    checkboxContainer: {
+      marginBottom: '25px'
+    },
+    booleanCheckbox: {
+      display: 'flex', 
+      alignItems: 'center', 
+      color: '#fff', 
+      fontSize: '14px', 
       cursor: 'pointer',
-      fontWeight: 'bold',
-      fontSize: '16px',
+      padding: '10px',
+      borderRadius: '8px',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
       transition: 'all 0.3s ease'
-    },
-    primaryButton: {
-      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-      color: 'white'
-    },
-    secondaryButton: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      border: '1px solid rgba(255, 255, 255, 0.3)'
     }
   };
 
@@ -370,56 +494,47 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>👤 Personal Information</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Full Name *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.fullName}
-                  onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  placeholder="Your professional name"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email *</label>
-                <input
-                  type="email"
-                  style={styles.input}
-                  value={profileData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="professional@email.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Phone Number *</label>
-                <input
-                  type="tel"
-                  style={styles.input}
-                  value={profileData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Location *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="City, State/Country"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Professional Website</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.website}
-                  onChange={(e) => handleInputChange('website', e.target.value)}
-                  placeholder="https://yourphotography.com"
-                />
-              </div>
+              <FormInput
+                label="Full Name"
+                value={profileData.fullName}
+                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                placeholder="Your professional name"
+                error={errors.fullName}
+                required
+              />
+              <FormInput
+                label="Email"
+                type="email"
+                value={profileData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="professional@email.com"
+                error={errors.email}
+                required
+              />
+              <FormInput
+                label="Phone Number"
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                error={errors.phone}
+                required
+              />
+              <FormInput
+                label="Location"
+                value={profileData.location}
+                onChange={(e) => handleInputChange('location', e.target.value)}
+                placeholder="City, State/Country"
+                error={errors.location}
+                required
+              />
+              <FormInput
+                label="Professional Website"
+                type="url"
+                value={profileData.website}
+                onChange={(e) => handleInputChange('website', e.target.value)}
+                placeholder="https://yourphotography.com"
+              />
             </div>
           </div>
         );
@@ -429,62 +544,49 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🎓 Professional Background</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Professional Headline *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.headline}
-                  onChange={(e) => handleInputChange('headline', e.target.value)}
-                  placeholder="e.g., Fashion & Portrait Photographer"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Years of Experience *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.yearsExperience}
-                  onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
-                >
-                  <option value="">Select experience level</option>
-                  <option value="0-1">0-1 years (Beginner)</option>
-                  <option value="2-3">2-3 years (Developing)</option>
-                  <option value="4-6">4-6 years (Experienced)</option>
-                  <option value="7-10">7-10 years (Professional)</option>
-                  <option value="10+">10+ years (Expert)</option>
-                </select>
-              </div>
-            </div>
-            
-            <div style={styles.formGroup}>
-              <label style={styles.label}>About You & Your Photography *</label>
-              <textarea
-                style={styles.textarea}
-                value={profileData.bio}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                placeholder="Describe your photography style, approach, and what sets you apart. Include your artistic vision and professional philosophy."
+              <FormInput
+                label="Professional Headline"
+                value={profileData.headline}
+                onChange={(e) => handleInputChange('headline', e.target.value)}
+                placeholder="e.g., Fashion & Portrait Photographer"
+                error={errors.headline}
+                required
+              />
+              <FormSelect
+                label="Years of Experience"
+                value={profileData.yearsExperience}
+                onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
+                options={yearsExperienceOptions}
+                placeholder="Select experience level"
+                error={errors.yearsExperience}
+                required
               />
             </div>
+            
+            <FormTextarea
+              label="About You & Your Photography"
+              value={profileData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="Describe your photography style, approach, and what sets you apart. Include your artistic vision and professional philosophy."
+              error={errors.bio}
+              required
+            />
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Education Background</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.educationBackground}
-                  onChange={(e) => handleInputChange('educationBackground', e.target.value)}
-                  placeholder="Photography school, art degree, workshops, masterclasses, etc."
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Certifications</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.certifications}
-                  onChange={(e) => handleInputChange('certifications', e.target.value)}
-                  placeholder="Professional certifications, photography associations, etc."
-                />
-              </div>
+              <FormTextarea
+                label="Education Background"
+                value={profileData.educationBackground}
+                onChange={(e) => handleInputChange('educationBackground', e.target.value)}
+                placeholder="Photography school, art degree, workshops, masterclasses, etc."
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Certifications"
+                value={profileData.certifications}
+                onChange={(e) => handleInputChange('certifications', e.target.value)}
+                placeholder="Professional certifications, photography associations, etc."
+                minHeight="80px"
+              />
             </div>
           </div>
         );
@@ -494,74 +596,32 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>📸 Photography Specializations</h2>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Photography Types (Select all that apply) *</label>
-              <div style={styles.checkboxGrid}>
-                {photographyTypes.map(type => (
-                  <div
-                    key={type}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.photographyTypes.includes(type) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('photographyTypes', type)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.photographyTypes.includes(type)}
-                      onChange={() => {}}
-                    />
-                    <span>{type}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Photography Types (Select all that apply)"
+              options={photographyTypes}
+              selectedValues={profileData.photographyTypes}
+              onChange={(values) => handleArrayChange('photographyTypes', values)}
+              error={errors.photographyTypes}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Photography Styles *</label>
-              <div style={styles.checkboxGrid}>
-                {photographyStyles.map(style => (
-                  <div
-                    key={style}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.styles.includes(style) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('styles', style)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.styles.includes(style)}
-                      onChange={() => {}}
-                    />
-                    <span>{style}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Photography Styles (Select all that apply)"
+              options={photographyStyles}
+              selectedValues={profileData.styles}
+              onChange={(values) => handleArrayChange('styles', values)}
+              error={errors.styles}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Preferred Client Types *</label>
-              <div style={styles.checkboxGrid}>
-                {clientTypes.map(client => (
-                  <div
-                    key={client}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.clientTypes.includes(client) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('clientTypes', client)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.clientTypes.includes(client)}
-                      onChange={() => {}}
-                    />
-                    <span>{client}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Preferred Client Types (Select all that apply)"
+              options={clientTypes}
+              selectedValues={profileData.clientTypes}
+              onChange={(values) => handleArrayChange('clientTypes', values)}
+              error={errors.clientTypes}
+              columns={3}
+            />
           </div>
         );
 
@@ -570,103 +630,48 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🛠️ Equipment & Technical Skills</h2>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Camera Equipment *</label>
-              <div style={styles.checkboxGrid}>
-                {cameraEquipment.map(camera => (
-                  <div
-                    key={camera}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.cameraEquipment.includes(camera) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('cameraEquipment', camera)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.cameraEquipment.includes(camera)}
-                      onChange={() => {}}
-                    />
-                    <span>{camera}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Camera Equipment (Select all that apply)"
+              options={cameraEquipment}
+              selectedValues={profileData.cameraEquipment}
+              onChange={(values) => handleArrayChange('cameraEquipment', values)}
+              error={errors.cameraEquipment}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Lens Collection *</label>
-              <div style={styles.checkboxGrid}>
-                {lensTypes.map(lens => (
-                  <div
-                    key={lens}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.lensCollection.includes(lens) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('lensCollection', lens)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.lensCollection.includes(lens)}
-                      onChange={() => {}}
-                    />
-                    <span>{lens}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Lens Collection (Select all that apply)"
+              options={lensTypes}
+              selectedValues={profileData.lensCollection}
+              onChange={(values) => handleArrayChange('lensCollection', values)}
+              error={errors.lensCollection}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Lighting Equipment *</label>
-              <div style={styles.checkboxGrid}>
-                {lightingEquipment.map(light => (
-                  <div
-                    key={light}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.lightingEquipment.includes(light) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('lightingEquipment', light)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.lightingEquipment.includes(light)}
-                      onChange={() => {}}
-                    />
-                    <span>{light}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Lighting Equipment (Select all that apply)"
+              options={lightingEquipment}
+              selectedValues={profileData.lightingEquipment}
+              onChange={(values) => handleArrayChange('lightingEquipment', values)}
+              error={errors.lightingEquipment}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Editing Software & Technical Skills</label>
-              <div style={styles.checkboxGrid}>
-                {[...editingSoftware, ...technicalSkills].map(skill => (
-                  <div
-                    key={skill}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.editingSoftware.includes(skill) || profileData.technicalSkills.includes(skill) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => {
-                      if (editingSoftware.includes(skill)) {
-                        handleArrayToggle('editingSoftware', skill);
-                      } else {
-                        handleArrayToggle('technicalSkills', skill);
-                      }
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.editingSoftware.includes(skill) || profileData.technicalSkills.includes(skill)}
-                      onChange={() => {}}
-                    />
-                    <span>{skill}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Editing Software"
+              options={editingSoftware}
+              selectedValues={profileData.editingSoftware}
+              onChange={(values) => handleArrayChange('editingSoftware', values)}
+              columns={3}
+            />
+
+            <FormCheckboxGroup
+              label="Technical Skills"
+              options={technicalSkills}
+              selectedValues={profileData.technicalSkills}
+              onChange={(values) => handleArrayChange('technicalSkills', values)}
+              columns={3}
+            />
           </div>
         );
 
@@ -674,51 +679,46 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🏢 Business Setup</h2>
+            
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Studio Access *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.studioAccess}
-                  onChange={(e) => handleInputChange('studioAccess', e.target.value)}
-                >
-                  <option value="">Select studio access</option>
-                  <option value="own-studio">I own my studio</option>
-                  <option value="rent-studio">I rent studio space</option>
-                  <option value="partner-studios">I have partner studios</option>
-                  <option value="location-only">Location shoots only</option>
-                  <option value="client-studio">I work in client studios</option>
-                </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Studio Location</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.studioLocation}
-                  onChange={(e) => handleInputChange('studioLocation', e.target.value)}
-                  placeholder="Studio address or area"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Travel Radius *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.travelRadius}
-                  onChange={(e) => handleInputChange('travelRadius', e.target.value)}
-                >
-                  <option value="">Select travel preference</option>
-                  <option value="local-30">Local only (30 miles)</option>
-                  <option value="regional-100">Regional (100 miles)</option>
-                  <option value="state-wide">State-wide</option>
-                  <option value="national">National</option>
-                  <option value="international">International</option>
-                </select>
-              </div>
+              <FormSelect
+                label="Studio Access"
+                value={profileData.studioAccess}
+                onChange={(e) => handleInputChange('studioAccess', e.target.value)}
+                options={studioAccessOptions}
+                placeholder="Select studio access"
+                error={errors.studioAccess}
+                required
+              />
+              <FormInput
+                label="Studio Location"
+                value={profileData.studioLocation}
+                onChange={(e) => handleInputChange('studioLocation', e.target.value)}
+                placeholder="Studio address or area"
+              />
+              <FormSelect
+                label="Travel Radius"
+                value={profileData.travelRadius}
+                onChange={(e) => handleInputChange('travelRadius', e.target.value)}
+                options={travelRadiusOptions}
+                placeholder="Select travel preference"
+                error={errors.travelRadius}
+                required
+              />
+              <FormSelect
+                label="Availability"
+                value={profileData.availability}
+                onChange={(e) => handleInputChange('availability', e.target.value)}
+                options={availabilityOptions}
+                placeholder="Select availability"
+              />
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>
+            <div style={styles.checkboxContainer}>
+              <label style={{ 
+                ...styles.booleanCheckbox,
+                background: profileData.mobileServices ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <input
                   type="checkbox"
                   checked={profileData.mobileServices}
@@ -727,6 +727,31 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
                 />
                 I offer mobile photography services (on-location shoots)
               </label>
+            </div>
+
+            <FormCheckboxGroup
+              label="Preferred Project Types"
+              options={preferredProjectOptions}
+              selectedValues={profileData.preferredProjectTypes}
+              onChange={(values) => handleArrayChange('preferredProjectTypes', values)}
+              columns={3}
+            />
+
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Collaboration Style"
+                value={profileData.collaborationStyle}
+                onChange={(e) => handleInputChange('collaborationStyle', e.target.value)}
+                placeholder="Describe your working style and approach to collaborating with teams..."
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Client Communication"
+                value={profileData.clientCommunication}
+                onChange={(e) => handleInputChange('clientCommunication', e.target.value)}
+                placeholder="How do you prefer to communicate with clients during projects..."
+                minHeight="80px"
+              />
             </div>
           </div>
         );
@@ -740,67 +765,60 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
             </p>
             
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Portrait Session (Starting Rate)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.portraitSession}
-                  onChange={(e) => handleInputChange('rates.portraitSession', e.target.value)}
-                  placeholder="300"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Fashion Shoot (Half Day)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.fashionShoot}
-                  onChange={(e) => handleInputChange('rates.fashionShoot', e.target.value)}
-                  placeholder="800"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Commercial Day Rate</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.commercialDay}
-                  onChange={(e) => handleInputChange('rates.commercialDay', e.target.value)}
-                  placeholder="1500"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Editorial Day Rate</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.editorialDay}
-                  onChange={(e) => handleInputChange('rates.editorialDay', e.target.value)}
-                  placeholder="1200"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Event Hourly Rate</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.eventHourly}
-                  onChange={(e) => handleInputChange('rates.eventHourly', e.target.value)}
-                  placeholder="150"
-                />
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Packages Offered</label>
-              <textarea
-                style={styles.textarea}
-                value={profileData.packagesOffered.join('\n')}
-                onChange={(e) => handleInputChange('packagesOffered', e.target.value.split('\n').filter(p => p.trim()))}
-                placeholder="List your photography packages (one per line):&#10;Basic Portrait Package - $300&#10;Premium Fashion Shoot - $1200&#10;Full Campaign Package - $3000"
+              <FormInput
+                label="Portrait Session (Starting Rate)"
+                type="number"
+                value={profileData.rates.portraitSession}
+                onChange={(e) => handleInputChange('rates.portraitSession', e.target.value)}
+                placeholder="300"
+              />
+              <FormInput
+                label="Fashion Shoot (Half Day)"
+                type="number"
+                value={profileData.rates.fashionShoot}
+                onChange={(e) => handleInputChange('rates.fashionShoot', e.target.value)}
+                placeholder="800"
+              />
+              <FormInput
+                label="Commercial Day Rate"
+                type="number"
+                value={profileData.rates.commercialDay}
+                onChange={(e) => handleInputChange('rates.commercialDay', e.target.value)}
+                placeholder="1500"
+              />
+              <FormInput
+                label="Editorial Day Rate"
+                type="number"
+                value={profileData.rates.editorialDay}
+                onChange={(e) => handleInputChange('rates.editorialDay', e.target.value)}
+                placeholder="1200"
+              />
+              <FormInput
+                label="Event Hourly Rate"
+                type="number"
+                value={profileData.rates.eventHourly}
+                onChange={(e) => handleInputChange('rates.eventHourly', e.target.value)}
+                placeholder="150"
+              />
+              <FormSelect
+                label="Currency"
+                value={profileData.rates.currency}
+                onChange={(e) => handleInputChange('rates.currency', e.target.value)}
+                options={currencyOptions}
+                placeholder="Select currency"
               />
             </div>
+
+            <FormTextarea
+              label="Packages Offered"
+              value={profileData.packagesOffered.join('\n')}
+              onChange={(e) => handlePackagesChange(e.target.value)}
+              placeholder="List your photography packages (one per line):
+Basic Portrait Package - $300
+Premium Fashion Shoot - $1200
+Full Campaign Package - $3000"
+              minHeight="120px"
+            />
           </div>
         );
 
@@ -808,88 +826,95 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🌟 Portfolio & Social Media</h2>
+            
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Portfolio Website *</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.portfolioWebsite}
-                  onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                  placeholder="https://yourportfolio.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Business Instagram</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.instagramBusiness}
-                  onChange={(e) => handleInputChange('instagramBusiness', e.target.value)}
-                  placeholder="@yourphotography or full URL"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Behance Portfolio</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.behancePortfolio}
-                  onChange={(e) => handleInputChange('behancePortfolio', e.target.value)}
-                  placeholder="https://behance.net/yourwork"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>LinkedIn Profile</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.linkedinProfile}
-                  onChange={(e) => handleInputChange('linkedinProfile', e.target.value)}
-                  placeholder="https://linkedin.com/in/yourname"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Personal Instagram</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.instagram}
-                  onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
-                  placeholder="@yourpersonal"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Facebook Page</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.facebook}
-                  onChange={(e) => handleInputChange('socialMedia.facebook', e.target.value)}
-                  placeholder="Facebook business page"
-                />
-              </div>
+              <FormInput
+                label="Portfolio Website"
+                type="url"
+                value={profileData.portfolioWebsite}
+                onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
+                placeholder="https://yourportfolio.com"
+                error={errors.portfolioWebsite}
+                required
+              />
+              <FormInput
+                label="Business Instagram"
+                value={profileData.instagramBusiness}
+                onChange={(e) => handleInputChange('instagramBusiness', e.target.value)}
+                placeholder="@yourphotography or full URL"
+              />
+              <FormInput
+                label="Behance Portfolio"
+                type="url"
+                value={profileData.behancePortfolio}
+                onChange={(e) => handleInputChange('behancePortfolio', e.target.value)}
+                placeholder="https://behance.net/yourwork"
+              />
+              <FormInput
+                label="LinkedIn Profile"
+                type="url"
+                value={profileData.linkedinProfile}
+                onChange={(e) => handleInputChange('linkedinProfile', e.target.value)}
+                placeholder="https://linkedin.com/in/yourname"
+              />
+              <FormInput
+                label="Personal Instagram"
+                value={profileData.socialMedia.instagram}
+                onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
+                placeholder="@yourpersonal"
+              />
+              <FormInput
+                label="Facebook Page"
+                value={profileData.socialMedia.facebook}
+                onChange={(e) => handleInputChange('socialMedia.facebook', e.target.value)}
+                placeholder="Facebook business page"
+              />
+              <FormInput
+                label="Twitter/X"
+                value={profileData.socialMedia.twitter}
+                onChange={(e) => handleInputChange('socialMedia.twitter', e.target.value)}
+                placeholder="@yourusername"
+              />
+              <FormInput
+                label="TikTok"
+                value={profileData.socialMedia.tiktok}
+                onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
+                placeholder="@yourusername"
+              />
             </div>
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Publications & Features</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.publications}
-                  onChange={(e) => handleInputChange('publications', e.target.value)}
-                  placeholder="Magazines, blogs, websites where your work has been featured"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Notable Clients</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.notableClients}
-                  onChange={(e) => handleInputChange('notableClients', e.target.value)}
-                  placeholder="Well-known clients, brands, celebrities you've worked with"
-                />
-              </div>
+              <FormTextarea
+                label="Publications & Features"
+                value={profileData.publications}
+                onChange={(e) => handleInputChange('publications', e.target.value)}
+                placeholder="Magazines, blogs, websites where your work has been featured"
+                minHeight="100px"
+              />
+              <FormTextarea
+                label="Notable Clients"
+                value={profileData.notableClients}
+                onChange={(e) => handleInputChange('notableClients', e.target.value)}
+                placeholder="Well-known clients, brands, celebrities you've worked with"
+                minHeight="100px"
+              />
+            </div>
+
+            <div style={styles.formGrid}>
+              <FormTextarea
+                label="Awards & Recognition"
+                value={profileData.awards}
+                onChange={(e) => handleInputChange('awards', e.target.value)}
+                placeholder="Photography awards, competitions, industry recognition"
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Exhibitions"
+                value={profileData.exhibitions}
+                onChange={(e) => handleInputChange('exhibitions', e.target.value)}
+                placeholder="Art galleries, photography exhibitions, shows"
+                minHeight="80px"
+              />
             </div>
           </div>
         );
@@ -898,25 +923,45 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
         return (
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✅ Review & Submit</h2>
-            <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
+            <Card>
               <h3 style={{ color: '#26de81', marginBottom: '15px' }}>Photography Profile Summary</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
                 <div>
                   <strong>Name:</strong> {profileData.fullName}<br/>
                   <strong>Location:</strong> {profileData.location}<br/>
-                  <strong>Experience:</strong> {profileData.yearsExperience}<br/>
-                  <strong>Studio Access:</strong> {profileData.studioAccess}
+                  <strong>Experience:</strong> {
+                    yearsExperienceOptions.find(option => option.value === profileData.yearsExperience)?.label || 
+                    profileData.yearsExperience
+                  }<br/>
+                  <strong>Studio Access:</strong> {
+                    studioAccessOptions.find(option => option.value === profileData.studioAccess)?.label || 
+                    profileData.studioAccess
+                  }<br/>
+                  <strong>Mobile Services:</strong> {profileData.mobileServices ? 'Yes' : 'No'}
                 </div>
                 <div>
                   <strong>Specializations:</strong> {profileData.photographyTypes.slice(0, 3).join(', ')}{profileData.photographyTypes.length > 3 ? '...' : ''}<br/>
                   <strong>Styles:</strong> {profileData.styles.slice(0, 3).join(', ')}{profileData.styles.length > 3 ? '...' : ''}<br/>
-                  <strong>Travel:</strong> {profileData.travelRadius}<br/>
-                  <strong>Equipment:</strong> {profileData.cameraEquipment.length} cameras, {profileData.lensCollection.length} lenses
+                  <strong>Travel:</strong> {
+                    travelRadiusOptions.find(option => option.value === profileData.travelRadius)?.label || 
+                    profileData.travelRadius
+                  }<br/>
+                  <strong>Equipment:</strong> {profileData.cameraEquipment.length} cameras, {profileData.lensCollection.length} lenses<br/>
+                  <strong>Portfolio:</strong> {profileData.portfolioWebsite || 'Not provided'}
                 </div>
               </div>
-            </div>
+              
+              {profileData.bio && (
+                <div style={{ marginTop: '15px' }}>
+                  <p style={{ color: '#ddd', fontSize: '14px' }}>
+                    <strong>Bio:</strong> {profileData.bio.slice(0, 200)}
+                    {profileData.bio.length > 200 && '...'}
+                  </p>
+                </div>
+              )}
+            </Card>
             
-            <div style={{ background: 'rgba(255, 193, 7, 0.1)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255, 193, 7, 0.3)', marginBottom: '30px' }}>
+            <Card style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
               <h4 style={{ color: '#FFC107', marginBottom: '10px' }}>📸 Next Steps</h4>
               <p style={{ margin: 0, color: '#ddd' }}>
                 After submitting your profile, you'll be redirected to your dashboard where you can:
@@ -925,19 +970,14 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
                 <br/>• Connect with models, stylists, and brands
                 <br/>• Manage your bookings and client relationships
               </p>
-            </div>
+            </Card>
 
             {message && (
-              <div style={{
-                padding: '15px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                background: message.includes('success') ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
-                border: `1px solid ${message.includes('success') ? '#4CAF50' : '#F44336'}`,
-                color: message.includes('success') ? '#81C784' : '#EF5350'
-              }}>
-                {message}
-              </div>
+              <Notification
+                type={messageType}
+                message={message}
+                onClose={() => { setMessage(''); setMessageType(''); }}
+              />
             )}
           </div>
         );
@@ -956,12 +996,12 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
             <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>
               📸 Photography Profile Setup
             </h1>
-            <button 
+            <Button 
+              type="secondary"
               onClick={onLogout}
-              style={{ ...styles.button, ...styles.secondaryButton }}
             >
               Logout
-            </button>
+            </Button>
           </div>
           <p style={{ color: '#ddd', fontSize: '1.1rem', margin: 0 }}>
             Create your professional photography profile to connect with models, brands, and creative teams
@@ -991,48 +1031,59 @@ const PhotographerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
 
         {/* Content */}
         <div style={styles.content}>
+          {message && currentStep < 8 && (
+            <Notification
+              type={messageType}
+              message={message}
+              onClose={() => { setMessage(''); setMessageType(''); }}
+            />
+          )}
+          
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
         <div style={styles.navigation}>
-          <button
+          <Button
+            type="secondary"
             onClick={prevStep}
             disabled={currentStep === 1}
             style={{
-              ...styles.button,
-              ...styles.secondaryButton,
               opacity: currentStep === 1 ? 0.5 : 1,
               cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
             }}
           >
             ← Previous
-          </button>
+          </Button>
 
           <div style={{ color: 'white', fontSize: '14px' }}>
             Step {currentStep} of {steps.length}
           </div>
 
           {currentStep < steps.length ? (
-            <button
+            <Button
+              type="primary"
               onClick={nextStep}
-              style={{ ...styles.button, ...styles.primaryButton }}
             >
               Next →
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              type="primary"
               onClick={handleSubmit}
               disabled={isSubmitting}
               style={{
-                ...styles.button,
-                ...styles.primaryButton,
                 opacity: isSubmitting ? 0.7 : 1,
                 cursor: isSubmitting ? 'not-allowed' : 'pointer'
               }}
             >
-              {isSubmitting ? 'Creating Profile...' : 'Complete Profile 🚀'}
-            </button>
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size={16} style={{ display: 'inline-block', marginRight: '10px' }} />
+                  Creating Profile...
+                </>
+              ) : 'Complete Profile 🚀'}
+            </Button>
           )}
         </div>
       </div>

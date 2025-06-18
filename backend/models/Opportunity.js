@@ -47,6 +47,12 @@ const opportunitySchema = new mongoose.Schema({
     ]
   },
   
+  targetProfessionalTypes: {
+    type: [String],
+    enum: ['model', 'photographer', 'fashion-designer', 'stylist', 'makeup-artist'],
+    default: ['model'] // Backwards compatibility for existing opportunities
+  },
+
   // Location Details
   location: {
     type: {
@@ -195,6 +201,11 @@ const opportunitySchema = new mongoose.Schema({
       ref: 'User',
       required: true
     },
+    professionalType: {
+      type: String,
+      enum: ['model', 'photographer', 'fashion-designer', 'stylist', 'makeup-artist'],
+      required: true
+    },
     appliedAt: {
       type: Date,
       default: Date.now
@@ -295,6 +306,7 @@ opportunitySchema.index({ 'location.city': 1, 'location.country': 1 });
 opportunitySchema.index({ applicationDeadline: 1, status: 1 });
 opportunitySchema.index({ company: 1, createdAt: -1 });
 opportunitySchema.index({ slug: 1 });
+opportunitySchema.index({ targetProfessionalTypes: 1 }); // New index for professional type filtering
 
 // Generate slug before saving
 opportunitySchema.pre('save', function(next) {
@@ -341,6 +353,11 @@ opportunitySchema.methods.getApplicationByUser = function(userId) {
   return this.applications.find(app => 
     app.applicant.toString() === userId.toString()
   );
+};
+
+// New method to check if a professional type can apply
+opportunitySchema.methods.canProfessionalTypeApply = function(professionalType) {
+  return this.targetProfessionalTypes.includes(professionalType);
 };
 
 module.exports = mongoose.model('Opportunity', opportunitySchema);

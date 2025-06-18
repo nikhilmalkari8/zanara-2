@@ -1,7 +1,18 @@
-// src/components/setup/DesignerProfileSetup.js
+// src/components/setup/FashionDesignerProfileSetup.js
 import React, { useState } from 'react';
+import { 
+  FormInput, 
+  FormSelect, 
+  FormTextarea, 
+  FormCheckboxGroup,
+  Button,
+  Card,
+  LoadingSpinner,
+  Notification
+} from '../shared';
+import { profileService } from '../../services/api';
 
-const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
+const FashionDesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [profileData, setProfileData] = useState({
     // Personal Information
@@ -71,8 +82,11 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     clientTypes: []
   });
 
+  // Form validation
+  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
 
   const steps = [
     { number: 1, title: 'Personal Info', icon: '👤' },
@@ -165,6 +179,41 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     'Dance Companies', 'Wedding Clients', 'Corporate Clients', 'Non-Profits'
   ];
 
+  const businessModelOptions = [
+    { value: 'independent-designer', label: 'Independent Designer' },
+    { value: 'fashion-brand-owner', label: 'Fashion Brand Owner' },
+    { value: 'freelance-designer', label: 'Freelance Designer' },
+    { value: 'design-consultant', label: 'Design Consultant' },
+    { value: 'custom-couture', label: 'Custom/Couture Designer' },
+    { value: 'pattern-maker', label: 'Pattern Making Service' },
+    { value: 'design-studio', label: 'Design Studio' }
+  ];
+
+  const productionCapacityOptions = [
+    { value: 'single-pieces', label: 'Single Pieces/Prototypes' },
+    { value: 'small-batch', label: 'Small Batch (1-50 pieces)' },
+    { value: 'medium-batch', label: 'Medium Batch (51-500 pieces)' },
+    { value: 'large-scale', label: 'Large Scale (500+ pieces)' },
+    { value: 'no-production', label: 'Design Only (No Production)' }
+  ];
+
+  const availabilityOptions = [
+    { value: 'full-time', label: 'Full Time' },
+    { value: 'part-time', label: 'Part Time' },
+    { value: 'project-based', label: 'Project Based' },
+    { value: 'seasonal', label: 'Seasonal' },
+    { value: 'freelance', label: 'Freelance' }
+  ];
+
+  const experienceLevelOptions = [
+    { value: '0-2', label: '0-2 years (Emerging Designer)' },
+    { value: '3-5', label: '3-5 years (Developing Designer)' },
+    { value: '6-10', label: '6-10 years (Experienced Designer)' },
+    { value: '11-15', label: '11-15 years (Senior Designer)' },
+    { value: '15+', label: '15+ years (Master Designer)' }
+  ];
+
+  // Form handling functions
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -175,11 +224,27 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           [child]: value
         }
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     } else {
       setProfileData(prev => ({
         ...prev,
         [field]: value
       }));
+      
+      // Clear errors when field is edited
+      if (errors[field]) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: null
+        }));
+      }
     }
   };
 
@@ -192,45 +257,125 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
     }));
   };
 
+  // Navigation functions
   const nextStep = () => {
+    // Validate current step
+    const currentStepErrors = validateStep(currentStep);
+    
+    if (Object.keys(currentStepErrors).length > 0) {
+      setErrors(currentStepErrors);
+      setMessage('Please fix the errors before proceeding.');
+      setMessageType('error');
+      return;
+    }
+    
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
+      window.scrollTo(0, 0);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      window.scrollTo(0, 0);
     }
   };
 
+  // Validation function for each step
+  const validateStep = (step) => {
+    const stepErrors = {};
+    
+    switch (step) {
+      case 1: // Personal Information
+        if (!profileData.fullName || profileData.fullName.trim() === '') {
+          stepErrors.fullName = 'Full name is required';
+        }
+        if (!profileData.email || !/^\S+@\S+\.\S+$/.test(profileData.email)) {
+          stepErrors.email = 'Valid email is required';
+        }
+        if (!profileData.phone) {
+          stepErrors.phone = 'Phone number is required';
+        }
+        if (!profileData.location) {
+          stepErrors.location = 'Location is required';
+        }
+        break;
+      
+      case 2: // Professional Background
+        if (!profileData.headline) {
+          stepErrors.headline = 'Professional headline is required';
+        }
+        if (!profileData.bio) {
+          stepErrors.bio = 'Bio is required';
+        }
+        if (!profileData.yearsExperience) {
+          stepErrors.yearsExperience = 'Experience level is required';
+        }
+        break;
+      
+      case 3: // Design Specializations
+        if (profileData.designCategories.length === 0) {
+          stepErrors.designCategories = 'Select at least one design category';
+        }
+        break;
+      
+      case 4: // Technical Skills
+        if (profileData.technicalSkills.length === 0) {
+          stepErrors.technicalSkills = 'Select at least one technical skill';
+        }
+        break;
+      
+      case 5: // Business & Production
+        if (!profileData.businessModel) {
+          stepErrors.businessModel = 'Business model is required';
+        }
+        break;
+      
+      case 7: // Services & Rates
+        if (!profileData.availability) {
+          stepErrors.availability = 'Availability is required';
+        }
+        break;
+      
+      default:
+        // No validation for other steps
+        break;
+    }
+    
+    return stepErrors;
+  };
+
+  // Submit profile
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setMessage('');
+    setMessageType('');
+    
+    // Validate final step
+    const finalErrors = validateStep(currentStep);
+    if (Object.keys(finalErrors).length > 0) {
+      setErrors(finalErrors);
+      setMessage('Please fix the errors before submitting.');
+      setMessageType('error');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-      });
+      // Use the profileService to submit the data
+      const response = await profileService.completeProfile(profileData);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response) {
         setMessage('Designer profile created successfully! Redirecting to dashboard...');
+        setMessageType('success');
         setTimeout(() => {
           onProfileComplete();
         }, 2000);
-      } else {
-        setMessage(data.message || 'Failed to create profile');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      setMessage(error.message || 'Failed to create profile. Please try again.');
+      setMessageType('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -296,90 +441,12 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
       gap: '20px',
       marginBottom: '30px'
     },
-    formGroup: {
-      marginBottom: '20px'
-    },
-    label: {
-      display: 'block',
-      marginBottom: '8px',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      color: '#fff'
-    },
-    input: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    select: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none'
-    },
-    textarea: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none',
-      minHeight: '100px',
-      resize: 'vertical'
-    },
-    checkboxGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '10px',
-      marginTop: '10px'
-    },
-    checkbox: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '8px',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      transition: 'background 0.2s ease'
-    },
-    checkboxChecked: {
-      background: 'rgba(76, 175, 80, 0.2)'
-    },
     navigation: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '30px 40px',
       borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-    },
-    button: {
-      padding: '12px 24px',
-      borderRadius: '8px',
-      border: 'none',
-      cursor: 'pointer',
-      fontWeight: 'bold',
-      fontSize: '16px',
-      transition: 'all 0.3s ease'
-    },
-    primaryButton: {
-      background: 'linear-gradient(45deg, #4CAF50, #66BB6A)',
-      color: 'white'
-    },
-    secondaryButton: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      border: '1px solid rgba(255, 255, 255, 0.3)'
     }
   };
 
@@ -390,46 +457,40 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>👤 Personal Information</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Full Name *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.fullName}
-                  onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  placeholder="Your professional name"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email *</label>
-                <input
-                  type="email"
-                  style={styles.input}
-                  value={profileData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="professional@email.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Phone Number *</label>
-                <input
-                  type="tel"
-                  style={styles.input}
-                  value={profileData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Location *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="City, State/Country"
-                />
-              </div>
+              <FormInput
+                label="Full Name"
+                value={profileData.fullName}
+                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                placeholder="Your professional name"
+                error={errors.fullName}
+                required
+              />
+              <FormInput
+                label="Email"
+                type="email"
+                value={profileData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="professional@email.com"
+                error={errors.email}
+                required
+              />
+              <FormInput
+                label="Phone Number"
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                error={errors.phone}
+                required
+              />
+              <FormInput
+                label="Location"
+                value={profileData.location}
+                onChange={(e) => handleInputChange('location', e.target.value)}
+                placeholder="City, State/Country"
+                error={errors.location}
+                required
+              />
             </div>
           </div>
         );
@@ -439,63 +500,50 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🎓 Professional Background</h2>
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Professional Headline *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.headline}
-                  onChange={(e) => handleInputChange('headline', e.target.value)}
-                  placeholder="e.g., Sustainable Fashion Designer & Pattern Maker"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Years of Experience *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.yearsExperience}
-                  onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
-                >
-                  <option value="">Select experience level</option>
-                  <option value="0-2">0-2 years (Emerging Designer)</option>
-                  <option value="3-5">3-5 years (Developing Designer)</option>
-                  <option value="6-10">6-10 years (Experienced Designer)</option>
-                  <option value="11-15">11-15 years (Senior Designer)</option>
-                  <option value="15+">15+ years (Master Designer)</option>
-                </select>
-              </div>
+              <FormInput
+                label="Professional Headline"
+                value={profileData.headline}
+                onChange={(e) => handleInputChange('headline', e.target.value)}
+                placeholder="e.g., Sustainable Fashion Designer & Pattern Maker"
+                error={errors.headline}
+                required
+              />
+              <FormSelect
+                label="Years of Experience"
+                value={profileData.yearsExperience}
+                onChange={(e) => handleInputChange('yearsExperience', e.target.value)}
+                options={experienceLevelOptions}
+                placeholder="Select experience level"
+                error={errors.yearsExperience}
+                required
+              />
             </div>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Design Philosophy & Approach *</label>
-              <textarea
-                style={styles.textarea}
-                value={profileData.bio}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                placeholder="Describe your design philosophy, creative process, and what drives your work. What makes your design approach unique?"
-              />
-            </div>
+            <FormTextarea
+              label="Design Philosophy & Approach"
+              value={profileData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="Describe your design philosophy, creative process, and what drives your work. What makes your design approach unique?"
+              error={errors.bio}
+              required
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Design Philosophy Statement</label>
-              <textarea
-                style={{ ...styles.textarea, minHeight: '80px' }}
-                value={profileData.designPhilosophy}
-                onChange={(e) => handleInputChange('designPhilosophy', e.target.value)}
-                placeholder="Your core design beliefs and values that guide your creative decisions"
-              />
-            </div>
+            <FormTextarea
+              label="Design Philosophy Statement"
+              value={profileData.designPhilosophy}
+              onChange={(e) => handleInputChange('designPhilosophy', e.target.value)}
+              placeholder="Your core design beliefs and values that guide your creative decisions"
+              minHeight="80px"
+            />
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Education & Training</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.education}
-                  onChange={(e) => handleInputChange('education', e.target.value)}
-                  placeholder="Fashion design school, degrees, workshops, apprenticeships"
-                />
-              </div>
+              <FormTextarea
+                label="Education & Training"
+                value={profileData.education}
+                onChange={(e) => handleInputChange('education', e.target.value)}
+                placeholder="Fashion design school, degrees, workshops, apprenticeships"
+                minHeight="80px"
+              />
             </div>
           </div>
         );
@@ -505,97 +553,38 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✂️ Design Specializations</h2>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Design Categories (Select all that apply) *</label>
-              <div style={styles.checkboxGrid}>
-                {designCategories.map(category => (
-                  <div
-                    key={category}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.designCategories.includes(category) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('designCategories', category)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.designCategories.includes(category)}
-                      onChange={() => {}}
-                    />
-                    <span>{category}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Design Categories (Select all that apply)"
+              options={designCategories}
+              selectedValues={profileData.designCategories}
+              onChange={(values) => handleInputChange('designCategories', values)}
+              error={errors.designCategories}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Product Types</label>
-              <div style={styles.checkboxGrid}>
-                {productTypes.map(product => (
-                  <div
-                    key={product}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.productTypes.includes(product) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('productTypes', product)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.productTypes.includes(product)}
-                      onChange={() => {}}
-                    />
-                    <span>{product}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Product Types"
+              options={productTypes}
+              selectedValues={profileData.productTypes}
+              onChange={(values) => handleInputChange('productTypes', values)}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Design Styles</label>
-              <div style={styles.checkboxGrid}>
-                {designStyles.map(style => (
-                  <div
-                    key={style}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.designStyles.includes(style) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('designStyles', style)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.designStyles.includes(style)}
-                      onChange={() => {}}
-                    />
-                    <span>{style}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Design Styles"
+              options={designStyles}
+              selectedValues={profileData.designStyles}
+              onChange={(values) => handleInputChange('designStyles', values)}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Target Market</label>
-              <div style={styles.checkboxGrid}>
-                {targetMarket.map(market => (
-                  <div
-                    key={market}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.targetMarket.includes(market) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('targetMarket', market)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.targetMarket.includes(market)}
-                      onChange={() => {}}
-                    />
-                    <span>{market}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Target Market"
+              options={targetMarket}
+              selectedValues={profileData.targetMarket}
+              onChange={(values) => handleInputChange('targetMarket', values)}
+              columns={3}
+            />
           </div>
         );
 
@@ -604,97 +593,38 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🛠️ Technical Skills</h2>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Technical Design Skills *</label>
-              <div style={styles.checkboxGrid}>
-                {technicalSkills.map(skill => (
-                  <div
-                    key={skill}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.technicalSkills.includes(skill) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('technicalSkills', skill)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.technicalSkills.includes(skill)}
-                      onChange={() => {}}
-                    />
-                    <span>{skill}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Technical Design Skills"
+              options={technicalSkills}
+              selectedValues={profileData.technicalSkills}
+              onChange={(values) => handleInputChange('technicalSkills', values)}
+              error={errors.technicalSkills}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Software & Technology Skills</label>
-              <div style={styles.checkboxGrid}>
-                {softwareSkills.map(software => (
-                  <div
-                    key={software}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.softwareSkills.includes(software) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('softwareSkills', software)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.softwareSkills.includes(software)}
-                      onChange={() => {}}
-                    />
-                    <span>{software}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Software & Technology Skills"
+              options={softwareSkills}
+              selectedValues={profileData.softwareSkills}
+              onChange={(values) => handleInputChange('softwareSkills', values)}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Construction & Sewing Skills</label>
-              <div style={styles.checkboxGrid}>
-                {constructionSkills.map(skill => (
-                  <div
-                    key={skill}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.constructionSkills.includes(skill) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('constructionSkills', skill)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.constructionSkills.includes(skill)}
-                      onChange={() => {}}
-                    />
-                    <span>{skill}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Construction & Sewing Skills"
+              options={constructionSkills}
+              selectedValues={profileData.constructionSkills}
+              onChange={(values) => handleInputChange('constructionSkills', values)}
+              columns={3}
+            />
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Material & Fabric Knowledge</label>
-              <div style={styles.checkboxGrid}>
-                {materialKnowledge.map(material => (
-                  <div
-                    key={material}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.materialKnowledge.includes(material) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('materialKnowledge', material)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.materialKnowledge.includes(material)}
-                      onChange={() => {}}
-                    />
-                    <span>{material}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Material & Fabric Knowledge"
+              options={materialKnowledge}
+              selectedValues={profileData.materialKnowledge}
+              onChange={(values) => handleInputChange('materialKnowledge', values)}
+              columns={3}
+            />
           </div>
         );
 
@@ -704,70 +634,48 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>🏭 Business & Production</h2>
             
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Business Model *</label>
-                <select
-                  style={styles.select}
-                  value={profileData.businessModel}
-                  onChange={(e) => handleInputChange('businessModel', e.target.value)}
-                >
-                  <option value="">Select business model</option>
-                  <option value="independent-designer">Independent Designer</option>
-                  <option value="fashion-brand-owner">Fashion Brand Owner</option>
-                  <option value="freelance-designer">Freelance Designer</option>
-                  <option value="design-consultant">Design Consultant</option>
-                  <option value="custom-couture">Custom/Couture Designer</option>
-                  <option value="pattern-maker">Pattern Making Service</option>
-                  <option value="design-studio">Design Studio</option>
-                </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Production Capacity</label>
-                <select
-                  style={styles.select}
-                  value={profileData.productionCapacity}
-                  onChange={(e) => handleInputChange('productionCapacity', e.target.value)}
-                >
-                  <option value="">Select production capacity</option>
-                  <option value="single-pieces">Single Pieces/Prototypes</option>
-                  <option value="small-batch">Small Batch (1-50 pieces)</option>
-                  <option value="medium-batch">Medium Batch (51-500 pieces)</option>
-                  <option value="large-scale">Large Scale (500+ pieces)</option>
-                  <option value="no-production">Design Only (No Production)</option>
-                </select>
-              </div>
+              <FormSelect
+                label="Business Model"
+                value={profileData.businessModel}
+                onChange={(e) => handleInputChange('businessModel', e.target.value)}
+                options={businessModelOptions}
+                placeholder="Select business model"
+                error={errors.businessModel}
+                required
+              />
+              <FormSelect
+                label="Production Capacity"
+                value={profileData.productionCapacity}
+                onChange={(e) => handleInputChange('productionCapacity', e.target.value)}
+                options={productionCapacityOptions}
+                placeholder="Select production capacity"
+              />
             </div>
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Manufacturing Knowledge</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.manufacturingKnowledge}
-                  onChange={(e) => handleInputChange('manufacturingKnowledge', e.target.value)}
-                  placeholder="Experience with manufacturers, suppliers, production processes, quality control"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Sustainability Practices</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.sustainabilityPractices}
-                  onChange={(e) => handleInputChange('sustainabilityPractices', e.target.value)}
-                  placeholder="Eco-friendly practices, sustainable materials, ethical production methods"
-                />
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Quality Standards & Processes</label>
-              <textarea
-                style={{ ...styles.textarea, minHeight: '80px' }}
-                value={profileData.qualityStandards}
-                onChange={(e) => handleInputChange('qualityStandards', e.target.value)}
-                placeholder="Quality control processes, standards, testing procedures, attention to detail"
+              <FormTextarea
+                label="Manufacturing Knowledge"
+                value={profileData.manufacturingKnowledge}
+                onChange={(e) => handleInputChange('manufacturingKnowledge', e.target.value)}
+                placeholder="Experience with manufacturers, suppliers, production processes, quality control"
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Sustainability Practices"
+                value={profileData.sustainabilityPractices}
+                onChange={(e) => handleInputChange('sustainabilityPractices', e.target.value)}
+                placeholder="Eco-friendly practices, sustainable materials, ethical production methods"
+                minHeight="80px"
               />
             </div>
+
+            <FormTextarea
+              label="Quality Standards & Processes"
+              value={profileData.qualityStandards}
+              onChange={(e) => handleInputChange('qualityStandards', e.target.value)}
+              placeholder="Quality control processes, standards, testing procedures, attention to detail"
+              minHeight="80px"
+            />
           </div>
         );
 
@@ -777,105 +685,78 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>📚 Portfolio & Collections</h2>
             
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Portfolio Website *</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.portfolioWebsite}
-                  onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                  placeholder="https://yourdesignportfolio.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Instagram</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={profileData.socialMedia.instagram}
-                  onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
-                  placeholder="@yourdesignername or full URL"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Behance Portfolio</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.behance}
-                  onChange={(e) => handleInputChange('socialMedia.behance', e.target.value)}
-                  placeholder="https://behance.net/yourwork"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>LinkedIn Profile</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.linkedin}
-                  onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
-                  placeholder="https://linkedin.com/in/yourname"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Personal Website</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.website}
-                  onChange={(e) => handleInputChange('socialMedia.website', e.target.value)}
-                  placeholder="https://yourpersonalsite.com"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Design Blog</label>
-                <input
-                  type="url"
-                  style={styles.input}
-                  value={profileData.socialMedia.blog}
-                  onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
-                  placeholder="Your design blog or publication"
-                />
-              </div>
+              <FormInput
+                label="Portfolio Website"
+                type="url"
+                value={profileData.portfolioWebsite}
+                onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
+                placeholder="https://yourdesignportfolio.com"
+              />
+              <FormInput
+                label="Instagram"
+                value={profileData.socialMedia.instagram}
+                onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
+                placeholder="@yourdesignername or full URL"
+              />
+              <FormInput
+                label="Behance Portfolio"
+                type="url"
+                value={profileData.socialMedia.behance}
+                onChange={(e) => handleInputChange('socialMedia.behance', e.target.value)}
+                placeholder="https://behance.net/yourwork"
+              />
+              <FormInput
+                label="LinkedIn Profile"
+                type="url"
+                value={profileData.socialMedia.linkedin}
+                onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
+                placeholder="https://linkedin.com/in/yourname"
+              />
+              <FormInput
+                label="Personal Website"
+                type="url"
+                value={profileData.socialMedia.website}
+                onChange={(e) => handleInputChange('socialMedia.website', e.target.value)}
+                placeholder="https://yourpersonalsite.com"
+              />
+              <FormInput
+                label="Design Blog"
+                type="url"
+                value={profileData.socialMedia.blog}
+                onChange={(e) => handleInputChange('socialMedia.blog', e.target.value)}
+                placeholder="Your design blog or publication"
+              />
             </div>
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Collections & Past Work</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '100px' }}
-                  value={profileData.collections}
-                  onChange={(e) => handleInputChange('collections', e.target.value)}
-                  placeholder="Describe your notable collections, signature pieces, and design milestones"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Design Awards & Recognition</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '100px' }}
-                  value={profileData.designAwards}
-                  onChange={(e) => handleInputChange('designAwards', e.target.value)}
-                  placeholder="Awards, competitions won, industry recognition"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Exhibitions & Shows</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.exhibitions}
-                  onChange={(e) => handleInputChange('exhibitions', e.target.value)}
-                  placeholder="Fashion weeks, exhibitions, trunk shows, pop-ups"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Collaborations</label>
-                <textarea
-                  style={{ ...styles.textarea, minHeight: '80px' }}
-                  value={profileData.collaborations}
-                  onChange={(e) => handleInputChange('collaborations', e.target.value)}
-                  placeholder="Brand collaborations, partnerships, notable projects"
-                />
-              </div>
+              <FormTextarea
+                label="Collections & Past Work"
+                value={profileData.collections}
+                onChange={(e) => handleInputChange('collections', e.target.value)}
+                placeholder="Describe your notable collections, signature pieces, and design milestones"
+                minHeight="100px"
+              />
+              <FormTextarea
+                label="Design Awards & Recognition"
+                value={profileData.designAwards}
+                onChange={(e) => handleInputChange('designAwards', e.target.value)}
+                placeholder="Awards, competitions won, industry recognition"
+                minHeight="100px"
+              />
+              <FormTextarea
+                label="Exhibitions & Shows"
+                value={profileData.exhibitions}
+                onChange={(e) => handleInputChange('exhibitions', e.target.value)}
+                placeholder="Fashion weeks, exhibitions, trunk shows, pop-ups"
+                minHeight="80px"
+              />
+              <FormTextarea
+                label="Collaborations"
+                value={profileData.collaborations}
+                onChange={(e) => handleInputChange('collaborations', e.target.value)}
+                placeholder="Brand collaborations, partnerships, notable projects"
+                minHeight="80px"
+              />
             </div>
           </div>
         );
@@ -885,313 +766,236 @@ const DesignerProfileSetup = ({ user, onLogout, onProfileComplete }) => {
           <div>
             <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>💰 Services & Rates</h2>
             
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Services Offered</label>
-              <div style={styles.checkboxGrid}>
-                {servicesOffered.map(service => (
-                  <div
-                    key={service}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.servicesOffered.includes(service) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('servicesOffered', service)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.servicesOffered.includes(service)}
-                      onChange={() => {}}
-                    />
-                    <span>{service}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FormCheckboxGroup
+              label="Services Offered"
+              options={servicesOffered}
+              selectedValues={profileData.servicesOffered}
+              onChange={(values) => handleInputChange('servicesOffered', values)}
+              columns={3}
+            />
 
             <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Consultation Rate (USD/hour)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.consultationHourly}
-                  onChange={(e) => handleInputChange('rates.consultationHourly', e.target.value)}
-                  placeholder="125"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Custom Design Starting Rate (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.customDesignStarting}
-                  onChange={(e) => handleInputChange('rates.customDesignStarting', e.target.value)}
-                  placeholder="800"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Pattern Making Rate (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.patternMaking}
-                  onChange={(e) => handleInputChange('rates.patternMaking', e.target.value)}
-                  placeholder="200"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Technical Drawings Rate (USD)</label>
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={profileData.rates.technicalDrawings}
-                  onChange={(e) => handleInputChange('rates.technicalDrawings', e.target.value)}
-                  placeholder="75"
-                />
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Project Types</label>
-              <div style={styles.checkboxGrid}>
-                {projectTypes.map(type => (
-                  <div
-                    key={type}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.projectTypes.includes(type) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('projectTypes', type)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.projectTypes.includes(type)}
-                      onChange={() => {}}
-                    />
-                    <span>{type}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Client Types</label>
-              <div style={styles.checkboxGrid}>
-                {clientTypes.map(client => (
-                  <div
-                    key={client}
-                    style={{
-                      ...styles.checkbox,
-                      ...(profileData.clientTypes.includes(client) ? styles.checkboxChecked : {})
-                    }}
-                    onClick={() => handleArrayToggle('clientTypes', client)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={profileData.clientTypes.includes(client)}
-                      onChange={() => {}}
-                    />
-                    <span>{client}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Availability</label>
-                <select
-                  style={styles.select}
-                  value={profileData.availability}
-                  onChange={(e) => handleInputChange('availability', e.target.value)}
-                >
-                  <option value="">Select availability</option>
-                  <option value="full-time">Full Time</option>
-                  <option value="part-time">Part Time</option>
-                  <option value="project-based">Project Based</option>
-                  <option value="seasonal">Seasonal</option>
-                  <option value="by-commission">By Commission Only</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Collaboration Style</label>
-              <textarea
-                style={{ ...styles.textarea, minHeight: '80px' }}
-                value={profileData.collaborationStyle}
-                onChange={(e) => handleInputChange('collaborationStyle', e.target.value)}
-                placeholder="Describe your working style, communication preferences, and project approach"
+              <FormInput
+                label="Consultation Rate (USD/hour)"
+                type="number"
+                value={profileData.rates.consultationHourly}
+                onChange={(e) => handleInputChange('rates.consultationHourly', e.target.value)}
+                placeholder="125"
+              />
+              <FormInput
+                label="Custom Design Starting Rate (USD)"
+                type="number"
+                value={profileData.rates.customDesignStarting}
+                onChange={(e) => handleInputChange('rates.customDesignStarting', e.target.value)}
+                placeholder="800"
+              />
+              <FormInput
+                label="Pattern Making Rate (USD)"
+                type="number"
+                value={profileData.rates.patternMaking}
+                onChange={(e) => handleInputChange('rates.patternMaking', e.target.value)}
+                placeholder="200"
+              />
+              <FormInput
+                label="Technical Drawings Rate (USD)"
+                type="number"
+                value={profileData.rates.technicalDrawings}
+                onChange={(e) => handleInputChange('rates.technicalDrawings', e.target.value)}
+                placeholder="75"
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label style={styles.label}>
-                <input
-                  type="checkbox"
-                  checked={profileData.customDesign}
-                  onChange={(e) => handleInputChange('customDesign', e.target.checked)}
-                  style={{ marginRight: '10px' }}
-                />
-                I offer custom design services
-              </label>
-              <label style={styles.label}>
-                <input
-                  type="checkbox"
-                  checked={profileData.consultingServices}
-                  onChange={(e) => handleInputChange('consultingServices', e.target.checked)}
-                  style={{ marginRight: '10px' }}
-                />
-                I provide design consulting services
-              </label>
-            </div>
-          </div>
-        );
+            <FormCheckboxGroup
+              label="Project Types"
+              options={projectTypes}
+              selectedValues={profileData.projectTypes}
+              onChange={(values) => handleInputChange('projectTypes', values)}
+              columns={3}
+            />
 
-      case 8: // Review & Submit
-        return (
-          <div>
-            <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✅ Review & Submit</h2>
-            <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
-              <h3 style={{ color: '#ff6b6b', marginBottom: '15px' }}>Fashion Designer Profile Summary</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
-                <div>
-                  <strong>Name:</strong> {profileData.fullName}<br/>
-                  <strong>Location:</strong> {profileData.location}<br/>
-                  <strong>Experience:</strong> {profileData.yearsExperience}<br/>
-                  <strong>Business Model:</strong> {profileData.businessModel}
-                </div>
-                <div>
-                  <strong>Categories:</strong> {profileData.designCategories.slice(0, 3).join(', ')}{profileData.designCategories.length > 3 ? '...' : ''}<br/>
-                  <strong>Technical Skills:</strong> {profileData.technicalSkills.length} skills<br/>
-                  <strong>Consultation Rate:</strong> ${profileData.rates.consultationHourly || 'TBD'}/hr<br/>
-                  <strong>Services:</strong> {profileData.servicesOffered.length} offerings
-                </div>
-              </div>
-            </div>
-            
-            <div style={{ background: 'rgba(255, 193, 7, 0.1)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255, 193, 7, 0.3)', marginBottom: '30px' }}>
-              <h4 style={{ color: '#FFC107', marginBottom: '10px' }}>✂️ Next Steps</h4>
-              <p style={{ margin: 0, color: '#ddd' }}>
-                After submitting your profile, you'll be redirected to your dashboard where you can:
-                <br/>• Upload your design portfolio and collections
-                <br/>• Browse and apply for design projects and collaborations
-                <br/>• Connect with brands, manufacturers, and other designers
-                <br/>• Showcase your technical drawings and creative process
-              </p>
+            <FormCheckboxGroup
+              label="Client Types"
+              options={clientTypes}
+              selectedValues={profileData.clientTypes}
+              onChange={(values) => handleInputChange('clientTypes', values)}
+              columns={3}
+            />
+
+            <div style={styles.formGrid}>
+              <FormSelect
+                label="Availability"
+                value={profileData.availability}
+                onChange={(e) => handleInputChange('availability', e.target.value)}
+                options={availabilityOptions}
+                placeholder="Select availability"
+                error={errors.availability}
+                required
+              />
             </div>
 
-            {message && (
-              <div style={{
-                padding: '15px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                background: message.includes('success') ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
-                border: `1px solid ${message.includes('success') ? '#4CAF50' : '#F44336'}`,
-                color: message.includes('success') ? '#81C784' : '#EF5350'
-              }}>
-                {message}
-              </div>
-            )}
-          </div>
-        );
+            <FormTextarea
+              label="Collaboration Style"
+              value={profileData.collaborationStyle}
+             onChange={(e) => handleInputChange('collaborationStyle', e.target.value)}
+             placeholder="Describe your working style, communication preferences, and project approach"
+             minHeight="80px"
+           />
+         </div>
+       );
 
-      default:
-        return null;
-    }
-  };
+     case 8: // Review & Submit
+       return (
+         <div>
+           <h2 style={{ marginBottom: '30px', fontSize: '2rem' }}>✅ Review & Submit</h2>
+           <Card>
+             <h3 style={{ color: '#ff6b6b', marginBottom: '15px' }}>Fashion Designer Profile Summary</h3>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+               <div>
+                 <strong>Name:</strong> {profileData.fullName}<br/>
+                 <strong>Location:</strong> {profileData.location}<br/>
+                 <strong>Experience:</strong> {profileData.yearsExperience}<br/>
+                 <strong>Business Model:</strong> {
+                   businessModelOptions.find(option => option.value === profileData.businessModel)?.label || 
+                   profileData.businessModel
+                 }
+               </div>
+               <div>
+                 <strong>Categories:</strong> {profileData.designCategories.slice(0, 3).join(', ')}{profileData.designCategories.length > 3 ? '...' : ''}<br/>
+                 <strong>Technical Skills:</strong> {profileData.technicalSkills.length} skills<br/>
+                 <strong>Consultation Rate:</strong> ${profileData.rates.consultationHourly || 'TBD'}/hr<br/>
+                 <strong>Services:</strong> {profileData.servicesOffered.length} offerings
+               </div>
+             </div>
+           </Card>
+           
+           <Card style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
+             <h4 style={{ color: '#FFC107', marginBottom: '10px' }}>✂️ Next Steps</h4>
+             <p style={{ margin: 0, color: '#ddd' }}>
+               After submitting your profile, you'll be redirected to your dashboard where you can:
+               <br/>• Upload your design portfolio and collections
+               <br/>• Browse and apply for design projects and collaborations
+               <br/>• Connect with brands, manufacturers, and other designers
+               <br/>• Showcase your technical drawings and creative process
+             </p>
+           </Card>
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.setupCard}>
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>
-              ✂️ Fashion Designer Setup
-            </h1>
-            <button 
-              onClick={onLogout}
-              style={{ ...styles.button, ...styles.secondaryButton }}
-            >
-              Logout
-            </button>
-          </div>
-          <p style={{ color: '#ddd', fontSize: '1.1rem', margin: 0 }}>
-            Create your professional fashion designer profile to connect with brands and showcase your creativity
-          </p>
-        </div>
+           {message && (
+             <Notification
+               type={messageType}
+               message={message}
+               onClose={() => { setMessage(''); setMessageType(''); }}
+             />
+           )}
+         </div>
+       );
 
-        {/* Step Indicator */}
-        <div style={styles.stepIndicator}>
-          {steps.map(step => (
-            <div
-              key={step.number}
-              style={{
-                ...styles.step,
-                ...(step.number === currentStep ? styles.stepActive : 
-                   step.number < currentStep ? styles.stepCompleted : styles.stepUpcoming)
-              }}
-            >
-              <div style={{ fontSize: '20px', marginBottom: '3px' }}>
-                {step.number < currentStep ? '✅' : step.icon}
-              </div>
-              <div style={{ fontSize: '10px', textAlign: 'center', color: 'white' }}>
-                {step.title}
-              </div>
-            </div>
-          ))}
-        </div>
+     default:
+       return null;
+   }
+ };
 
-        {/* Content */}
-        <div style={styles.content}>
-          {renderStepContent()}
-        </div>
+ return (
+   <div style={styles.container}>
+     <div style={styles.setupCard}>
+       {/* Header */}
+       <div style={styles.header}>
+         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+           <h1 style={{ color: 'white', fontSize: '2.5rem', margin: 0 }}>
+             ✂️ Fashion Designer Setup
+           </h1>
+           <Button 
+             type="secondary"
+             onClick={onLogout}
+           >
+             Logout
+           </Button>
+         </div>
+         <p style={{ color: '#ddd', fontSize: '1.1rem', margin: 0 }}>
+           Create your professional fashion designer profile to connect with brands and showcase your creativity
+         </p>
+       </div>
 
-        {/* Navigation */}
-        <div style={styles.navigation}>
-          <button
-            onClick={prevStep}
-            disabled={currentStep === 1}
-            style={{
-              ...styles.button,
-              ...styles.secondaryButton,
-              opacity: currentStep === 1 ? 0.5 : 1,
-              cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            ← Previous
-          </button>
+       {/* Step Indicator */}
+       <div style={styles.stepIndicator}>
+         {steps.map(step => (
+           <div
+             key={step.number}
+             style={{
+               ...styles.step,
+               ...(step.number === currentStep ? styles.stepActive : 
+                  step.number < currentStep ? styles.stepCompleted : styles.stepUpcoming)
+             }}
+           >
+             <div style={{ fontSize: '20px', marginBottom: '3px' }}>
+               {step.number < currentStep ? '✅' : step.icon}
+             </div>
+             <div style={{ fontSize: '10px', textAlign: 'center', color: 'white' }}>
+               {step.title}
+             </div>
+           </div>
+         ))}
+       </div>
 
-          <div style={{ color: 'white', fontSize: '14px' }}>
-            Step {currentStep} of {steps.length}
-          </div>
+       {/* Content */}
+       <div style={styles.content}>
+         {message && currentStep < 8 && (
+           <Notification
+             type={messageType}
+             message={message}
+             onClose={() => { setMessage(''); setMessageType(''); }}
+           />
+         )}
+         
+         {renderStepContent()}
+       </div>
 
-          {currentStep < steps.length ? (
-            <button
-              onClick={nextStep}
-              style={{ ...styles.button, ...styles.primaryButton }}
-            >
-              Next →
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              style={{
-                ...styles.button,
-                ...styles.primaryButton,
-                opacity: isSubmitting ? 0.7 : 1,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isSubmitting ? 'Creating Profile...' : 'Complete Profile ✨'}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+       {/* Navigation */}
+       <div style={styles.navigation}>
+         <Button
+           type="secondary"
+           onClick={prevStep}
+           disabled={currentStep === 1}
+           style={{
+             opacity: currentStep === 1 ? 0.5 : 1,
+             cursor: currentStep === 1 ? 'not-allowed' : 'pointer'
+           }}
+         >
+           ← Previous
+         </Button>
+
+         <div style={{ color: 'white', fontSize: '14px' }}>
+           Step {currentStep} of {steps.length}
+         </div>
+
+         {currentStep < steps.length ? (
+           <Button
+             type="primary"
+             onClick={nextStep}
+           >
+             Next →
+           </Button>
+         ) : (
+           <Button
+             type="primary"
+             onClick={handleSubmit}
+             disabled={isSubmitting}
+             style={{
+               opacity: isSubmitting ? 0.7 : 1,
+               cursor: isSubmitting ? 'not-allowed' : 'pointer'
+             }}
+           >
+             {isSubmitting ? (
+               <>
+                 <LoadingSpinner size={16} style={{ display: 'inline-block', marginRight: '10px' }} />
+                 Creating Profile...
+               </>
+             ) : 'Complete Profile ✨'}
+           </Button>
+         )}
+       </div>
+     </div>
+   </div>
+ );
 };
 
-export default DesignerProfileSetup;
+export default FashionDesignerProfileSetup;
