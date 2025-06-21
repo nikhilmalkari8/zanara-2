@@ -46,190 +46,179 @@ const getCollectionName = (professionalType) => {
 };
 
 // Enhanced browse endpoint with multi-professional type support
-// Add this to routes/professionalProfile.js
-
-// Enhanced browse endpoint with multi-professional type support
 router.get('/browse', auth, async (req, res) => {
-    try {
-      const {
-        page = 1,
-        limit = 20,
-        professionalTypes, // Comma-separated list
-        search,
-        location,
-        experience,
-        availability,
-        skills,
-        // Model-specific filters
-        gender,
-        bodyType,
-        hairColor,
-        eyeColor,
-        ageMin,
-        ageMax,
-        heightMin,
-        heightMax,
-        sort = 'newest'
-      } = req.query;
-  
-      // Parse professional types
-      const typesToSearch = professionalTypes ? professionalTypes.split(',') : ['model'];
-      console.log('Searching for professional types:', typesToSearch);
-  
-      let allProfiles = [];
-      let breakdown = {};
-  
-      // Search each professional type
-      for (const profType of typesToSearch) {
-        const ProfileModel = getProfileModel(profType);
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      professionalTypes, // Comma-separated list
+      search,
+      location,
+      experience,
+      availability,
+      skills,
+      // Model-specific filters
+      gender,
+      bodyType,
+      hairColor,
+      eyeColor,
+      ageMin,
+      ageMax,
+      heightMin,
+      heightMax,
+      sort = 'newest'
+    } = req.query;
+
+    // Parse professional types
+    const typesToSearch = professionalTypes ? professionalTypes.split(',') : ['model'];
+    console.log('Searching for professional types:', typesToSearch);
+
+    let allProfiles = [];
+    let breakdown = {};
+
+    // Search each professional type
+    for (const profType of typesToSearch) {
+      const ProfileModel = getProfileModel(profType);
+      
+      // Build query for this professional type
+      let query = { isComplete: true };
+
+      // Text search
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        const matchingUsers = await User.find({
+          professionalType: profType,
+          $or: [
+            { firstName: searchRegex },
+            { lastName: searchRegex }
+          ]
+        }).select('_id');
+        const matchingUserIds = matchingUsers.map(user => user._id);
         
-        try {
-          // Build query for this professional type
-          let query = { isComplete: true };
-  
-          // Text search
-          if (search) {
-            const searchRegex = new RegExp(search, 'i');
-            const matchingUsers = await User.find({
-              professionalType: profType,
-              $or: [
-                { firstName: searchRegex },
-                { lastName: searchRegex }
-              ]
-            }).select('_id');
-            const matchingUserIds = matchingUsers.map(user => user._id);
-            
-            query.$or = [
-              { userId: { $in: matchingUserIds } },
-              { skills: searchRegex },
-              { specializations: searchRegex },
-              { location: searchRegex }
-            ];
+        query.$or = [
+          { userId: { $in: matchingUserIds } },
+          { skills: searchRegex },
+          { specializations: searchRegex },
+          { location: searchRegex }
+        ];
+      }
+
+      // Location filter
+      if (location) {
+        query.$or = query.$or || [];
+        query.$or.push({ location: { $regex: location, $options: 'i' } });
+      }
+
+      // Experience filter
+      if (experience && experience !== 'all') {
+        query.experience = experience;
+      }
+
+      // Availability filter
+      if (availability && availability !== 'all') {
+        query.availability = availability;
+      }
+
+      // Skills filter
+      if (skills) {
+        const skillsArray = skills.split(',').map(s => s.trim());
+        query.skills = { $in: skillsArray };
+      }
+
+      // Model-specific filters
+      if (profType === 'model') {
+        if (gender && gender !== 'all') query.gender = gender;
+        if (bodyType && bodyType !== 'all') query.bodyType = bodyType;
+        if (hairColor) query.hairColor = { $regex: hairColor, $options: 'i' };
+        if (eyeColor) query.eyeColor = { $regex: eyeColor, $options: 'i' };
+        
+        // Age filter (requires dateOfBirth calculation)
+        if (ageMin || ageMax) {
+          const now = new Date();
+          if (ageMax) {
+            const minDate = new Date(now.getFullYear() - parseInt(ageMax) - 1, now.getMonth(), now.getDate());
+            query.dateOfBirth = { $gte: minDate };
           }
-  
-          // Location filter
-          if (location) {
-            query.$or = query.$or || [];
-            query.$or.push({ location: { $regex: location, $options: 'i' } });
+          if (ageMin) {
+            const maxDate = new Date(now.getFullYear() - parseInt(ageMin), now.getMonth(), now.getDate());
+            query.dateOfBirth = { ...query.dateOfBirth, $lte: maxDate };
           }
-  
-          // Experience filter
-          if (experience && experience !== 'all') {
-            query.experience = experience;
-          }
-  
-          // Availability filter
-          if (availability && availability !== 'all') {
-            query.availability = availability;
-          }
-  
-          // Skills filter
-          if (skills) {
-            const skillsArray = skills.split(',').map(s => s.trim());
-            query.skills = { $in: skillsArray };
-          }
-  
-          // Model-specific filters
-          if (profType === 'model') {
-            if (gender && gender !== 'all') query.gender = gender;
-            if (bodyType && bodyType !== 'all') query.bodyType = bodyType;
-            if (hairColor) query.hairColor = { $regex: hairColor, $options: 'i' };
-            if (eyeColor) query.eyeColor = { $regex: eyeColor, $options: 'i' };
-            
-            // Age filter (requires dateOfBirth calculation)
-            if (ageMin || ageMax) {
-              const now = new Date();
-              if (ageMax) {
-                const minDate = new Date(now.getFullYear() - parseInt(ageMax) - 1, now.getMonth(), now.getDate());
-                query.dateOfBirth = { $gte: minDate };
-              }
-              if (ageMin) {
-                const maxDate = new Date(now.getFullYear() - parseInt(ageMin), now.getMonth(), now.getDate());
-                query.dateOfBirth = { ...query.dateOfBirth, $lte: maxDate };
-              }
-            }
-          }
-  
-          console.log(`Searching ${profType} with query:`, query);
-  
-          // Execute query for this professional type
-          let profiles = await ProfileModel.find(query)
-            .populate('userId', 'firstName lastName email professionalType')
-            .lean();
-  
-          console.log(`Found ${profiles.length} ${profType} profiles`);
-  
-          // Add professional type and computed fields
-          profiles = profiles.map(profile => ({
-            ...profile,
-            professionalType: profType,
-            displayName: profType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            profileViews: Math.floor(Math.random() * 1000) + 50, // Mock data
-            lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)), // Random within last week
-            location: profile.preferredLocations?.[0] || profile.location || 'Location not specified'
-          }));
-  
-          allProfiles = allProfiles.concat(profiles);
-          breakdown[profType] = profiles.length;
-  
-        } catch (error) {
-          console.error(`Error querying ${profType} profiles:`, error);
-          breakdown[profType] = 0;
         }
       }
-  
-      console.log('Total profiles found across all types:', allProfiles.length);
-      console.log('Breakdown by type:', breakdown);
-  
-      // Sort all profiles
-      switch (sort) {
-        case 'newest':
-          allProfiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          break;
-        case 'experience':
-          allProfiles.sort((a, b) => {
-            const experienceOrder = { 'professional': 4, 'experienced': 3, 'intermediate': 2, 'beginner': 1 };
-            return (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0);
-          });
-          break;
-        case 'professional-type':
-          allProfiles.sort((a, b) => a.professionalType.localeCompare(b.professionalType));
-          break;
+
+      try {
+        // Execute query for this professional type
+        let profiles = await ProfileModel.find(query)
+          .populate('userId', 'firstName lastName email professionalType')
+          .lean();
+
+        // Add professional type and computed fields
+        profiles = profiles.map(profile => ({
+          ...profile,
+          professionalType: profType,
+          displayName: profType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          profileViews: Math.floor(Math.random() * 1000) + 50, // Mock data
+          lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)), // Random within last week
+          location: profile.preferredLocations?.[0] || profile.location || 'Location not specified'
+        }));
+
+        allProfiles = allProfiles.concat(profiles);
+        breakdown[profType] = profiles.length;
+
+      } catch (error) {
+        console.error(`Error querying ${profType} profiles:`, error);
+        breakdown[profType] = 0;
       }
-  
-      // Pagination
-      const total = allProfiles.length;
-      const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + parseInt(limit);
-      const paginatedProfiles = allProfiles.slice(startIndex, endIndex);
-  
-      console.log('Returning profiles:', paginatedProfiles.length, 'of', total);
-  
-      res.json({
-        models: paginatedProfiles, // Keep 'models' for frontend compatibility
-        totalPages,
-        currentPage: parseInt(page),
-        total,
-        hasMore: page < totalPages,
-        breakdown,
-        searchedTypes: typesToSearch,
-        searchContext: {
-          searcherType: req.user?.userType || 'talent',
-          searcherProfession: req.user?.professionalType,
-          canContact: true,
-          canInviteToProjects: req.user?.userType === 'hiring'
-        }
-      });
-  
-    } catch (error) {
-      console.error('Browse profiles error:', error);
-      res.status(500).json({
-        message: 'Server error while browsing profiles',
-        error: error.message
+    }
+
+    // Sort all profiles
+    switch (sort) {
+      case 'newest':
+        allProfiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case 'experience':
+        allProfiles.sort((a, b) => {
+          const experienceOrder = { 'professional': 4, 'experienced': 3, 'intermediate': 2, 'beginner': 1 };
+          return (experienceOrder[b.experience] || 0) - (experienceOrder[a.experience] || 0);
+        });
+        break;
+      case 'professional-type':
+        allProfiles.sort((a, b) => a.professionalType.localeCompare(b.professionalType));
+        break;
+    }
+
+    // Pagination
+    const total = allProfiles.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedProfiles = allProfiles.slice(startIndex, endIndex);
+
+    res.json({
+      models: paginatedProfiles, // Keep 'models' for frontend compatibility
+      totalPages,
+      currentPage: parseInt(page),
+      total,
+      hasMore: page < totalPages,
+      breakdown,
+      searchedTypes: typesToSearch,
+      searchContext: {
+        searcherType: req.user?.userType || 'talent',
+        searcherProfession: req.user?.professionalType,
+        canContact: true,
+        canInviteToProjects: req.user?.userType === 'hiring'
+      }
+    });
+
+  } catch (error) {
+    console.error('Browse profiles error:', error);
+    res.status(500).json({
+      message: 'Server error while browsing profiles',
+      error: error.message
     });
   }
 });
+
 // Fix the existing model endpoint that ModelProfile.js is trying to use
 router.get('/model/:id', auth, async (req, res) => {
   try {
