@@ -9,7 +9,7 @@ import UnifiedRegister from './components/auth/UnifiedRegister';
 import Login from './components/auth/Login';
 
 // Setup Components
-import ModelProfileSetup from './components/setup/ModelProfileSetup2';
+import ModelProfileSetup from './components/setup/ModelProfileSetup';
 import PhotographerProfileSetup from './components/setup/PhotographerProfileSetup';
 import FashionDesignerProfileSetup from './components/setup/FashionDesignerProfileSetup';
 import StylistProfileSetup from './components/setup/StylistProfileSetup';
