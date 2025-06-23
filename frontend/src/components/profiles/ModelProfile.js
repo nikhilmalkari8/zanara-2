@@ -1,14 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Card, 
-  Button, 
-  LoadingSpinner, 
-  EmptyState, 
-  Notification, 
-  MultiImageUploader
-} from '../shared';
-import { profileService, connectionService } from '../../services/api';
-import ConnectionRequestModal from '../connections/ConnectionRequestModal';
+  Camera, Eye, Heart, MessageCircle, Share2, Edit3, Upload, X, ChevronLeft, ChevronRight,
+  MapPin, Calendar, Star, Award, Crown, Diamond, Zap, Globe, Instagram, Youtube, Music,
+  Phone, Mail, ExternalLink, Plus, Minus, Check, Clock, DollarSign, Users, TrendingUp
+} from 'lucide-react';
 
 const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConnect, onMessage }) => {
   // State management
@@ -22,7 +17,17 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   const [notification, setNotification] = useState({ message: '', type: '', show: false });
   const [activePhotoIndex, setActivePhotoIndex] = useState(null);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
-  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+  const [showAllExperience, setShowAllExperience] = useState(false);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(null);
+  const [portfolioFilter, setPortfolioFilter] = useState('all'); // 'all', 'photos', 'videos'
+  const [mounted, setMounted] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Refs for animations
+  const cursorRef = useRef(null);
+  const bgAnimationRef = useRef(null);
+  const heroRef = useRef(null);
+  const particleCountRef = useRef(0);
 
   // Check if viewing own profile
   const isOwnProfile = user && (
@@ -31,6 +36,31 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     user._id === profileId ||
     user.id === profileId
   );
+
+  // Helper functions to handle different portfolio media types
+  const getPortfolioPhotos = () => {
+    return ensureArray(profile?.photos || profile?.portfolioPhotos);
+  };
+
+  const getPortfolioVideos = () => {
+    return ensureArray(profile?.videos || profile?.portfolioVideos);
+  };
+
+  const getFilteredPortfolio = () => {
+    const photos = getPortfolioPhotos().map(item => ({ type: 'photo', url: item, id: `photo-${Date.now()}-${Math.random()}` }));
+    const videos = getPortfolioVideos().map(item => ({ type: 'video', url: item, id: `video-${Date.now()}-${Math.random()}` }));
+    
+    let combined = [];
+    if (portfolioFilter === 'all') {
+      combined = [...photos, ...videos];
+    } else if (portfolioFilter === 'photos') {
+      combined = photos;
+    } else if (portfolioFilter === 'videos') {
+      combined = videos;
+    }
+    
+    return showAllPhotos ? combined : combined.slice(0, 12);
+  };
 
   // Helper functions to handle schema mismatches
   const ensureArray = (value) => {
@@ -52,16 +82,81 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     return [];
   };
 
-  // Fetch profile data
+  // Animation effects
+  useEffect(() => {
+    setMounted(true);
+    
+    const handleMouseMove = (e) => {
+      const { clientX: x, clientY: y } = e;
+      setMousePosition({ x, y });
+      
+      if (cursorRef.current && window.innerWidth >= 768) {
+        cursorRef.current.style.transform = `translate3d(${x - 10}px, ${y - 10}px, 0)`;
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // Premium particle system
+  useEffect(() => {
+    if (!bgAnimationRef.current) return;
+    
+    const maxParticles = 12;
+    let animationFrame;
+
+    const createParticle = () => {
+      if (particleCountRef.current >= maxParticles) return;
+      
+      const particle = document.createElement('div');
+      const size = Math.random() * 3 + 1;
+      const opacity = Math.random() * 0.2 + 0.05;
+      const duration = Math.random() * 25 + 15;
+      const hue = Math.random() > 0.7 ? '#d4af37' : '#ffffff';
+      
+      particle.className = 'absolute rounded-full pointer-events-none will-change-transform';
+      particle.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        background: ${hue};
+        left: ${Math.random() * 100}%;
+        top: 100%;
+        opacity: ${opacity};
+        animation: float-up-luxury ${duration}s linear infinite;
+        box-shadow: 0 0 10px ${hue}40;
+      `;
+
+      bgAnimationRef.current.appendChild(particle);
+      particleCountRef.current++;
+
+      setTimeout(() => {
+        if (particle.parentNode) {
+          particle.parentNode.removeChild(particle);
+          particleCountRef.current = Math.max(0, particleCountRef.current - 1);
+        }
+      }, duration * 1000);
+    };
+
+    const interval = setInterval(createParticle, 2500);
+    
+    for (let i = 0; i < 3; i++) {
+      setTimeout(createParticle, i * 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch real profile data
   useEffect(() => {
     if (profileData) {
       setProfile(profileData);
       setEditData(profileData);
       setLoading(false);
-    } else {
+    } else if (profileId || targetUser) {
       fetchModelProfile();
     }
-  }, [profileData, profileId]);
+  }, [profileData, profileId, targetUser]);
 
   // Check connection status when profile loads
   useEffect(() => {
@@ -73,9 +168,22 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   const fetchModelProfile = async () => {
     try {
       setLoading(true);
-      const data = await profileService.getProfileById(profileId);
-      setProfile(data);
-      setEditData(data);
+      
+      // Try to get the profile via API call
+      const response = await fetch(`/api/professional-profile/${profileId || targetUser._id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+        setEditData(data);
+      } else {
+        throw new Error('Profile not found');
+      }
+      
       setError(null);
     } catch (error) {
       console.error('Error loading model profile:', error);
@@ -85,24 +193,46 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     }
   };
 
-  // Check connection status with this user
+  // Check connection status with real API call
   const checkConnectionStatus = async () => {
     try {
-      const data = await connectionService.getConnectionStatus(profileId);
-      setConnectionStatus(data.status || 'none');
+      const response = await fetch(`/api/connections/status/${profileId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConnectionStatus(data.status || 'none');
+      }
     } catch (error) {
       console.error('Error checking connection status:', error);
     }
   };
 
-  // Handle save changes
+  // Handle save changes with real API call
   const handleSaveChanges = async () => {
     try {
       setUploading(true);
-      await profileService.updateProfile(editData);
-      await fetchModelProfile();
-      setIsEditing(false);
-      showNotification('Profile updated successfully!', 'success');
+      
+      const response = await fetch(`/api/professional-profile/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(editData)
+      });
+      
+      if (response.ok) {
+        const updatedProfile = await response.json();
+        setProfile(updatedProfile);
+        setIsEditing(false);
+        showNotification('Profile updated successfully!', 'success');
+      } else {
+        throw new Error('Failed to update profile');
+      }
     } catch (error) {
       showNotification(error.message || 'Failed to update profile', 'error');
     } finally {
@@ -110,34 +240,70 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     }
   };
 
-  // Handle portfolio upload
-  const handlePortfolioUpload = async (files) => {
+  // Handle portfolio upload with real API call
+  const handlePortfolioUpload = async (files, mediaType = 'photo') => {
     if (files.length === 0) return;
 
     try {
       setUploading(true);
-      const data = await profileService.uploadPortfolioPhotos(files);
-      const updatedPhotos = [...(profile.photos || []), ...data.photos];
-      setProfile({ ...profile, photos: updatedPhotos });
-      setEditData({ ...editData, photos: updatedPhotos });
-      showNotification(`${files.length} photos uploaded successfully!`, 'success');
+      const formData = new FormData();
+      
+      Array.from(files).forEach(file => {
+        formData.append(mediaType === 'photo' ? 'portfolioPhotos' : 'portfolioVideos', file);
+      });
+
+      const response = await fetch(`/api/professional-profile/upload-${mediaType === 'photo' ? 'photos' : 'videos'}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const updatedMedia = mediaType === 'photo' 
+          ? [...getPortfolioPhotos(), ...data.photos]
+          : [...getPortfolioVideos(), ...data.videos];
+        
+        const fieldName = mediaType === 'photo' ? 'photos' : 'videos';
+        setProfile({ ...profile, [fieldName]: updatedMedia });
+        setEditData({ ...editData, [fieldName]: updatedMedia });
+        showNotification(`${files.length} ${mediaType}(s) uploaded successfully!`, 'success');
+      } else {
+        throw new Error(`Failed to upload ${mediaType}s`);
+      }
     } catch (error) {
-      showNotification('Failed to upload photos', 'error');
+      showNotification(`Failed to upload ${mediaType}s`, 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  // Handle connect
+  // Handle connect with real API call
   const handleConnect = async () => {
     if (connectionStatus !== 'none') return;
     
     try {
-      await connectionService.sendConnectionRequest(profileId, 
-        `I'd like to connect with you on Zanara.`, 
-        'model');
-      setConnectionStatus('pending');
-      showNotification('Connection request sent!', 'success');
+      const response = await fetch('/api/connections/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          receiverId: profileId,
+          message: `I'd like to connect with you on Zanara.`,
+          receiverType: profile?.professionalType || 'model'
+        })
+      });
+
+      if (response.ok) {
+        setConnectionStatus('pending');
+        showNotification('Connection request sent!', 'success');
+      } else {
+        throw new Error('Failed to send connection request');
+      }
     } catch (error) {
       showNotification(error.message || 'Failed to send connection request', 'error');
     }
@@ -146,27 +312,9 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   // Helper function to show notifications
   const showNotification = (message, type = 'info') => {
     setNotification({ message, type, show: true });
-    // Auto-hide after 5 seconds
     setTimeout(() => {
       setNotification(prev => ({ ...prev, show: false }));
     }, 5000);
-  };
-
-  // Handle connect button click
-  const handleConnectClick = () => {
-    setIsConnectionModalOpen(true);
-  };
-
-  // Send connection request
-  const handleSendConnectionRequest = async (message) => {
-    try {
-      await connectionService.sendConnectionRequest(profileId, message, profile.professionalType || 'model');
-      setConnectionStatus('pending');
-      setIsConnectionModalOpen(false);
-      showNotification('Connection request sent successfully!', 'success');
-    } catch (error) {
-      showNotification(error.message || 'Failed to send connection request', 'error');
-    }
   };
 
   // Experience management functions
@@ -199,20 +347,6 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     showNotification('Experience removed', 'success');
   };
 
-  // Remove Portfolio Photo
-  const removePortfolioPhoto = async (photoIndex) => {
-    try {
-      const profilePhotos = ensureArray(profile.photos);
-      const updatedPhotos = profilePhotos.filter((_, index) => index !== photoIndex);
-      const updatedProfile = { ...profile, photos: updatedPhotos };
-      setProfile(updatedProfile);
-      setEditData(updatedProfile);
-      showNotification('Photo removed successfully', 'success');
-    } catch (error) {
-      showNotification('Failed to remove photo', 'error');
-    }
-  };
-
   // Handle array input changes
   const handleArrayInputChange = (field, value) => {
     const arrayValue = value.split(',').map(item => item.trim()).filter(item => item);
@@ -232,1198 +366,2330 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
     }
   };
 
-  // UI styles
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Model purple theme
-      padding: '20px'
-    },
-    formInput: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none',
-      marginBottom: '10px'
-    },
-    textarea: {
-      width: '100%',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: 'white',
-      fontSize: '16px',
-      outline: 'none',
-      minHeight: '100px',
-      resize: 'vertical',
-      marginBottom: '10px'
-    },
-    badge: {
-      background: 'rgba(102, 126, 234, 0.2)',
-      color: '#667eea',
-      padding: '8px 12px',
-      borderRadius: '15px',
-      fontSize: '12px',
-      border: '1px solid rgba(102, 126, 234, 0.3)',
-      display: 'inline-block',
-      margin: '5px'
-    },
-    skillItem: {
-      background: 'rgba(255, 255, 255, 0.05)', 
-      padding: '8px 12px', 
-      borderRadius: '8px',
-      fontSize: '14px',
-      marginBottom: '8px'
-    },
-    experienceCard: {
-      background: 'rgba(255,255,255,0.1)',
-      padding: '15px',
-      borderRadius: '8px',
-      border: '1px solid rgba(255,255,255,0.2)',
-      marginBottom: '10px'
-    },
-    coverPhoto: {
-      height: '250px',
-      width: '100%',
-      background: 'rgba(255, 255, 255, 0.1)',
-      borderRadius: '15px 15px 0 0',
-      overflow: 'hidden',
-      position: 'relative'
-    },
-    profilePicture: {
-      width: '120px',
-      height: '120px',
-      borderRadius: '50%',
-      border: '4px solid white',
-      position: 'absolute',
-      bottom: '-60px',
-      left: '25px',
-      background: 'rgba(255, 255, 255, 0.2)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '48px',
-      color: 'white',
-      overflow: 'hidden'
-    },
-    portfolioGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-      gap: '15px',
-      marginTop: '20px'
-    },
-    portfolioItem: {
-      borderRadius: '8px',
-      overflow: 'hidden',
-      aspectRatio: '1',
-      background: 'rgba(255, 255, 255, 0.1)',
-      position: 'relative'
-    },
-    contactItem: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      marginBottom: '10px'
-    }
-  };
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          minHeight: '60vh' 
-        }}>
-          <LoadingSpinner size={60} />
-          <p style={{ color: 'white', marginTop: '20px', fontSize: '18px' }}>
-            Loading model profile...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div style={styles.container}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-          <Card>
-            <EmptyState
-              icon="❌"
-              title="Error Loading Profile"
-              description={error}
-              actionButton={
-                <Button type="primary" onClick={onBack}>
-                  Go Back
-                </Button>
-              }
-            />
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Get the current profile data (edited or original)
-  const currentProfile = isEditing ? editData : profile;
-  const displayPhotos = showAllPhotos ? ensureArray(profile.photos) : ensureArray(profile.photos).slice(0, 8);
-
   // Get connection button text and status
   const getConnectionButton = () => {
     switch (connectionStatus) {
       case 'pending':
-        return <Button type="secondary" disabled>Request Sent</Button>;
+        return (
+          <button className="luxury-button luxury-button-secondary" disabled>
+            <Clock className="w-4 h-4 mr-2" />
+            Request Sent
+          </button>
+        );
       case 'connected':
-        return <Button type="secondary" disabled>Connected</Button>;
+        return (
+          <button className="luxury-button luxury-button-connected" disabled>
+            <Check className="w-4 h-4 mr-2" />
+            Connected
+          </button>
+        );
       default:
-        return <Button type="primary" onClick={handleConnectClick}>Connect</Button>;
+        return (
+          <button className="luxury-button luxury-button-primary" onClick={handleConnect}>
+            <Users className="w-4 h-4 mr-2" />
+            Connect
+          </button>
+        );
     }
   };
 
-  return (
-    <div style={styles.container}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        {/* Notification */}
-        {notification.show && (
-          <Notification
-            type={notification.type}
-            message={notification.message}
-            onClose={() => setNotification(prev => ({ ...prev, show: false }))}
-          />
-        )}
+  // Get the current profile data (edited or original)
+  const currentProfile = isEditing ? editData : profile;
+  const displayPortfolio = getFilteredPortfolio();
 
-        {/* Header with navigation */}
-        <Card style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Button type="secondary" onClick={onBack}>
-              ← Back
-            </Button>
-            <h1 style={{ color: 'white', fontSize: '1.5rem', margin: 0 }}>
-              📸 Model Profile
-            </h1>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {isOwnProfile && (
-                <>
-                  {isEditing ? (
-                    <>
-                      <Button 
-                        type="primary" 
-                        onClick={handleSaveChanges}
-                        disabled={uploading}
-                      >
-                        {uploading ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                      <Button 
-                        type="secondary" 
-                        onClick={() => setIsEditing(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button 
-                      type="primary" 
-                      onClick={() => setIsEditing(true)}
-                    >
-                      ✏️ Edit Profile
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Cover Photo and Profile Picture */}
-        <div style={{ position: 'relative', marginBottom: '70px' }}>
-          <div style={styles.coverPhoto}>
-            {currentProfile?.coverPhoto ? (
-              <img 
-                src={`http://localhost:8001${currentProfile.coverPhoto}`} 
-                alt="Cover" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{ 
-                width: '100%', 
-                height: '100%', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'rgba(255, 255, 255, 0.2)',
-                fontSize: '24px'
-              }}>
-                Professional Model
-              </div>
-            )}
-            
-            {isEditing && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(0, 0, 0, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <input
-                  type="file"
-                  id="coverPhoto"
-                  accept="image/*"
-                  onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
-                  style={{ display: 'none' }}
-                  disabled={uploading}
-                />
-                <label
-                  htmlFor="coverPhoto"
-                  style={{
-                    background: 'white',
-                    color: '#333',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {uploading ? 'Uploading...' : 'Change Cover Photo'}
-                </label>
-              </div>
-            )}
-          </div>
-          
-          <div style={styles.profilePicture}>
-            {currentProfile?.profilePicture ? (
-              <img 
-                src={`http://localhost:8001${currentProfile.profilePicture}`} 
-                alt={currentProfile.fullName} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              '📸'
-            )}
-            
-            {isEditing && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <input
-                  type="file"
-                  id="profilePicture"
-                  accept="image/*"
-                  onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
-                  style={{ display: 'none' }}
-                  disabled={uploading}
-                />
-                <label
-                  htmlFor="profilePicture"
-                  style={{
-                    color: 'white',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {uploading ? '...' : '📷'}
-                </label>
-              </div>
-            )}
+  if (loading) {
+    return (
+      <div className="luxury-container">
+        <div className="luxury-loading">
+          <div className="luxury-spinner"></div>
+          <div className="luxury-loading-text">
+            <div>Loading Profile</div>
+            <div className="luxury-loading-subtitle">Preparing premium experience...</div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Profile Header */}
-        <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  <input
-                    type="text"
-                    value={editData.fullName || ''}
-                    onChange={(e) => handleInputChange('fullName', e.target.value)}
-                    style={{ ...styles.formInput, fontSize: '24px', fontWeight: 'bold' }}
-                    placeholder="Full Name"
-                  />
-                  <input
-                    type="text"
-                    value={editData.headline || ''}
-                    onChange={(e) => handleInputChange('headline', e.target.value)}
-                    style={{ ...styles.formInput, fontSize: '18px' }}
-                    placeholder="Professional Headline (e.g., Fashion & Commercial Model)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.location || ''}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="📍 Location"
-                  />
-                </div>
-              ) : (
-                <>
-                  <h1 style={{ color: 'white', fontSize: '2rem', margin: '0 0 10px 0' }}>
-                    {currentProfile?.fullName || `${targetUser?.firstName} ${targetUser?.lastName}` || 'Professional Model'}
-                  </h1>
-                  <p style={{ color: '#ddd', fontSize: '1.2rem', margin: '0 0 15px 0' }}>
-                    📸 {currentProfile?.headline || 'Professional Model'}
-                  </p>
-                  <div style={{ color: '#ccc', fontSize: '14px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                    <span>📍 {currentProfile?.location || 'Location not set'}</span>
-                    <span>🔗 {currentProfile?.connectionsCount || 0} connections</span>
-                    {currentProfile?.verified && <span style={{ color: '#4CAF50' }}>✓ Verified</span>}
-                  </div>
-                </>
-              )}
+  if (error) {
+    return (
+      <div className="luxury-container">
+        <div className="luxury-error">
+          <div className="luxury-error-icon">⚠</div>
+          <div className="luxury-error-title">Profile Unavailable</div>
+          <div className="luxury-error-description">{error}</div>
+          <button className="luxury-button luxury-button-primary" onClick={onBack}>
+            Return to Browse
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Premium Styles */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes float-up-luxury {
+          0% {
+            transform: translateY(0) rotate(0deg) scale(0.8);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+            transform: translateY(-10vh) rotate(45deg) scale(1);
+          }
+          90% {
+            opacity: 1;
+            transform: translateY(-90vh) rotate(315deg) scale(1);
+          }
+          100% {
+            transform: translateY(-100vh) rotate(360deg) scale(0.8);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes luxury-fade-in {
+          0% {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes luxury-slide-in {
+          0% {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        @keyframes luxury-scale-in {
+          0% {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .luxury-container {
+          min-height: 100vh;
+          background: #000000;
+          color: #ffffff;
+          position: relative;
+          overflow-x: hidden;
+        }
+        
+        .luxury-background {
+          position: fixed;
+          inset: 0;
+          background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+        }
+        
+        .luxury-background::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at 25% 25%, rgba(212, 175, 55, 0.05) 0%, transparent 50%),
+                      radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+        }
+        
+        .luxury-background::after {
+          content: '';
+          position: absolute;
+          top: 20%;
+          left: 10%;
+          width: 300px;
+          height: 300px;
+          background: radial-gradient(circle, rgba(212, 175, 55, 0.03) 0%, transparent 70%);
+          border-radius: 50%;
+          filter: blur(40px);
+        }
+        
+        .luxury-cursor {
+          position: fixed;
+          width: 20px;
+          height: 20px;
+          background: rgba(212, 175, 55, 0.8);
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 9999;
+          mix-blend-mode: difference;
+          transition: all 0.1s ease;
+          transform: translate(-50%, -50%);
+        }
+        
+        .luxury-particles {
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          z-index: 1;
+          overflow: hidden;
+        }
+        
+        .luxury-glass {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+        }
+        
+        .luxury-glass-strong {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(30px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 24px;
+        }
+        
+        .luxury-content {
+          position: relative;
+          z-index: 10;
+          padding: 2rem;
+          max-width: 1400px;
+          margin: 0 auto;
+        }
+        
+        .luxury-header {
+          animation: luxury-fade-in 1s ease-out;
+          margin-bottom: 2rem;
+        }
+        
+        .luxury-navigation {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1.5rem 2rem;
+          margin-bottom: 1rem;
+        }
+        
+        .luxury-back-button {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          color: rgba(255, 255, 255, 0.8);
+          font-weight: 300;
+          transition: all 0.3s ease;
+          cursor: pointer;
+        }
+        
+        .luxury-back-button:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #d4af37;
+          transform: translateX(-2px);
+        }
+        
+        .luxury-title {
+          font-size: 1.5rem;
+          font-weight: 300;
+          color: rgba(255, 255, 255, 0.9);
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .luxury-actions {
+          display: flex;
+          gap: 1rem;
+        }
+        
+        .luxury-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          border-radius: 12px;
+          font-weight: 400;
+          font-size: 0.9rem;
+          transition: all 0.3s ease;
+          cursor: pointer;
+          border: none;
+          text-decoration: none;
+        }
+        
+        .luxury-button-primary {
+          background: linear-gradient(135deg, #d4af37 0%, #f7d794 100%);
+          color: #000000;
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+        }
+        
+        .luxury-button-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 30px rgba(212, 175, 55, 0.4);
+        }
+        
+        .luxury-button-secondary {
+          background: rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.8);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .luxury-button-secondary:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #d4af37;
+        }
+        
+        .luxury-button-connected {
+          background: rgba(34, 197, 94, 0.1);
+          color: #22c55e;
+          border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .luxury-hero {
+          position: relative;
+          margin-bottom: 3rem;
+          animation: luxury-scale-in 1s ease-out 0.2s both;
+        }
+        
+        .luxury-cover {
+          height: 400px;
+          border-radius: 24px 24px 0 0;
+          overflow: hidden;
+          position: relative;
+          background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+        }
+        
+        .luxury-cover img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: all 0.5s ease;
+        }
+        
+        .luxury-cover:hover img {
+          transform: scale(1.05);
+        }
+        
+        .luxury-cover-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+        }
+        
+        .luxury-profile-picture {
+          position: absolute;
+          bottom: -60px;
+          left: 2rem;
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          border: 4px solid rgba(255, 255, 255, 0.1);
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+        
+        .luxury-profile-picture img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .luxury-verified-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          width: 32px;
+          height: 32px;
+          background: linear-gradient(135deg, #d4af37 0%, #f7d794 100%);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+          animation: luxury-glow 2s ease-in-out infinite;
+        }
+        
+        .luxury-profile-header {
+          padding: 4rem 2rem 2rem;
+          border-radius: 0 0 24px 24px;
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-top: none;
+        }
+        
+        .luxury-profile-info {
+          margin-left: 140px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        
+        .luxury-profile-details h1 {
+          font-size: 2.5rem;
+          font-weight: 300;
+          color: #ffffff;
+          margin-bottom: 0.5rem;
+          background: linear-gradient(135deg, #ffffff 0%, #d4af37 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        
+        .luxury-profile-details .headline {
+          font-size: 1.25rem;
+          color: rgba(255, 255, 255, 0.7);
+          font-weight: 300;
+          margin-bottom: 1rem;
+        }
+        
+        .luxury-profile-meta {
+          display: flex;
+          gap: 2rem;
+          flex-wrap: wrap;
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.9rem;
+        }
+        
+        .luxury-profile-meta span {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .luxury-profile-actions {
+          display: flex;
+          gap: 1rem;
+          flex-shrink: 0;
+        }
+        
+        .luxury-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1.5rem;
+          margin-bottom: 3rem;
+          animation: luxury-fade-in 1s ease-out 0.4s both;
+        }
+        
+        .luxury-stat-card {
+          padding: 1.5rem;
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          transition: all 0.3s ease;
+          cursor: pointer;
+        }
+        
+        .luxury-stat-card:hover {
+          background: rgba(255, 255, 255, 0.06);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .luxury-stat-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          background: rgba(212, 175, 55, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 1rem;
+          color: #d4af37;
+        }
+        
+        .luxury-stat-value {
+          font-size: 1.5rem;
+          font-weight: 300;
+          color: #ffffff;
+          margin-bottom: 0.25rem;
+        }
+        
+        .luxury-stat-label {
+          font-size: 0.8rem;
+          color: rgba(255, 255, 255, 0.6);
+          font-weight: 300;
+        }
+        
+        .luxury-grid {
+          display: grid;
+          grid-template-columns: 2fr 1fr;
+          gap: 2rem;
+          margin-bottom: 3rem;
+        }
+        
+        .luxury-main-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+        
+        .luxury-sidebar {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+        
+        .luxury-card {
+          padding: 2rem;
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+          transition: all 0.3s ease;
+          animation: luxury-fade-in 1s ease-out var(--delay, 0.6s) both;
+        }
+        
+        .luxury-card:hover {
+          background: rgba(255, 255, 255, 0.05);
+          transform: translateY(-2px);
+        }
+        
+        .luxury-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+        }
+        
+        .luxury-card-title {
+          font-size: 1.25rem;
+          font-weight: 300;
+          color: rgba(255, 255, 255, 0.9);
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        
+        .luxury-card-action {
+          color: #d4af37;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .luxury-card-action:hover {
+          color: #f7d794;
+        }
+        
+        .luxury-portfolio-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 1rem;
+          margin-top: 1.5rem;
+        }
+        
+        .luxury-portfolio-item {
+          aspect-ratio: 3/4;
+          border-radius: 12px;
+          overflow: hidden;
+          position: relative;
+          cursor: pointer;
+          background: rgba(255, 255, 255, 0.05);
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-portfolio-item:hover {
+          transform: scale(1.05);
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .luxury-portfolio-item img,
+        .luxury-portfolio-item video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-portfolio-item:hover img,
+        .luxury-portfolio-item:hover video {
+          transform: scale(1.1);
+        }
+        
+        .luxury-portfolio-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.8) 100%);
+          opacity: 0;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: end;
+          padding: 1rem;
+        }
+        
+        .luxury-portfolio-item:hover .luxury-portfolio-overlay {
+          opacity: 1;
+        }
+
+        .luxury-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 1rem;
+          background: rgba(212, 175, 55, 0.1);
+          border: 1px solid rgba(212, 175, 55, 0.3);
+          border-radius: 20px;
+          color: #d4af37;
+          font-size: 0.8rem;
+          font-weight: 300;
+          margin: 0.25rem;
+        }
+        
+        .luxury-skill-item {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          font-size: 0.9rem;
+          color: rgba(255, 255, 255, 0.8);
+          margin-bottom: 0.5rem;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-skill-item:hover {
+          background: rgba(212, 175, 55, 0.1);
+          color: #d4af37;
+        }
+        
+        .luxury-experience-card {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 1.5rem;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          margin-bottom: 1rem;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-experience-card:hover {
+          background: rgba(255, 255, 255, 0.08);
+          transform: translateY(-2px);
+        }
+        
+        .luxury-experience-title {
+          font-size: 1.1rem;
+          font-weight: 400;
+          color: #ffffff;
+          margin-bottom: 0.5rem;
+        }
+        
+        .luxury-experience-company {
+          color: #d4af37;
+          font-weight: 300;
+          margin-bottom: 0.25rem;
+        }
+        
+        .luxury-experience-duration {
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.85rem;
+          margin-bottom: 0.75rem;
+        }
+        
+        .luxury-experience-description {
+          color: rgba(255, 255, 255, 0.7);
+          line-height: 1.6;
+          font-size: 0.9rem;
+        }
+        
+        .luxury-current-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.25rem 0.75rem;
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.3);
+          border-radius: 12px;
+          color: #22c55e;
+          font-size: 0.75rem;
+          margin-top: 0.5rem;
+        }
+        
+        .luxury-contact-item {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem;
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 12px;
+          margin-bottom: 0.75rem;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-contact-item:hover {
+          background: rgba(255, 255, 255, 0.06);
+          transform: translateX(4px);
+        }
+        
+        .luxury-contact-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: rgba(212, 175, 55, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #d4af37;
+        }
+        
+        .luxury-social-link {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 12px;
+          color: rgba(255, 255, 255, 0.8);
+          text-decoration: none;
+          transition: all 0.3s ease;
+          margin-bottom: 0.5rem;
+        }
+        
+        .luxury-social-link:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: #d4af37;
+          transform: translateX(4px);
+        }
+        
+        .luxury-form-input {
+          width: 100%;
+          padding: 1rem;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.05);
+          color: #ffffff;
+          font-size: 1rem;
+          outline: none;
+          margin-bottom: 1rem;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-form-input:focus {
+          border-color: #d4af37;
+          background: rgba(255, 255, 255, 0.08);
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+        }
+        
+        .luxury-form-input::placeholder {
+          color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .luxury-textarea {
+          width: 100%;
+          padding: 1rem;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.05);
+          color: #ffffff;
+          font-size: 1rem;
+          outline: none;
+          min-height: 120px;
+          resize: vertical;
+          margin-bottom: 1rem;
+          transition: all 0.3s ease;
+        }
+        
+        .luxury-textarea:focus {
+          border-color: #d4af37;
+          background: rgba(255, 255, 255, 0.08);
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+        }
+        
+        .luxury-modal {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          animation: luxury-fade-in 0.3s ease-out;
+        }
+        
+        .luxury-modal-content {
+          background: rgba(0, 0, 0, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 20px;
+          padding: 2rem;
+          max-width: 500px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+        }
+        
+        .luxury-notification {
+          position: fixed;
+          top: 2rem;
+          right: 2rem;
+          padding: 1rem 1.5rem;
+          border-radius: 12px;
+          color: #ffffff;
+          font-weight: 400;
+          z-index: 1001;
+          animation: luxury-slide-in 0.3s ease-out;
+          border: 1px solid;
+        }
+        
+        .luxury-notification.success {
+          background: rgba(34, 197, 94, 0.1);
+          border-color: rgba(34, 197, 94, 0.3);
+          color: #22c55e;
+        }
+        
+        .luxury-notification.error {
+          background: rgba(239, 68, 68, 0.1);
+          border-color: rgba(239, 68, 68, 0.3);
+          color: #ef4444;
+        }
+        
+        .luxury-notification.info {
+          background: rgba(59, 130, 246, 0.1);
+          border-color: rgba(59, 130, 246, 0.3);
+          color: #3b82f6;
+        }
+        
+        .luxury-loading {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 60vh;
+        }
+        
+        .luxury-spinner {
+          width: 60px;
+          height: 60px;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+          border-top: 2px solid #d4af37;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 2rem;
+        }
+        
+        .luxury-loading-text {
+          text-align: center;
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 1.25rem;
+          font-weight: 300;
+        }
+        
+        .luxury-loading-subtitle {
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.9rem;
+          margin-top: 0.5rem;
+        }
+        
+        .luxury-error {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 60vh;
+          text-align: center;
+        }
+        
+        .luxury-error-icon {
+          font-size: 4rem;
+          margin-bottom: 1rem;
+          opacity: 0.7;
+        }
+        
+        .luxury-error-title {
+          font-size: 1.5rem;
+          font-weight: 300;
+          color: #ffffff;
+          margin-bottom: 0.5rem;
+        }
+        
+        .luxury-error-description {
+          color: rgba(255, 255, 255, 0.7);
+          margin-bottom: 2rem;
+          max-width: 400px;
+        }
+        
+        .luxury-empty-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .luxury-empty-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          opacity: 0.7;
+        }
+        
+        .luxury-empty-title {
+          font-size: 1.25rem;
+          font-weight: 300;
+          margin-bottom: 0.5rem;
+          color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .luxury-empty-description {
+          font-size: 0.9rem;
+          line-height: 1.6;
+        }
+        
+        @media (max-width: 768px) {
+          .luxury-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .luxury-profile-info {
+            flex-direction: column;
+            gap: 2rem;
+            margin-left: 0;
+            margin-top: 2rem;
+          }
+          
+          .luxury-profile-picture {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            margin: 0 auto 2rem;
+          }
+          
+          .luxury-stats {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .luxury-portfolio-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        `
+      }} />
+
+      {/* Luxury Cursor */}
+      <div 
+        ref={cursorRef}
+        className="luxury-cursor"
+        style={{ display: window.innerWidth >= 768 ? 'block' : 'none' }}
+      />
+
+      {/* Luxury Particles */}
+      <div ref={bgAnimationRef} className="luxury-particles" />
+
+      {/* Luxury Background */}
+      <div className="luxury-background" />
+
+      {/* Notification */}
+      {notification.show && (
+        <div className={`luxury-notification ${notification.type}`}>
+          {notification.message}
+        </div>
+      )}
+
+      {/* Main Container */}
+      <div className="luxury-container">
+        <div className="luxury-content">
+          
+          {/* Navigation Header */}
+          <div className="luxury-header">
+            <div className="luxury-glass luxury-navigation">
+              <button className="luxury-back-button" onClick={onBack}>
+                <ChevronLeft className="w-5 h-5" />
+                Back to Browse
+              </button>
+              
+              <div className="luxury-title">
+                <Crown className="w-6 h-6 text-yellow-500" />
+                Professional Model Profile
+              </div>
+              
+              <div className="luxury-actions">
+                {isOwnProfile && (
+                  <>
+                    {isEditing ? (
+                      <>
+                        <button 
+                          className="luxury-button luxury-button-primary"
+                          onClick={handleSaveChanges}
+                          disabled={uploading}
+                        >
+                          {uploading ? <div className="luxury-spinner" style={{ width: '16px', height: '16px', margin: 0 }}/> : <Check className="w-4 h-4" />}
+                          {uploading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                        <button 
+                          className="luxury-button luxury-button-secondary"
+                          onClick={() => setIsEditing(false)}
+                        >
+                          <X className="w-4 h-4" />
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        className="luxury-button luxury-button-secondary"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        Edit Profile
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            
-            {!isOwnProfile && (
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {getConnectionButton()}
-                <Button type="secondary" onClick={onMessage}>
-                  Message
-                </Button>
-              </div>
-            )}
           </div>
-        </Card>
 
-        {/* Main Content Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          {/* Left Column */}
-          <div>
-            {/* About Section */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>✨ About</h2>
-              {isEditing ? (
-                <textarea
-                  value={editData.bio || ''}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  style={styles.textarea}
-                  placeholder="Describe your modeling experience, style, and what makes you unique..."
-                />
-              ) : (
-                <p style={{ color: '#ddd', lineHeight: '1.6' }}>
-                  {currentProfile?.bio ||
-                    'Professional model with experience in fashion, commercial, and editorial work. Passionate about bringing creative visions to life through authentic and dynamic performances.'}
-                </p>
-              )}
-            </Card>
-
-            {/* Portfolio Photos */}
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>📸 Portfolio</h2>
-                {isEditing && (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    id="portfolio-upload"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handlePortfolioUpload(e.target.files)}
+          {/* Hero Section */}
+          <div className="luxury-hero">
+            <div className="luxury-glass-strong">
+              <div className="luxury-cover">
+                {currentProfile?.coverPhoto ? (
+                  <img 
+                    src={currentProfile.coverPhoto.startsWith('http') ? currentProfile.coverPhoto : `http://localhost:8001${currentProfile.coverPhoto}`} 
+                    alt="Cover" 
                   />
-                )}
-                {isEditing && (
-                  <label htmlFor="portfolio-upload">
-                    <Button type="secondary" style={{ cursor: 'pointer' }}>
-                      {uploading ? 'Uploading...' : '+ Add Photos'}
-                    </Button>
-                  </label>
-                )}
-              </div>
-
-              {/* Portfolio grid */}
-              {displayPhotos && displayPhotos.length > 0 ? (
-                <>
-                  <div style={styles.portfolioGrid}>
-                    {displayPhotos.map((photo, index) => (
-                      <div key={index} style={styles.portfolioItem}>
-                        <img 
-                          src={`http://localhost:8001${photo}`} 
-                          alt={`Portfolio ${index + 1}`} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => setActivePhotoIndex(index)}
-                        />
-                        {isEditing && (
-                          <button
-                            onClick={() => removePortfolioPhoto(index)}
-                            style={{
-                              position: 'absolute',
-                              top: '5px',
-                              right: '5px',
-                              background: 'rgba(255, 0, 0, 0.7)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '50%',
-                              width: '24px',
-                              height: '24px',
-                              cursor: 'pointer',
-                              fontSize: '12px'
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                ) : (
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(0, 0, 0, 0.8) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'rgba(255, 255, 255, 0.3)',
+                    fontSize: '2rem',
+                    fontWeight: '300'
+                  }}>
+                    Professional Portfolio
                   </div>
-                  
-                  {ensureArray(profile.photos).length > 8 && !showAllPhotos && (
-                    <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                      <Button 
-                        type="secondary" 
-                        onClick={() => setShowAllPhotos(true)}
-                      >
-                        Show All Photos ({ensureArray(profile.photos).length})
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {showAllPhotos && ensureArray(profile.photos).length > 8 && (
-                    <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                      <Button 
-                        type="secondary" 
-                        onClick={() => setShowAllPhotos(false)}
-                      >
-                        Show Less
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <EmptyState
-                  icon="📸"
-                  title="No Portfolio Photos"
-                  description={isEditing ? "Upload photos to showcase your modeling work" : "This model hasn't uploaded any portfolio photos yet"}
-                  actionButton={isEditing && (
-                    <label htmlFor="portfolio-upload">
-                      <Button type="primary" style={{ cursor: 'pointer' }}>
-                        Add Photos
-                      </Button>
-                    </label>
-                  )}
-                />
-              )}
-            </Card>
-
-            {/* Experience */}
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h2 style={{ color: 'white', fontSize: '1.3rem', margin: 0 }}>💼 Experience</h2>
+                )}
+                <div className="luxury-cover-overlay" />
+                
                 {isEditing && (
-                  <Button type="secondary" onClick={addExperience}>
-                    + Add Experience
-                  </Button>
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <input
+                      type="file"
+                      id="coverPhoto"
+                      accept="image/*"
+                      onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
+                      style={{ display: 'none' }}
+                      disabled={uploading}
+                    />
+                    <label htmlFor="coverPhoto" className="luxury-button luxury-button-primary">
+                      <Upload className="w-4 h-4" />
+                      {uploading ? 'Uploading...' : 'Change Cover Photo'}
+                    </label>
+                  </div>
                 )}
               </div>
               
-              {isEditing ? (
-                <div>
-                  {ensureExperienceArray(editData.experience).map((exp, index) => (
-                    <div key={index} style={styles.experienceCard}>
-                      <input
-                        type="text"
-                        value={exp.role}
-                        onChange={(e) => updateExperience(index, 'role', e.target.value)}
-                        style={styles.formInput}
-                        placeholder="Role/Project Title"
-                      />
-                      <input
-                        type="text"
-                        value={exp.company}
-                        onChange={(e) => updateExperience(index, 'company', e.target.value)}
-                        style={styles.formInput}
-                        placeholder="Client/Agency/Brand"
-                      />
-                      <input
-                        type="text"
-                        value={exp.duration}
-                        onChange={(e) => updateExperience(index, 'duration', e.target.value)}
-                        style={styles.formInput}
-                        placeholder="Duration (e.g., 2023-2024)"
-                      />
-                      <textarea
-                        value={exp.description}
-                        onChange={(e) => updateExperience(index, 'description', e.target.value)}
-                        style={styles.textarea}
-                        placeholder="Description of the work..."
-                      />
-                      <label style={{ color: 'white', fontSize: '14px', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+              <div className="luxury-profile-picture">
+                {currentProfile?.profilePicture ? (
+                  <img 
+                    src={currentProfile.profilePicture.startsWith('http') ? currentProfile.profilePicture : `http://localhost:8001${currentProfile.profilePicture}`} 
+                    alt={currentProfile.fullName} 
+                  />
+                ) : (
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '3rem',
+                    color: 'rgba(255, 255, 255, 0.3)'
+                  }}>
+                    <Camera />
+                  </div>
+                )}
+                
+                {currentProfile?.verified && (
+                  <div className="luxury-verified-badge">
+                    <Crown className="w-4 h-4 text-black" />
+                  </div>
+                )}
+                
+                {isEditing && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%'
+                  }}>
+                    <input
+                      type="file"
+                      id="profilePicture"
+                      accept="image/*"
+                      onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
+                      style={{ display: 'none' }}
+                      disabled={uploading}
+                    />
+                    <label htmlFor="profilePicture" style={{ cursor: 'pointer', color: '#d4af37' }}>
+                      <Camera className="w-6 h-6" />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="luxury-profile-header">
+                <div className="luxury-profile-info">
+                  <div className="luxury-profile-details">
+                    {isEditing ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
                         <input
-                          type="checkbox"
-                          checked={exp.current || false}
-                          onChange={(e) => updateExperience(index, 'current', e.target.checked)}
-                          style={{ marginRight: '8px' }}
+                          type="text"
+                          value={editData.fullName || ''}
+                          onChange={(e) => handleInputChange('fullName', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Full Name"
+                          style={{ fontSize: '2rem', fontWeight: '300' }}
                         />
-                        Current project
-                      </label>
-                      <Button 
-                        type="danger" 
-                        onClick={() => removeExperience(index)}
-                        size="small"
-                      >
-                        Remove Experience
-                      </Button>
+                        <input
+                          type="text"
+                          value={editData.headline || ''}
+                          onChange={(e) => handleInputChange('headline', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Professional Headline"
+                          style={{ fontSize: '1.25rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={editData.location || ''}
+                          onChange={(e) => handleInputChange('location', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Location"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <h1>{currentProfile?.fullName || `${targetUser?.firstName} ${targetUser?.lastName}` || 'Professional Model'}</h1>
+                        <div className="headline">{currentProfile?.headline || 'Professional Model & Creative Visionary'}</div>
+                        <div className="luxury-profile-meta">
+                          <span>
+                            <MapPin className="w-4 h-4" />
+                            {currentProfile?.location || 'Location not set'}
+                          </span>
+                          <span>
+                            <Users className="w-4 h-4" />
+                            {currentProfile?.connectionsCount?.toLocaleString() || '0'} connections
+                          </span>
+                          <span>
+                            <Eye className="w-4 h-4" />
+                            {currentProfile?.profileViews?.toLocaleString() || '0'} views
+                          </span>
+                          {currentProfile?.verified && (
+                            <span style={{ color: '#d4af37' }}>
+                              <Crown className="w-4 h-4" />
+                              Verified Professional
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {!isOwnProfile && (
+                    <div className="luxury-profile-actions">
+                      {getConnectionButton()}
+                      <button className="luxury-button luxury-button-secondary" onClick={onMessage}>
+                        <MessageCircle className="w-4 h-4" />
+                        Message
+                      </button>
+                      <button className="luxury-button luxury-button-secondary">
+                        <Share2 className="w-4 h-4" />
+                        Share
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <>
-                  {ensureExperienceArray(currentProfile.experience).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                      {ensureExperienceArray(currentProfile.experience).map((exp, index) => (
-                        <div key={index} style={styles.experienceCard}>
-                          <h4 style={{ color: 'white', marginBottom: '5px' }}>{exp.role}</h4>
-                          {exp.company && <p style={{ color: '#ddd', fontSize: '14px', marginBottom: '5px' }}>{exp.company}</p>}
-                          {exp.duration && <p style={{ color: '#ccc', fontSize: '12px', marginBottom: '10px' }}>{exp.duration}</p>}
-                          {exp.description && <p style={{ color: '#ddd', fontSize: '14px' }}>{exp.description}</p>}
-                          {exp.current && <span style={{ color: '#4CAF50', fontSize: '12px' }}>• Current</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Section */}
+          <div className="luxury-stats">
+            <div className="luxury-stat-card">
+              <div className="luxury-stat-icon">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div className="luxury-stat-value">{currentProfile?.profileViews?.toLocaleString() || '0'}</div>
+              <div className="luxury-stat-label">Profile Views</div>
+            </div>
+            
+            <div className="luxury-stat-card">
+              <div className="luxury-stat-icon">
+                <Star className="w-5 h-5" />
+              </div>
+              <div className="luxury-stat-value">{currentProfile?.avgRating || '5.0'}</div>
+              <div className="luxury-stat-label">Average Rating</div>
+            </div>
+            
+            <div className="luxury-stat-card">
+              <div className="luxury-stat-icon">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="luxury-stat-value">{currentProfile?.completionRate || '100'}%</div>
+              <div className="luxury-stat-label">Completion Rate</div>
+            </div>
+            
+            <div className="luxury-stat-card">
+              <div className="luxury-stat-icon">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div className="luxury-stat-value">{currentProfile?.responseRate || '100'}%</div>
+              <div className="luxury-stat-label">Response Rate</div>
+            </div>
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="luxury-grid">
+            
+            {/* Main Content */}
+            <div className="luxury-main-content">
+              
+              {/* About Section */}
+              <div className="luxury-card" style={{ '--delay': '0.6s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    <Zap className="w-5 h-5" />
+                    About
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <textarea
+                    value={editData.bio || ''}
+                    onChange={(e) => handleInputChange('bio', e.target.value)}
+                    className="luxury-textarea"
+                    placeholder="Describe your modeling experience, style, and what makes you unique..."
+                    rows={6}
+                  />
+                ) : (
+                  <p style={{ 
+                    color: 'rgba(255, 255, 255, 0.8)', 
+                    lineHeight: '1.8',
+                    fontSize: '1rem'
+                  }}>
+                    {currentProfile?.bio || 'Professional model with experience in fashion, commercial, and editorial work. Passionate about bringing creative visions to life through authentic and dynamic performances.'}
+                  </p>
+                )}
+              </div>
+
+              {/* Portfolio Photos & Videos */}
+              <div className="luxury-card" style={{ '--delay': '0.8s' }}>
+                <div className="luxury-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h2 className="luxury-card-title">
+                    <Camera className="w-5 h-5" />
+                    Portfolio
+                  </h2>
+                  
+                  {/* Filter Buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '12px', padding: '4px' }}>
+                      <button
+                        onClick={() => setPortfolioFilter('all')}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: portfolioFilter === 'all' ? '#d4af37' : 'transparent',
+                          color: portfolioFilter === 'all' ? '#000' : 'rgba(255, 255, 255, 0.7)',
+                          fontSize: '0.8rem',
+                          fontWeight: '400',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        All ({getPortfolioPhotos().length + getPortfolioVideos().length})
+                      </button>
+                      <button
+                        onClick={() => setPortfolioFilter('photos')}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: portfolioFilter === 'photos' ? '#d4af37' : 'transparent',
+                          color: portfolioFilter === 'photos' ? '#000' : 'rgba(255, 255, 255, 0.7)',
+                          fontSize: '0.8rem',
+                          fontWeight: '400',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        Photos ({getPortfolioPhotos().length})
+                      </button>
+                      <button
+                        onClick={() => setPortfolioFilter('videos')}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: portfolioFilter === 'videos' ? '#d4af37' : 'transparent',
+                          color: portfolioFilter === 'videos' ? '#000' : 'rgba(255, 255, 255, 0.7)',
+                          fontSize: '0.8rem',
+                          fontWeight: '400',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        Videos ({getPortfolioVideos().length})
+                      </button>
+                    </div>
+                    
+                    {isEditing && (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          id="portfolio-photos-upload"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handlePortfolioUpload(Array.from(e.target.files), 'photo')}
+                        />
+                        <label htmlFor="portfolio-photos-upload" className="luxury-card-action" style={{ cursor: 'pointer' }}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          {uploading ? 'Uploading...' : 'Add Photos'}
+                        </label>
+                        
+                        <input
+                          type="file"
+                          accept="video/*"
+                          multiple
+                          id="portfolio-videos-upload"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handlePortfolioUpload(Array.from(e.target.files), 'video')}
+                        />
+                        <label htmlFor="portfolio-videos-upload" className="luxury-card-action" style={{ cursor: 'pointer' }}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Videos
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {displayPortfolio && displayPortfolio.length > 0 ? (
+                  <>
+                    <div className="luxury-portfolio-grid">
+                      {displayPortfolio.map((item, index) => (
+                        <div key={item.id} className="luxury-portfolio-item" onClick={() => {
+                          if (item.type === 'photo') {
+                            setActivePhotoIndex(index);
+                          } else {
+                            setActiveVideoIndex(index);
+                          }
+                        }}>
+                          {item.type === 'photo' ? (
+                            <img 
+                              src={item.url.startsWith('http') ? item.url : `http://localhost:8001${item.url}`}
+                              alt={`Portfolio ${index + 1}`} 
+                            />
+                          ) : (
+                            <div style={{ position: 'relative' }}>
+                              <video 
+                                src={item.url.startsWith('http') ? item.url : `http://localhost:8001${item.url}`}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                muted
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'rgba(0, 0, 0, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <div style={{
+                                  width: '60px',
+                                  height: '60px',
+                                  background: 'rgba(212, 175, 55, 0.9)',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#000'
+                                }}>
+                                  ▶
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="luxury-portfolio-overlay">
+                            <div style={{ color: 'white', fontSize: '0.8rem' }}>
+                              {item.type === 'photo' ? 'View Photo' : 'Play Video'}
+                            </div>
+                          </div>
+                          
+                          {/* Media Type Badge */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            background: item.type === 'photo' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)',
+                            color: 'white',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.7rem',
+                            fontWeight: '500'
+                          }}>
+                            {item.type === 'photo' ? 'PHOTO' : 'VIDEO'}
+                          </div>
+                          
+                          {isEditing && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Handle remove media
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                background: 'rgba(239, 68, 68, 0.8)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '28px',
+                                height: '28px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <EmptyState
-                      icon="💼"
-                      title="No Experience Listed"
-                      description={isEditing ? "Add your modeling experience and projects" : "No modeling experience has been added yet"}
-                    />
-                  )}
-                </>
-              )}
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div>
-            {/* Modeling Types */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎭 Modeling Types</h2>
-              {isEditing ? (
-                <textarea
-                  value={(editData.modelingTypes || []).join(', ')}
-                  onChange={(e) => handleArrayInputChange('modelingTypes', e.target.value)}
-                  style={styles.textarea}
-                  placeholder="Fashion, Commercial, Editorial, Runway, Fitness, Beauty, Parts Modeling (comma separated)"
-                />
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(currentProfile?.modelingTypes?.length > 0 
-                    ? currentProfile.modelingTypes 
-                    : ['Fashion', 'Commercial', 'Editorial']).map((type, index) => (
-                    <span key={index} style={styles.badge}>
-                      {type}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Measurements */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📏 Measurements</h2>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={editData.measurements?.height || ''}
-                    onChange={(e) => handleInputChange('measurements.height', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Height (e.g., 5'8\ / 173cm)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.weight || ''}
-                    onChange={(e) => handleInputChange('measurements.weight', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Weight (optional)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.bust || ''}
-                    onChange={(e) => handleInputChange('measurements.bust', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Bust/Chest (e.g., 34\)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.waist || ''}
-                    onChange={(e) => handleInputChange('measurements.waist', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Waist (e.g., 26\)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.hips || ''}
-                    onChange={(e) => handleInputChange('measurements.hips', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Hips (e.g., 36\)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.shoeSize || ''}
-                    onChange={(e) => handleInputChange('measurements.shoeSize', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Shoe Size (e.g., 8.5)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.measurements?.dressSize || ''}
-                    onChange={(e) => handleInputChange('measurements.dressSize', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Dress Size (e.g., 6)"
-                  />
-                </div>
-              ) : (
-                <>
-                  {currentProfile?.measurements && Object.values(currentProfile.measurements).some(val => val) ? (
-                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {currentProfile?.measurements?.height && (
-                        <div><strong style={{ color: 'white' }}>Height:</strong> {currentProfile.measurements.height}</div>
-                      )}
-                      {currentProfile?.measurements?.weight && (
-                        <div><strong style={{ color: 'white' }}>Weight:</strong> {currentProfile.measurements.weight}</div>
-                      )}
-                      {currentProfile?.measurements?.bust && (
-                        <div><strong style={{ color: 'white' }}>Bust/Chest:</strong> {currentProfile.measurements.bust}</div>
-                      )}
-                      {currentProfile?.measurements?.waist && (
-                        <div><strong style={{ color: 'white' }}>Waist:</strong> {currentProfile.measurements.waist}</div>
-                      )}
-                      {currentProfile?.measurements?.hips && (
-                        <div><strong style={{ color: 'white' }}>Hips:</strong> {currentProfile.measurements.hips}</div>
-                      )}
-                      {currentProfile?.measurements?.shoeSize && (
-                        <div><strong style={{ color: 'white' }}>Shoe Size:</strong> {currentProfile.measurements.shoeSize}</div>
-                      )}
-                      {currentProfile?.measurements?.dressSize && (
-                        <div><strong style={{ color: 'white' }}>Dress Size:</strong> {currentProfile.measurements.dressSize}</div>
-                      )}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon="📏"
-                      title="No Measurements Listed"
-                      description="Physical measurements haven't been provided yet"
-                    />
-                  )}
-                </>
-              )}
-            </Card>
-
-            {/* Physical Features */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>👁️ Physical Features</h2>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={editData.physicalFeatures?.eyeColor || ''}
-                    onChange={(e) => handleInputChange('physicalFeatures.eyeColor', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Eye Color"
-                  />
-                  <input
-                    type="text"
-                    value={editData.physicalFeatures?.hairColor || ''}
-                    onChange={(e) => handleInputChange('physicalFeatures.hairColor', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Hair Color"
-                  />
-                  <input
-                    type="text"
-                    value={editData.physicalFeatures?.hairLength || ''}
-                    onChange={(e) => handleInputChange('physicalFeatures.hairLength', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Hair Length"
-                  />
-                  <input
-                    type="text"
-                    value={editData.physicalFeatures?.skinTone || ''}
-                    onChange={(e) => handleInputChange('physicalFeatures.skinTone', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Skin Tone"
-                  />
-                  <input
-                    type="text"
-                    value={editData.physicalFeatures?.ethnicity || ''}
-                    onChange={(e) => handleInputChange('physicalFeatures.ethnicity', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Ethnicity"
-                  />
-                </div>
-              ) : (
-                <>
-                  {currentProfile?.physicalFeatures && Object.values(currentProfile.physicalFeatures).some(val => val) ? (
-                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {currentProfile?.physicalFeatures?.eyeColor && (
-                        <div><strong style={{ color: 'white' }}>Eyes:</strong> {currentProfile.physicalFeatures.eyeColor}</div>
-                      )}
-                      {currentProfile?.physicalFeatures?.hairColor && (
-                        <div><strong style={{ color: 'white' }}>Hair Color:</strong> {currentProfile.physicalFeatures.hairColor}</div>
-                      )}
-                      {currentProfile?.physicalFeatures?.hairLength && (
-                        <div><strong style={{ color: 'white' }}>Hair Length:</strong> {currentProfile.physicalFeatures.hairLength}</div>
-                      )}
-                      {currentProfile?.physicalFeatures?.skinTone && (
-                        <div><strong style={{ color: 'white' }}>Skin Tone:</strong> {currentProfile.physicalFeatures.skinTone}</div>
-                      )}
-                      {currentProfile?.physicalFeatures?.ethnicity && (
-                        <div><strong style={{ color: 'white' }}>Ethnicity:</strong> {currentProfile.physicalFeatures.ethnicity}</div>
-                      )}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon="👁️"
-                      title="No Physical Features Listed"
-                      description="Physical features haven't been provided yet"
-                    />
-                  )}
-                </>
-              )}
-            </Card>
-
-            {/* Skills & Abilities */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🎯 Skills & Abilities</h2>
-              {isEditing ? (
-                <textarea
-                  value={(editData.skills || []).join(', ')}
-                  onChange={(e) => handleArrayInputChange('skills', e.target.value)}
-                  style={styles.textarea}
-                  placeholder="Dancing, Acting, Sports, Languages, Musical Instruments, Martial Arts (comma separated)"
-                />
-              ) : (
-                <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(currentProfile?.skills?.length > 0
-                    ? currentProfile.skills
-                    : ['Professional Posing', 'Runway Walking', 'Commercial Acting']).map((skill, index) => (
-                    <div key={index} style={styles.skillItem}>
-                      • {skill}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Availability & Rates */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>💰 Availability & Rates</h2>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={editData.rates?.hourly || ''}
-                    onChange={(e) => handleInputChange('rates.hourly', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Hourly Rate (e.g., $150/hour)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.rates?.daily || ''}
-                    onChange={(e) => handleInputChange('rates.daily', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Daily Rate (e.g., $800/day)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.rates?.runway || ''}
-                    onChange={(e) => handleInputChange('rates.runway', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Runway Rate (e.g., $500/show)"
-                  />
-                  <select
-                    value={editData.availability || ''}
-                    onChange={(e) => handleInputChange('availability', e.target.value)}
-                    style={styles.formInput}
-                  >
-                    <option value="">Select Availability</option>
-                    <option value="full-time">Available Full Time</option>
-                    <option value="part-time">Part Time</option>
-                    <option value="freelance">Freelance Projects</option>
-                    <option value="seasonal">Seasonal Work</option>
-                    <option value="by-appointment">By Appointment</option>
-                  </select>
-                  <label style={{ color: 'white', fontSize: '14px', marginBottom: '5px', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={editData.willingToTravel || false}
-                      onChange={(e) => handleInputChange('willingToTravel', e.target.checked)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    Willing to travel for assignments
-                  </label>
-                </div>
-              ) : (
-                <>
-                  {(currentProfile?.rates && Object.keys(currentProfile.rates).length > 0) || 
-                   currentProfile?.availability || currentProfile?.willingToTravel ? (
-                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {currentProfile?.rates?.hourly && (
-                        <div><strong style={{ color: 'white' }}>Hourly:</strong> {currentProfile.rates.hourly}</div>
-                      )}
-                      {currentProfile?.rates?.daily && (
-                        <div><strong style={{ color: 'white' }}>Daily:</strong> {currentProfile.rates.daily}</div>
-                      )}
-                      {currentProfile?.rates?.runway && (
-                        <div><strong style={{ color: 'white' }}>Runway:</strong> {currentProfile.rates.runway}</div>
-                      )}
-                      {currentProfile?.availability && (
-                        <div style={{ marginTop: '10px' }}>
-                          <strong style={{ color: 'white' }}>Availability:</strong> {currentProfile.availability}
-                        </div>
-                      )}
-                      {currentProfile?.willingToTravel && (
-                        <div style={{ color: '#4CAF50' }}>✓ Available for travel assignments</div>
-                      )}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon="💰"
-                      title="No Rates Listed"
-                      description="Contact for rates and availability"
-                    />
-                  )}
-                </>
-              )}
-            </Card>
-
-            {/* Agency & Representation */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>🏢 Agency & Representation</h2>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={editData.agency?.name || ''}
-                    onChange={(e) => handleInputChange('agency.name', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Agency Name"
-                  />
-                  <input
-                    type="text"
-                    value={editData.agency?.contact || ''}
-                    onChange={(e) => handleInputChange('agency.contact', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Agency Contact"
-                  />
-                  <input
-                    type="text"
-                    value={editData.agency?.location || ''}
-                    onChange={(e) => handleInputChange('agency.location', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="Agency Location"
-                  />
-                  <label style={{ color: 'white', fontSize: '14px', marginBottom: '5px', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={editData.seekingRepresentation || false}
-                      onChange={(e) => handleInputChange('seekingRepresentation', e.target.checked)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    Currently seeking representation
-                  </label>
-                </div>
-              ) : (
-                <>
-                  {(currentProfile?.agency && Object.values(currentProfile.agency).some(val => val)) || 
-                   currentProfile?.seekingRepresentation ? (
-                    <div style={{ color: '#ddd', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {currentProfile?.agency?.name && (
-                        <div><strong style={{ color: 'white' }}>Agency:</strong> {currentProfile.agency.name}</div>
-                      )}
-                      {currentProfile?.agency?.contact && (
-                        <div><strong style={{ color: 'white' }}>Contact:</strong> {currentProfile.agency.contact}</div>
-                      )}
-                      {currentProfile?.agency?.location && (
-                        <div><strong style={{ color: 'white' }}>Location:</strong> {currentProfile.agency.location}</div>
-                      )}
-                      {currentProfile?.seekingRepresentation && (
-                        <div style={{ color: '#4CAF50', marginTop: '10px' }}>✓ Seeking representation</div>
-                      )}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon="🏢"
-                      title="No Agency Information"
-                      description="Agency details haven't been provided yet"
-                    />
-                  )}
-                </>
-              )}
-            </Card>
-
-            {/* Contact Info */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📞 Contact</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {isEditing ? (
-                  <>
-                    <input
-                      type="email"
-                      value={editData.email || ''}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      style={styles.formInput}
-                      placeholder="✉️ Email"
-                    />
-                    <input
-                      type="tel"
-                      value={editData.phone || ''}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      style={styles.formInput}
-                      placeholder="📞 Phone Number"
-                    />
-                    <input
-                      type="url"
-                      value={editData.portfolioWebsite || ''}
-                      onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
-                      style={styles.formInput}
-                      placeholder="🌐 Portfolio Website"
-                    />
+                    
+                    {(getPortfolioPhotos().length + getPortfolioVideos().length > 12) && !showAllPhotos && (
+                      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                        <button 
+                          className="luxury-button luxury-button-secondary"
+                          onClick={() => setShowAllPhotos(true)}
+                        >
+                          Show All Media ({getPortfolioPhotos().length + getPortfolioVideos().length})
+                        </button>
+                      </div>
+                    )}
+                    
+                    {showAllPhotos && (getPortfolioPhotos().length + getPortfolioVideos().length > 12) && (
+                      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                        <button 
+                          className="luxury-button luxury-button-secondary"
+                          onClick={() => setShowAllPhotos(false)}
+                        >
+                          Show Less
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
+                  <div className="luxury-empty-state">
+                    <div className="luxury-empty-icon">📸</div>
+                    <div className="luxury-empty-title">No Portfolio Media</div>
+                    <div className="luxury-empty-description">
+                      {isEditing ? "Upload photos and videos to showcase your modeling work" : "This model hasn't uploaded any portfolio media yet"}
+                    </div>
+                    {isEditing && (
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+                        <label htmlFor="portfolio-photos-upload">
+                          <button className="luxury-button luxury-button-primary">
+                            <Upload className="w-4 h-4" />
+                            Add Photos
+                          </button>
+                        </label>
+                        <label htmlFor="portfolio-videos-upload">
+                          <button className="luxury-button luxury-button-primary">
+                            <Upload className="w-4 h-4" />
+                            Add Videos
+                          </button>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Experience with Show More/Less */}
+              <div className="luxury-card" style={{ '--delay': '1.0s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    <Award className="w-5 h-5" />
+                    Professional Experience
+                  </h2>
+                  {isEditing && (
+                    <button className="luxury-card-action" onClick={addExperience}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Experience
+                    </button>
+                  )}
+                </div>
+                
+                {isEditing ? (
+                  <div>
+                    {ensureExperienceArray(editData.experience).map((exp, index) => (
+                      <div key={index} className="luxury-experience-card">
+                        <input
+                          type="text"
+                          value={exp.role}
+                          onChange={(e) => updateExperience(index, 'role', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Role/Project Title"
+                        />
+                        <input
+                          type="text"
+                          value={exp.company}
+                          onChange={(e) => updateExperience(index, 'company', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Client/Agency/Brand"
+                        />
+                        <input
+                          type="text"
+                          value={exp.duration}
+                          onChange={(e) => updateExperience(index, 'duration', e.target.value)}
+                          className="luxury-form-input"
+                          placeholder="Duration (e.g., 2023-2024)"
+                        />
+                        <textarea
+                          value={exp.description}
+                          onChange={(e) => updateExperience(index, 'description', e.target.value)}
+                          className="luxury-textarea"
+                          placeholder="Description of the work..."
+                          rows={3}
+                        />
+                        <label style={{ 
+                          color: 'white', 
+                          fontSize: '0.9rem', 
+                          marginBottom: '1rem', 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={exp.current || false}
+                            onChange={(e) => updateExperience(index, 'current', e.target.checked)}
+                            style={{ marginRight: '0.5rem' }}
+                          />
+                          Current project
+                        </label>
+                        <button 
+                          className="luxury-button luxury-button-secondary"
+                          onClick={() => removeExperience(index)}
+                          style={{ background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
+                        >
+                          <Minus className="w-4 h-4" />
+                          Remove Experience
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <>
-                    {currentProfile?.email && (
-                      <div style={styles.contactItem}>
-                        <span style={{ color: '#ccc' }}>✉️</span>
-                        <span style={{ color: 'white' }}>{currentProfile.email}</span>
+                    {ensureExperienceArray(currentProfile?.experience).length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        {ensureExperienceArray(currentProfile?.experience)
+                          .slice(0, showAllExperience ? undefined : 3)
+                          .map((exp, index) => (
+                          <div key={index} className="luxury-experience-card">
+                            <div className="luxury-experience-title">{exp.role}</div>
+                            {exp.company && <div className="luxury-experience-company">{exp.company}</div>}
+                            {exp.duration && <div className="luxury-experience-duration">{exp.duration}</div>}
+                            {exp.description && <div className="luxury-experience-description">{exp.description}</div>}
+                            {exp.current && (
+                              <div className="luxury-current-badge">
+                                <Zap className="w-3 h-3" />
+                                Current
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        
+                        {/* Show More/Less for Experience */}
+                        {ensureExperienceArray(currentProfile?.experience).length > 3 && (
+                          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                            <button 
+                              className="luxury-button luxury-button-secondary"
+                              onClick={() => setShowAllExperience(!showAllExperience)}
+                            >
+                              {showAllExperience 
+                                ? 'Show Less Experience' 
+                                : `Show All Experience (${ensureExperienceArray(currentProfile?.experience).length})`
+                              }
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">💼</div>
+                        <div className="luxury-empty-title">No Experience Listed</div>
+                        <div className="luxury-empty-description">
+                          {isEditing ? "Add your modeling experience and projects" : "No modeling experience has been added yet"}
+                        </div>
                       </div>
                     )}
-                    {currentProfile?.phone && (
-                      <div style={styles.contactItem}>
-                        <span style={{ color: '#ccc' }}>📞</span>
-                        <span style={{ color: 'white' }}>{currentProfile.phone}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="luxury-sidebar">
+              
+              {/* Modeling Types from Real Data */}
+              <div className="luxury-card" style={{ '--delay': '0.7s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    <Star className="w-5 h-5" />
+                    Specializations
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <textarea
+                    value={(editData.modelingTypes || []).join(', ')}
+                    onChange={(e) => handleArrayInputChange('modelingTypes', e.target.value)}
+                    className="luxury-textarea"
+                    placeholder="Fashion, Commercial, Editorial, Runway, Fitness, Beauty (comma separated)"
+                    rows={4}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {(currentProfile?.modelingTypes && currentProfile.modelingTypes.length > 0
+                      ? currentProfile.modelingTypes 
+                      : currentProfile?.modelType ? [currentProfile.modelType] : ['Fashion Modeling']).map((type, index) => (
+                      <div key={index} className="luxury-badge">
+                        <Diamond className="w-3 h-3" />
+                        {type}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Real Measurements Data */}
+              <div className="luxury-card" style={{ '--delay': '0.9s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    📏 Measurements
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={editData.height || ''}
+                      onChange={(e) => handleInputChange('height', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Height (e.g., 173cm or 5'8&quot;)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.weight || ''}
+                      onChange={(e) => handleInputChange('weight', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Weight (optional)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.bust || ''}
+                      onChange={(e) => handleInputChange('bust', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Bust/Chest measurement"
+                    />
+                    <input
+                      type="text"
+                      value={editData.waist || ''}
+                      onChange={(e) => handleInputChange('waist', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Waist measurement"
+                    />
+                    <input
+                      type="text"
+                      value={editData.hips || ''}
+                      onChange={(e) => handleInputChange('hips', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Hip measurement"
+                    />
+                    <input
+                      type="text"
+                      value={editData.shoeSize || ''}
+                      onChange={(e) => handleInputChange('shoeSize', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Shoe size"
+                    />
+                    <input
+                      type="text"
+                      value={editData.dressSize || ''}
+                      onChange={(e) => handleInputChange('dressSize', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Dress size"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {(currentProfile?.height || currentProfile?.weight || currentProfile?.bust || currentProfile?.waist || currentProfile?.hips) ? (
+                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {currentProfile?.height && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Height:</span>
+                            <span>{currentProfile.height}{currentProfile.heightUnit && ` ${currentProfile.heightUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.weight && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Weight:</span>
+                            <span>{currentProfile.weight}{currentProfile.weightUnit && ` ${currentProfile.weightUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.bust && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Bust/Chest:</span>
+                            <span>{currentProfile.bust}{currentProfile.bustUnit && ` ${currentProfile.bustUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.waist && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Waist:</span>
+                            <span>{currentProfile.waist}{currentProfile.waistUnit && ` ${currentProfile.waistUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.hips && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Hips:</span>
+                            <span>{currentProfile.hips}{currentProfile.hipsUnit && ` ${currentProfile.hipsUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.shoeSize && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Shoe Size:</span>
+                            <span>{currentProfile.shoeSize}{currentProfile.shoeSizeUnit && ` ${currentProfile.shoeSizeUnit}`}</span>
+                          </div>
+                        )}
+                        {currentProfile?.dressSize && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Dress Size:</span>
+                            <span>{currentProfile.dressSize}{currentProfile.dressSizeUnit && ` ${currentProfile.dressSizeUnit}`}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">📏</div>
+                        <div className="luxury-empty-title">No Measurements</div>
+                        <div className="luxury-empty-description">Physical measurements haven't been provided</div>
                       </div>
                     )}
-                    {currentProfile?.portfolioWebsite && (
-                      <div style={styles.contactItem}>
-                        <span style={{ color: '#ccc' }}>🌐</span>
+                  </>
+                )}
+              </div>
+
+              {/* Real Physical Features Data */}
+              <div className="luxury-card" style={{ '--delay': '1.1s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    👁️ Physical Features
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={editData.eyeColor || ''}
+                      onChange={(e) => handleInputChange('eyeColor', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Eye Color"
+                    />
+                    <input
+                      type="text"
+                      value={editData.hairColor || ''}
+                      onChange={(e) => handleInputChange('hairColor', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Hair Color"
+                    />
+                    <input
+                      type="text"
+                      value={editData.skinTone || ''}
+                      onChange={(e) => handleInputChange('skinTone', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Skin Tone"
+                    />
+                    <input
+                      type="text"
+                      value={editData.nationality || ''}
+                      onChange={(e) => handleInputChange('nationality', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Nationality/Ethnicity"
+                    />
+                    <input
+                      type="text"
+                      value={editData.bodyType || ''}
+                      onChange={(e) => handleInputChange('bodyType', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Body Type"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {(currentProfile?.eyeColor || currentProfile?.hairColor || currentProfile?.skinTone || currentProfile?.nationality || currentProfile?.bodyType) ? (
+                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {currentProfile?.eyeColor && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Eyes:</span>
+                            <span>{currentProfile.eyeColor}</span>
+                          </div>
+                        )}
+                        {currentProfile?.hairColor && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Hair:</span>
+                            <span>{currentProfile.hairColor}</span>
+                          </div>
+                        )}
+                        {currentProfile?.skinTone && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Skin Tone:</span>
+                            <span>{currentProfile.skinTone}</span>
+                          </div>
+                        )}
+                        {currentProfile?.nationality && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Nationality:</span>
+                            <span>{currentProfile.nationality}</span>
+                          </div>
+                        )}
+                        {currentProfile?.bodyType && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Body Type:</span>
+                            <span>{currentProfile.bodyType}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">👁️</div>
+                        <div className="luxury-empty-title">No Features Listed</div>
+                        <div className="luxury-empty-description">Physical features haven't been provided</div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Real Skills Data */}
+              <div className="luxury-card" style={{ '--delay': '1.3s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    🎯 Skills & Abilities
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <textarea
+                    value={(editData.specialSkills || editData.skills || []).join(', ')}
+                    onChange={(e) => handleArrayInputChange('specialSkills', e.target.value)}
+                    className="luxury-textarea"
+                    placeholder="Dancing, Acting, Sports, Languages, Musical Instruments (comma separated)"
+                    rows={4}
+                  />
+                ) : (
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {((currentProfile?.specialSkills && currentProfile.specialSkills.length > 0)
+                      ? currentProfile.specialSkills
+                      : (currentProfile?.skills && currentProfile.skills.length > 0)
+                      ? currentProfile.skills
+                      : ['Professional Posing', 'Runway Walking']).map((skill, index) => (
+                      <div key={index} className="luxury-skill-item">
+                        • {skill}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Real Rates Data */}
+              <div className="luxury-card" style={{ '--delay': '1.5s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    <DollarSign className="w-5 h-5" />
+                    Rates & Availability
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={editData.rates?.hourly || ''}
+                      onChange={(e) => handleInputChange('rates.hourly', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Hourly Rate (e.g., $150/hour)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.rates?.halfDay || editData.rates?.daily || ''}
+                      onChange={(e) => handleInputChange('rates.daily', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Daily Rate (e.g., $800/day)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.rates?.fullDay || ''}
+                      onChange={(e) => handleInputChange('rates.fullDay', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Full Day Rate (e.g., $1500/day)"
+                    />
+                    <select
+                      value={editData.availability || ''}
+                      onChange={(e) => handleInputChange('availability', e.target.value)}
+                      className="luxury-form-input"
+                    >
+                      <option value="">Select Availability</option>
+                      <option value="full-time">Available Full Time</option>
+                      <option value="part-time">Part Time</option>
+                      <option value="freelance">Freelance Projects</option>
+                      <option value="international">International Projects</option>
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    {(currentProfile?.rates && (currentProfile.rates.hourly || currentProfile.rates.daily || currentProfile.rates.halfDay || currentProfile.rates.fullDay)) || 
+                     currentProfile?.availability ? (
+                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {currentProfile?.rates?.hourly && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Hourly:</span>
+                            <span style={{ color: '#d4af37' }}>{currentProfile.rates.currency || '$'} {currentProfile.rates.hourly}</span>
+                          </div>
+                        )}
+                        {(currentProfile?.rates?.daily || currentProfile?.rates?.halfDay) && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Daily:</span>
+                            <span style={{ color: '#d4af37' }}>{currentProfile.rates.currency || '$'} {currentProfile.rates.daily || currentProfile.rates.halfDay}</span>
+                          </div>
+                        )}
+                        {currentProfile?.rates?.fullDay && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Full Day:</span>
+                            <span style={{ color: '#d4af37' }}>{currentProfile.rates.currency || '$'} {currentProfile.rates.fullDay}</span>
+                          </div>
+                        )}
+                        {currentProfile?.availability && (
+                          <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            <div style={{ color: '#22c55e', fontSize: '0.9rem' }}>
+                              <Clock className="w-4 h-4 mr-2" style={{ display: 'inline' }} />
+                              {currentProfile.availability}
+                            </div>
+                          </div>
+                        )}
+                        {(currentProfile?.travelWillingness === 'international' || currentProfile?.willingToTravel) && (
+                          <div style={{ color: '#22c55e', fontSize: '0.9rem' }}>
+                            <Globe className="w-4 h-4 mr-2" style={{ display: 'inline' }} />
+                            Available for international travel
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">💰</div>
+                        <div className="luxury-empty-title">Contact for Rates</div>
+                        <div className="luxury-empty-description">Rates and availability on request</div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Agency & Representation with Real Data */}
+              <div className="luxury-card" style={{ '--delay': '1.7s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    🏢 Agency & Representation
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={editData.agencies || editData.agency?.name || ''}
+                      onChange={(e) => handleInputChange('agencies', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Current/Previous Agencies"
+                    />
+                    <input
+                      type="text"
+                      value={editData.unionMembership || ''}
+                      onChange={(e) => handleInputChange('unionMembership', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Union Memberships (SAG-AFTRA, etc.)"
+                    />
+                    <label style={{ color: 'white', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={editData.seekingRepresentation || false}
+                        onChange={(e) => handleInputChange('seekingRepresentation', e.target.checked)}
+                        style={{ marginRight: '0.5rem' }}
+                      />
+                      Currently seeking representation
+                    </label>
+                  </div>
+                ) : (
+                  <>
+                    {(currentProfile?.agencies || currentProfile?.agency?.name || currentProfile?.unionMembership || currentProfile?.seekingRepresentation) ? (
+                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {(currentProfile?.agencies || currentProfile?.agency?.name) && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Agencies:</span>
+                            <span>{currentProfile.agencies || currentProfile.agency.name}</span>
+                          </div>
+                        )}
+                        {currentProfile?.unionMembership && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Union:</span>
+                            <span>{currentProfile.unionMembership}</span>
+                          </div>
+                        )}
+                        {currentProfile?.seekingRepresentation && (
+                          <div style={{ color: '#22c55e', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                            ✓ Seeking new representation
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">🏢</div>
+                        <div className="luxury-empty-title">No Agency Information</div>
+                        <div className="luxury-empty-description">Agency details haven't been provided</div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Contact Information with Real Data */}
+              <div className="luxury-card" style={{ '--delay': '1.9s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    📞 Contact Information
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {isEditing ? (
+                    <>
+                      <input
+                        type="email"
+                        value={editData.email || ''}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        className="luxury-form-input"
+                        placeholder="Email Address"
+                      />
+                      <input
+                        type="tel"
+                        value={editData.phone || ''}
+                        onChange={(e) => handleInputChange('phone', e.target.value)}
+                        className="luxury-form-input"
+                        placeholder="Phone Number"
+                      />
+                      <input
+                        type="url"
+                        value={editData.portfolioWebsite || ''}
+                        onChange={(e) => handleInputChange('portfolioWebsite', e.target.value)}
+                        className="luxury-form-input"
+                        placeholder="Portfolio Website"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {currentProfile?.email && (
+                        <div className="luxury-contact-item">
+                          <div className="luxury-contact-icon">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>{currentProfile.email}</div>
+                        </div>
+                      )}
+                      {currentProfile?.phone && (
+                        <div className="luxury-contact-item">
+                          <div className="luxury-contact-icon">
+                            <Phone className="w-4 h-4" />
+                          </div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>{currentProfile.phone}</div>
+                        </div>
+                      )}
+                      {currentProfile?.portfolioWebsite && (
                         <a
                           href={currentProfile.portfolioWebsite}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: '#667eea', textDecoration: 'none' }}
+                          className="luxury-contact-item"
+                          style={{ textDecoration: 'none' }}
                         >
-                          Portfolio Website
+                          <div className="luxury-contact-icon">
+                            <ExternalLink className="w-4 h-4" />
+                          </div>
+                          <div style={{ color: '#d4af37' }}>Portfolio Website</div>
                         </a>
+                      )}
+                      {!currentProfile?.email && !currentProfile?.phone && !currentProfile?.portfolioWebsite && (
+                        <div className="luxury-empty-state">
+                          <div className="luxury-empty-icon">📞</div>
+                          <div className="luxury-empty-title">No Contact Info</div>
+                          <div className="luxury-empty-description">Contact information private</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Social Media with Real Data */}
+              <div className="luxury-card" style={{ '--delay': '2.1s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    📱 Social Media
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={editData.socialMedia?.instagram || ''}
+                      onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="Instagram (@username or URL)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.socialMedia?.youtube || ''}
+                      onChange={(e) => handleInputChange('socialMedia.youtube', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="YouTube (Channel URL)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.socialMedia?.tiktok || ''}
+                      onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="TikTok (@username or URL)"
+                    />
+                    <input
+                      type="text"
+                      value={editData.socialMedia?.linkedin || ''}
+                      onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
+                      className="luxury-form-input"
+                      placeholder="LinkedIn (Profile URL)"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {(currentProfile?.socialMedia && Object.values(currentProfile.socialMedia).some(val => val)) ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {currentProfile?.socialMedia?.instagram && (
+                          <a
+                            href={
+                              currentProfile.socialMedia.instagram.startsWith('http')
+                                ? currentProfile.socialMedia.instagram
+                                : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="luxury-social-link"
+                          >
+                            <Instagram className="w-4 h-4" style={{ color: '#E4405F' }} />
+                            <span>Instagram</span>
+                          </a>
+                        )}
+                        {currentProfile?.socialMedia?.youtube && (
+                          <a
+                            href={currentProfile.socialMedia.youtube}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="luxury-social-link"
+                          >
+                            <Youtube className="w-4 h-4" style={{ color: '#FF0000' }} />
+                            <span>YouTube</span>
+                          </a>
+                        )}
+                        {currentProfile?.socialMedia?.tiktok && (
+                          <a
+                            href={
+                              currentProfile.socialMedia.tiktok.startsWith('http')
+                                ? currentProfile.socialMedia.tiktok
+                                : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="luxury-social-link"
+                          >
+                            <Music className="w-4 h-4" />
+                            <span>TikTok</span>
+                          </a>
+                        )}
+                        {currentProfile?.socialMedia?.linkedin && (
+                          <a
+                            href={currentProfile.socialMedia.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="luxury-social-link"
+                          >
+                            <Globe className="w-4 h-4" style={{ color: '#0A66C2' }} />
+                            <span>LinkedIn</span>
+                          </a>
+                        )}
                       </div>
-                    )}
-                    {!currentProfile?.email && !currentProfile?.phone && !currentProfile?.portfolioWebsite && (
-                      <EmptyState
-                        icon="📞"
-                        title="No Contact Info"
-                        description="Contact information hasn't been provided yet"
-                      />
+                    ) : (
+                      <div className="luxury-empty-state">
+                        <div className="luxury-empty-icon">📱</div>
+                        <div className="luxury-empty-title">No Social Media</div>
+                        <div className="luxury-empty-description">Social media profiles not added</div>
+                      </div>
                     )}
                   </>
                 )}
               </div>
-            </Card>
-
-            {/* Social Media */}
-            <Card>
-              <h2 style={{ color: 'white', fontSize: '1.3rem', marginBottom: '15px' }}>📱 Social Media</h2>
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={editData.socialMedia?.instagram || ''}
-                    onChange={(e) => handleInputChange('socialMedia.instagram', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="📷 Instagram (@username or URL)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.socialMedia?.tiktok || ''}
-                    onChange={(e) => handleInputChange('socialMedia.tiktok', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="🎵 TikTok (@username or URL)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.socialMedia?.youtube || ''}
-                    onChange={(e) => handleInputChange('socialMedia.youtube', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="🎥 YouTube (Channel URL)"
-                  />
-                  <input
-                    type="text"
-                    value={editData.socialMedia?.linkedin || ''}
-                    onChange={(e) => handleInputChange('socialMedia.linkedin', e.target.value)}
-                    style={styles.formInput}
-                    placeholder="💼 LinkedIn (Profile URL)"
-                  />
-                </div>
-              ) : (
-                <>
-                  {(currentProfile?.socialMedia && Object.values(currentProfile.socialMedia).some(val => val)) ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {currentProfile?.socialMedia?.instagram && (
-                        <a
-                          href={
-                            currentProfile.socialMedia.instagram.startsWith('http')
-                              ? currentProfile.socialMedia.instagram
-                              : `https://instagram.com/${currentProfile.socialMedia.instagram.replace('@', '')}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#E4405F',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <span>📷</span>
-                          <span>Instagram</span>
-                        </a>
-                      )}
-                      {currentProfile?.socialMedia?.tiktok && (
-                        <a
-                          href={
-                            currentProfile.socialMedia.tiktok.startsWith('http')
-                              ? currentProfile.socialMedia.tiktok
-                              : `https://tiktok.com/@${currentProfile.socialMedia.tiktok.replace('@', '')}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#000',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <span>🎵</span>
-                          <span>TikTok</span>
-                        </a>
-                      )}
-                      {currentProfile?.socialMedia?.youtube && (
-                        <a
-                          href={currentProfile.socialMedia.youtube}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#FF0000',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <span>🎥</span>
-                          <span>YouTube</span>
-                        </a>
-                      )}
-                      {currentProfile?.socialMedia?.linkedin && (
-                        <a
-                          href={currentProfile.socialMedia.linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#0A66C2',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <span>💼</span>
-                          <span>LinkedIn</span>
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon="📱"
-                      title="No Social Media Links"
-                      description="Social media profiles haven't been added yet"
-                    />
-                  )}
-                </>
-              )}
-            </Card>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Connection Request Modal */}
-      {isConnectionModalOpen && (
-        <ConnectionRequestModal
-          isOpen={isConnectionModalOpen}
-          onClose={() => setIsConnectionModalOpen(false)}
-          profile={{
-            ...profile,
-            fullName: profile?.fullName || `${targetUser?.firstName} ${targetUser?.lastName}`,
-            professionalType: profile?.professionalType || targetUser?.professionalType
-          }}
-          onSendRequest={handleSendConnectionRequest}
-        />
-      )}
-
       {/* Photo Modal for full-size viewing */}
       {activePhotoIndex !== null && (
         <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
+          className="luxury-modal"
           onClick={() => setActivePhotoIndex(null)}
         >
-          <img 
-            src={`http://localhost:8001${ensureArray(profile.photos)[activePhotoIndex]}`}
-            alt={`Portfolio ${activePhotoIndex + 1}`}
-            style={{
-              maxWidth: '90%',
-              maxHeight: '90%',
-              objectFit: 'contain'
-            }}
-          />
-          <button
-            onClick={() => setActivePhotoIndex(null)}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
+          <div 
+            className="luxury-modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '90vw', 
+              maxHeight: '90vh', 
+              background: 'transparent',
               border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              fontSize: '20px',
-              cursor: 'pointer'
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            ×
-          </button>
+            <img 
+              src={displayPortfolio[activePhotoIndex]?.url?.startsWith('http') 
+                ? displayPortfolio[activePhotoIndex].url 
+                : `http://localhost:8001${displayPortfolio[activePhotoIndex]?.url}`}
+              alt={`Portfolio ${activePhotoIndex + 1}`}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                borderRadius: '12px'
+              }}
+            />
+            <button
+              onClick={() => setActivePhotoIndex(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '48px',
+                height: '48px',
+                fontSize: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       )}
-    </div>
+
+      {/* Video Modal for full-size viewing */}
+      {activeVideoIndex !== null && (
+        <div 
+          className="luxury-modal"
+          onClick={() => setActiveVideoIndex(null)}
+        >
+          <div 
+            className="luxury-modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '90vw', 
+              maxHeight: '90vh', 
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <video 
+              src={displayPortfolio[activeVideoIndex]?.url?.startsWith('http') 
+                ? displayPortfolio[activeVideoIndex].url 
+                : `http://localhost:8001${displayPortfolio[activeVideoIndex]?.url}`}
+              controls
+              autoPlay
+              style={{
+                maxWidth: '100%',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                borderRadius: '12px'
+              }}
+            />
+            <button
+              onClick={() => setActiveVideoIndex(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '48px',
+                height: '48px',
+                fontSize: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
 export default ModelProfile;
+
+
+
