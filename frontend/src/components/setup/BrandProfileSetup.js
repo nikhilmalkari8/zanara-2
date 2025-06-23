@@ -479,10 +479,26 @@ const BrandProfileSetup = ({
  const handleSubmit = async () => {
    setIsSubmitting(true);
    try {
-     await new Promise(r => setTimeout(r, 2000));
-     onProfileComplete?.();
+     const token = localStorage.getItem('token');
+     const response = await fetch('http://localhost:8001/api/profile/complete', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Bearer ${token}`
+       },
+       body: JSON.stringify(profileData),
+     });
+
+     const data = await response.json();
+
+     if (response.ok) {
+       onProfileComplete?.();
+     } else {
+       alert(data.message || 'Failed to save profile. Please try again.');
+     }
    } catch (e) {
      console.error('Profile submission failed:', e);
+     alert('Network error. Please try again.');
    } finally {
      setIsSubmitting(false);
    }

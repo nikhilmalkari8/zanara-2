@@ -116,8 +116,7 @@ const FormInput = React.memo(function FormInput({
      </div>
      {error && <p className="text-rose-400 text-sm mt-1 animate-pulse">{error}</p>}
    </div>
- );
-});
+ });
 
 const FormSelect = React.memo(function FormSelect({
  label,
@@ -128,35 +127,35 @@ const FormSelect = React.memo(function FormSelect({
  error,
  required,
 }) {
- return (
-   <div className="group">
-     <label className="block text-sm font-medium text-gray-300 mb-2 group-focus-within:text-accent-amber transition-colors duration-200">
-       {label} {required && <span className="text-accent-amber">*</span>}
-     </label>
-     <div className="relative">
-       <select
-         value={value || ''}
-         onChange={onChange}
-         className={`w-full px-4 py-3.5 bg-gray-800/30 border border-gray-600/30 rounded-xl text-white 
-           focus:outline-none focus:border-accent-amber/60 focus:bg-gray-800/50 focus:ring-2 focus:ring-accent-amber/20
-           transition-all duration-300 hover:border-gray-500/70 appearance-none cursor-pointer ${error ? 'border-rose-500' : ''}`}
-       >
-         <option value="" className="bg-gray-800">{placeholder}</option>
-         {options.map((option) => (
-           <option key={option.value} value={option.value} className="bg-gray-800">
-             {option.label}
-           </option>
-         ))}
-       </select>
-       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-         </svg>
-       </div>
-     </div>
-     {error && <p className="text-rose-400 text-sm mt-1 animate-pulse">{error}</p>}
-   </div>
- );
+  return (
+    <div className="group">
+      <label className="block text-sm font-medium text-gray-300 mb-2 group-focus-within:text-accent-amber transition-colors duration-200">
+        {label} {required && <span className="text-accent-amber">*</span>}
+      </label>
+      <div className="relative">
+        <select
+          value={value || ''}
+          onChange={onChange}
+          className={`w-full px-4 py-3.5 bg-gray-800/30 border border-gray-600/30 rounded-xl text-white 
+            focus:outline-none focus:border-accent-amber/60 focus:bg-gray-800/50 focus:ring-2 focus:ring-accent-amber/20
+            transition-all duration-300 hover:border-gray-500/70 appearance-none cursor-pointer ${error ? 'border-rose-500' : ''}`}
+        >
+          <option value="" className="bg-gray-800">{placeholder}</option>
+          {options.map((option) => (
+            <option key={option.value} value={option.value} className="bg-gray-800">
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+      {error && <p className="text-rose-400 text-sm mt-1 animate-pulse">{error}</p>}
+    </div>
+  );
 });
 
 const FormTextarea = React.memo(function FormTextarea({
@@ -184,8 +183,7 @@ const FormTextarea = React.memo(function FormTextarea({
      />
      {error && <p className="text-rose-400 text-sm mt-1 animate-pulse">{error}</p>}
    </div>
- );
-});
+ });
 
 const AgencyProfileSetup = ({
  user = { firstName: 'Elite', lastName: 'Agency', email: 'contact@eliteagency.com' },
@@ -576,10 +574,26 @@ const AgencyProfileSetup = ({
  const handleSubmit = async () => {
    setIsSubmitting(true);
    try {
-     await new Promise(r => setTimeout(r, 2000));
-     onProfileComplete?.();
+     const token = localStorage.getItem('token');
+     const response = await fetch('http://localhost:8001/api/profile/complete', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Bearer ${token}`
+       },
+       body: JSON.stringify(profileData),
+     });
+
+     const data = await response.json();
+
+     if (response.ok) {
+       onProfileComplete?.();
+     } else {
+       alert(data.message || 'Failed to save profile. Please try again.');
+     }
    } catch (e) {
      console.error('Profile submission failed:', e);
+     alert('Network error. Please try again.');
    } finally {
      setIsSubmitting(false);
    }
