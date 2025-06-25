@@ -171,10 +171,34 @@ const getFileUrl = (filePath) => {
   return `${baseUrl}/${filePath.replace(/\\/g, '/')}`;
 };
 
+// Video upload for portfolio videos
+const portfolioVideos = multer({
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/portfolios/');
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, 'video-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only video files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB limit for videos
+  }
+}).array('portfolioVideos', 10);
+
 module.exports = {
   uploadMiddleware,
   deleteFile,
   validateImageDimensions,
   getFileUrl,
-  ensureDirectoryExists
+  ensureDirectoryExists,
+  portfolioVideos,
 };

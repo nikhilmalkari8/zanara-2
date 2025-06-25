@@ -134,7 +134,7 @@ const FormCheckboxGroup = React.memo(function FormCheckboxGroup({
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-300">{label}</label>
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${columns} gap-3`}>
+      <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-3`}>
         {options.map((option) => {
           const isSelected = selectedValues.includes(option);
           return (
@@ -194,12 +194,20 @@ const PhotographerProfileSetup = ({
     bio: '',
     yearsExperience: '',
     educationBackground: '',
-    certifications: '',
     
     // Photography Specializations
     photographyTypes: [],
     styles: [],
     clientTypes: [],
+    
+    // NEW Enhanced Fields
+    specializations: [],
+    shootingStyles: [],
+    certifications: [],
+    education: '',
+    
+    // Enhanced experience (keep as array for setup, convert to string for storage)
+    experience: [],
     
     // Technical Skills & Equipment
     cameraEquipment: [],
@@ -213,6 +221,20 @@ const PhotographerProfileSetup = ({
     studioLocation: '',
     mobileServices: false,
     travelRadius: '',
+    
+    // Project details
+    typicalProjectDuration: '',
+    teamCollaboration: [],
+    deliverables: {
+      editedPhotos: '',
+      rawFiles: false,
+      turnaroundTime: ''
+    },
+    
+    // Enhanced booking
+    bookingLeadTime: '',
+    travelWillingness: '',
+    weekendAvailability: true,
     
     // Pricing Structure
     rates: {
@@ -368,10 +390,12 @@ const PhotographerProfileSetup = ({
     ],
     studioAccess: [
       { value: 'own-studio', label: 'I own my studio' },
-      { value: 'rent-studio', label: 'I rent studio space' },
-      { value: 'partner-studios', label: 'I have partner studios' },
-      { value: 'location-only', label: 'Location shoots only' },
-      { value: 'client-studio', label: 'I work in client studios' }
+      { value: 'rented-studio', label: 'I rent studio space' },
+      { value: 'home-studio', label: 'I have a home studio' },
+      { value: 'no-studio', label: 'No studio access' }
+      // { value: 'partner-studios', label: 'I have partner studios' },
+      // { value: 'location-only', label: 'Location shoots only' },
+      // { value: 'client-studio', label: 'I work in client studios' }
     ],
     travelRadius: [
       { value: 'local-30', label: 'Local only (30 miles)' },
@@ -383,9 +407,10 @@ const PhotographerProfileSetup = ({
     availability: [
       { value: 'full-time', label: 'Full Time' },
       { value: 'part-time', label: 'Part Time' },
-      { value: 'freelance', label: 'Freelance/Project Based' },
+      { value: 'project-based', label: 'Freelance/Project Based' },
       { value: 'weekends-only', label: 'Weekends Only' },
-      { value: 'seasonal', label: 'Seasonal' }
+      { value: 'seasonal', label: 'Seasonal' },
+      { value: 'by-appointment', label: 'By Appointment' }
     ],
     preferredProjects: [
       'Fashion Editorials', 'Commercial Campaigns', 'Portrait Sessions',
@@ -397,6 +422,45 @@ const PhotographerProfileSetup = ({
       { value: 'EUR', label: 'EUR (€)' },
       { value: 'GBP', label: 'GBP (£)' },
       { value: 'CAD', label: 'CAD ($)' }
+    ],
+    photographySpecializations: [
+      'Wedding Photography', 'Portrait Photography', 'Fashion Photography',
+      'Commercial Photography', 'Event Photography', 'Product Photography',
+      'Real Estate Photography', 'Food Photography', 'Travel Photography',
+      'Sports Photography', 'Nature Photography', 'Street Photography',
+      'Documentary Photography', 'Fine Art Photography', 'Newborn Photography',
+      'Family Photography', 'Corporate Photography', 'Headshot Photography'
+    ],
+    shootingStyles: [
+      'Natural Light', 'Studio Lighting', 'Outdoor Photography', 'Indoor Photography',
+      'Editorial Style', 'Documentary Style', 'Artistic/Creative', 'Classic/Traditional',
+      'Modern/Contemporary', 'Candid/Lifestyle', 'Posed/Formal', 'Black & White',
+      'Film Photography', 'Digital Photography', 'HDR Photography', 'Macro Photography'
+    ],
+    certifications: [
+      'Adobe Certified Expert (ACE)', 'PPA Certified Professional Photographer',
+      'CPP (Certified Professional Photographer)', 'Google Partner Certified',
+      'Canon Professional Services', 'Nikon Professional Services',
+      'Capture One Certified', 'Phase One Certified', 'Profoto Certified',
+      'Wedding Photography Certification', 'Portrait Masters Certification'
+    ],
+    teamCollaboration: [
+      'Makeup Artists', 'Hair Stylists', 'Fashion Stylists', 'Creative Directors',
+      'Art Directors', 'Wardrobe Stylists', 'Set Designers', 'Lighting Assistants',
+      'Photography Assistants', 'Models', 'Props Stylists', 'Location Scouts'
+    ],
+    projectDurations: [
+      { value: 'half-day', label: 'Half Day (2-4 hours)' },
+      { value: 'full-day', label: 'Full Day (6-8 hours)' },
+      { value: 'multi-day', label: 'Multi-Day Projects' },
+      { value: 'weekly', label: 'Weekly Projects' },
+      { value: 'flexible', label: 'Flexible Duration' }
+    ],
+    travelOptions: [
+      { value: 'local-only', label: 'Local Only (within 50 miles)' },
+      { value: 'regional', label: 'Regional (within state/region)' },
+      { value: 'national', label: 'National (anywhere in country)' },
+      { value: 'international', label: 'International' }
     ]
   }), []);
 
@@ -481,21 +545,48 @@ const PhotographerProfileSetup = ({
   const nextStep = () => navigateToStep(currentStep + 1);
   const prevStep = () => navigateToStep(currentStep - 1);
 
+  // Map UI yearsExperience to backend enum
+  const mapYearsExperienceToBackend = (value) => {
+    switch (value) {
+      case '0-1': return '0-2';
+      case '2-3': return '2-3';
+      case '4-6': return '3-5';
+      case '7-10': return '6-10';
+      case '10+': return '11-15';
+      default: return value;
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8001/api/profile/complete', {
+      // Patch yearsExperience and studioAccess before sending
+      let patchedProfileData = {
+        ...profileData,
+        yearsExperience: mapYearsExperienceToBackend(profileData.yearsExperience),
+        studioAccess: profileData.studioAccess === 'rent-studio' ? 'rented-studio' : profileData.studioAccess,
+        deliverables: {
+          ...profileData.deliverables,
+          editedPhotos: profileData.deliverables?.editedPhotos ? Number(profileData.deliverables.editedPhotos) : 0
+        },
+        rates: {
+          ...profileData.rates,
+          currency: ['USD', 'EUR', 'GBP'].includes(profileData.rates.currency) ? profileData.rates.currency : 'USD'
+        },
+        availability: ['full-time', 'part-time', 'project-based', 'seasonal', 'by-appointment'].includes(profileData.availability) ? profileData.availability : 'project-based',
+        typicalProjectDuration: ['half-day', 'full-day', 'multi-day', 'weekly', 'flexible'].includes(profileData.typicalProjectDuration) ? profileData.typicalProjectDuration : '',
+        travelWillingness: ['local-only', 'regional', 'national', 'international'].includes(profileData.travelWillingness) ? profileData.travelWillingness : 'local-only',
+      };
+      const response = await fetch('http://localhost:8001/api/professional-profile/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify(patchedProfileData),
       });
-
       const data = await response.json();
-
       if (response.ok) {
         onProfileComplete?.();
       } else {
@@ -672,6 +763,24 @@ const PhotographerProfileSetup = ({
                 error={errors.clientTypes}
                 columns={3}
               />
+
+              <FormCheckboxGroup
+                label="Photography Specializations"
+                options={options.photographySpecializations}
+                selectedValues={profileData.specializations}
+                onChange={(values) => handleInputChange('specializations', values)}
+                error={errors.specializations}
+                columns={3}
+              />
+
+              <FormCheckboxGroup
+                label="Shooting Styles"
+                options={options.shootingStyles}
+                selectedValues={profileData.shootingStyles}
+                onChange={(values) => handleInputChange('shootingStyles', values)}
+                error={errors.shootingStyles}
+                columns={3}
+              />
             </div>
           </div>
         );
@@ -729,6 +838,22 @@ const PhotographerProfileSetup = ({
                selectedValues={profileData.technicalSkills}
                onChange={(values) => handleInputChange('technicalSkills', values)}
                columns={3}
+             />
+
+             <FormCheckboxGroup
+               label="Professional Certifications"
+               options={options.certifications}
+               selectedValues={profileData.certifications || []}
+               onChange={(values) => handleInputChange('certifications', values)}
+               columns={2}
+             />
+
+             <FormTextarea
+               label="Education & Training Background"
+               value={profileData.education}
+               onChange={(e) => handleInputChange('education', e.target.value)}
+               placeholder="Photography degree, workshops, masterclasses, self-taught, etc."
+               rows={3}
              />
            </div>
          </div>
@@ -826,6 +951,100 @@ const PhotographerProfileSetup = ({
                  placeholder="How do you prefer to communicate with clients during projects..."
                  rows={4}
                />
+             </div>
+
+             <FormSelect
+               label="Typical Project Duration"
+               value={profileData.typicalProjectDuration}
+               onChange={(e) => handleInputChange('typicalProjectDuration', e.target.value)}
+               options={options.projectDurations}
+               placeholder="Select typical project length"
+             />
+
+             <FormCheckboxGroup
+               label="Team Collaboration Experience"
+               options={options.teamCollaboration}
+               selectedValues={profileData.teamCollaboration}
+               onChange={(values) => handleInputChange('teamCollaboration', values)}
+               columns={3}
+             />
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <FormInput
+                 label="Typical # of Edited Photos Delivered"
+                 type="number"
+                 value={profileData.deliverables?.editedPhotos}
+                 onChange={(e) => handleInputChange('deliverables.editedPhotos', e.target.value)}
+                 placeholder="25"
+               />
+               <FormInput
+                 label="Typical Turnaround Time"
+                 value={profileData.deliverables?.turnaroundTime}
+                 onChange={(e) => handleInputChange('deliverables.turnaroundTime', e.target.value)}
+                 placeholder="3-5 business days"
+               />
+             </div>
+
+             <div className="glass-effect rounded-xl p-6">
+               <label className="flex items-center space-x-3 cursor-pointer group">
+                 <div className="relative">
+                   <input
+                     type="checkbox"
+                     checked={profileData.deliverables?.rawFiles}
+                     onChange={(e) => handleInputChange('deliverables.rawFiles', e.target.checked)}
+                     className="sr-only"
+                   />
+                   <div className={`w-5 h-5 rounded border-2 transition-all duration-200 ${
+                     profileData.deliverables?.rawFiles ? 'bg-accent-gold border-accent-gold' : 'border-gray-500 group-hover:border-gray-400'
+                   }`}>
+                     {profileData.deliverables?.rawFiles && (
+                       <svg className="w-3 h-3 text-primary-black m-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                       </svg>
+                     )}
+                   </div>
+                 </div>
+                 <span className="text-white">I provide raw/unedited files to clients</span>
+               </label>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <FormInput
+                 label="Booking Lead Time Preference"
+                 value={profileData.bookingLeadTime}
+                 onChange={(e) => handleInputChange('bookingLeadTime', e.target.value)}
+                 placeholder="2 weeks notice preferred"
+               />
+               <FormSelect
+                 label="Travel Willingness"
+                 value={profileData.travelWillingness}
+                 onChange={(e) => handleInputChange('travelWillingness', e.target.value)}
+                 options={options.travelOptions}
+                 placeholder="Select travel preference"
+               />
+             </div>
+
+             <div className="glass-effect rounded-xl p-6">
+               <label className="flex items-center space-x-3 cursor-pointer group">
+                 <div className="relative">
+                   <input
+                     type="checkbox"
+                     checked={profileData.weekendAvailability}
+                     onChange={(e) => handleInputChange('weekendAvailability', e.target.checked)}
+                     className="sr-only"
+                   />
+                   <div className={`w-5 h-5 rounded border-2 transition-all duration-200 ${
+                     profileData.weekendAvailability ? 'bg-accent-gold border-accent-gold' : 'border-gray-500 group-hover:border-gray-400'
+                   }`}>
+                     {profileData.weekendAvailability && (
+                       <svg className="w-3 h-3 text-primary-black m-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                       </svg>
+                     )}
+                   </div>
+                 </div>
+                 <span className="text-white">Available for weekend shoots</span>
+               </label>
              </div>
            </div>
          </div>

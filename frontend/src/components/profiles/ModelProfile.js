@@ -4,6 +4,9 @@ import {
   MapPin, Calendar, Star, Award, Crown, Diamond, Zap, Globe, Instagram, Youtube, Music,
   Phone, Mail, ExternalLink, Plus, Minus, Check, Clock, DollarSign, Users, TrendingUp
 } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import Cropper from 'react-easy-crop';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConnect, onMessage }) => {
   // State management
@@ -22,6 +25,12 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   const [portfolioFilter, setPortfolioFilter] = useState('all'); // 'all', 'photos', 'videos'
   const [mounted, setMounted] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [cropModal, setCropModal] = useState({ open: false, image: null, type: null });
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  // Add state for upload progress
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Refs for animations
   const cursorRef = useRef(null);
@@ -215,7 +224,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   const handleSaveChanges = async () => {
     try {
       setUploading(true);
-      
+      setLoading(true);
       const response = await fetch(`/api/professional-profile/update`, {
         method: 'PUT',
         headers: {
@@ -224,10 +233,8 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
         },
         body: JSON.stringify(editData)
       });
-      
       if (response.ok) {
-        const updatedProfile = await response.json();
-        setProfile(updatedProfile);
+        await fetchModelProfile();
         setIsEditing(false);
         showNotification('Profile updated successfully!', 'success');
       } else {
@@ -237,6 +244,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
       showNotification(error.message || 'Failed to update profile', 'error');
     } finally {
       setUploading(false);
+      setLoading(false);
     }
   };
 
@@ -246,37 +254,49 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
 
     try {
       setUploading(true);
+      setUploadProgress(0);
       const formData = new FormData();
-      
       Array.from(files).forEach(file => {
         formData.append(mediaType === 'photo' ? 'portfolioPhotos' : 'portfolioVideos', file);
       });
 
-      const response = await fetch(`/api/professional-profile/upload-${mediaType === 'photo' ? 'photos' : 'videos'}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
+      // Use XMLHttpRequest for progress
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/professional-profile/${mediaType === 'photo' ? 'photos' : 'videos'}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            const updatedMedia = mediaType === 'photo' 
+              ? [...getPortfolioPhotos(), ...data.photos]
+              : [...getPortfolioVideos(), ...data.videos];
+            const fieldName = mediaType === 'photo' ? 'photos' : 'videos';
+            setProfile({ ...profile, [fieldName]: updatedMedia });
+            setEditData({ ...editData, [fieldName]: updatedMedia });
+            showNotification(`${files.length} ${mediaType}(s) uploaded successfully!`, 'success');
+            resolve();
+          } else {
+            showNotification(`Failed to upload ${mediaType}s`, 'error');
+            reject();
+          }
+        };
+        xhr.onerror = () => {
+          showNotification(`Failed to upload ${mediaType}s`, 'error');
+          reject();
+        };
+        xhr.send(formData);
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const updatedMedia = mediaType === 'photo' 
-          ? [...getPortfolioPhotos(), ...data.photos]
-          : [...getPortfolioVideos(), ...data.videos];
-        
-        const fieldName = mediaType === 'photo' ? 'photos' : 'videos';
-        setProfile({ ...profile, [fieldName]: updatedMedia });
-        setEditData({ ...editData, [fieldName]: updatedMedia });
-        showNotification(`${files.length} ${mediaType}(s) uploaded successfully!`, 'success');
-      } else {
-        throw new Error(`Failed to upload ${mediaType}s`);
-      }
     } catch (error) {
       showNotification(`Failed to upload ${mediaType}s`, 'error');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -396,6 +416,295 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
   // Get the current profile data (edited or original)
   const currentProfile = isEditing ? editData : profile;
   const displayPortfolio = getFilteredPortfolio();
+
+  // Add after handlePortfolioUpload
+  const handleProfilePictureUpload = async (file) => {
+    if (!file) return;
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('profilePicture', file);
+      const response = await fetch('/api/professional-profile/picture', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok && data.profilePicture) {
+        setProfile(prev => ({ ...prev, profilePicture: data.profilePicture }));
+        setEditData(prev => ({ ...prev, profilePicture: data.profilePicture }));
+        showNotification('Profile picture updated!', 'success');
+      } else {
+        showNotification(data.message || 'Failed to update profile picture', 'error');
+      }
+    } catch (error) {
+      showNotification('Failed to update profile picture', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCoverPhotoUpload = async (file) => {
+    if (!file) return;
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('coverPhoto', file);
+      const response = await fetch('/api/professional-profile/cover-photo', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok && data.coverPhoto) {
+        setProfile(prev => ({ ...prev, coverPhoto: data.coverPhoto }));
+        setEditData(prev => ({ ...prev, coverPhoto: data.coverPhoto }));
+        showNotification('Cover photo updated!', 'success');
+      } else {
+        showNotification(data.message || 'Failed to update cover photo', 'error');
+      }
+    } catch (error) {
+      showNotification('Failed to update cover photo', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Add after handlePortfolioUpload, handleProfilePictureUpload, handleCoverPhotoUpload
+  const handleRemovePortfolioItem = async (item) => {
+    if (!window.confirm('Are you sure you want to remove this media from your portfolio?')) return;
+    try {
+      setUploading(true);
+      const endpoint = item.type === 'photo' ? '/api/professional-profile/remove-photo' : '/api/professional-profile/remove-video';
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ url: item.url })
+      });
+      if (response.ok) {
+        if (item.type === 'photo') {
+          const updatedPhotos = getPortfolioPhotos().filter((url) => url !== item.url);
+          setProfile((prev) => ({ ...prev, photos: updatedPhotos }));
+          setEditData((prev) => ({ ...prev, photos: updatedPhotos }));
+        } else {
+          const updatedVideos = getPortfolioVideos().filter((url) => url !== item.url);
+          setProfile((prev) => ({ ...prev, videos: updatedVideos }));
+          setEditData((prev) => ({ ...prev, videos: updatedVideos }));
+        }
+        showNotification('Media removed from portfolio', 'success');
+      } else {
+        showNotification('Failed to remove media', 'error');
+      }
+    } catch (error) {
+      showNotification('Failed to remove media', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // In the ModelProfile component, add dropzone logic:
+  // For portfolio upload area:
+  const onDropPortfolio = (acceptedFiles) => {
+    if (portfolioFilter === 'videos') {
+      handlePortfolioUpload(acceptedFiles, 'video');
+    } else {
+      handlePortfolioUpload(acceptedFiles, 'photo');
+    }
+  };
+  const {
+    getRootProps: getPortfolioDropzoneProps,
+    getInputProps: getPortfolioInputProps,
+    isDragActive: isPortfolioDragActive
+  } = useDropzone({
+    onDrop: onDropPortfolio,
+    accept: portfolioFilter === 'videos' ? {'video/*': []} : {'image/*': []},
+    multiple: true,
+    disabled: !isEditing
+  });
+  // For profile picture:
+  const onDropProfilePic = (acceptedFiles) => {
+    if (acceptedFiles && acceptedFiles[0]) openCropModal(acceptedFiles[0], 'profile');
+  };
+  const {
+    getRootProps: getProfilePicDropzoneProps,
+    getInputProps: getProfilePicInputProps,
+    isDragActive: isProfilePicDragActive
+  } = useDropzone({
+    onDrop: onDropProfilePic,
+    accept: {'image/*': []},
+    multiple: false,
+    disabled: !isEditing
+  });
+  // For cover photo:
+  const onDropCoverPhoto = (acceptedFiles) => {
+    if (acceptedFiles && acceptedFiles[0]) openCropModal(acceptedFiles[0], 'cover');
+  };
+  const {
+    getRootProps: getCoverDropzoneProps,
+    getInputProps: getCoverInputProps,
+    isDragActive: isCoverDragActive
+  } = useDropzone({
+    onDrop: onDropCoverPhoto,
+    accept: {'image/*': []},
+    multiple: false,
+    disabled: !isEditing
+  });
+
+  // Helper to open crop modal
+  const openCropModal = (file, type) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({ open: true, image: reader.result, type });
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Helper to get cropped image as blob
+  const getCroppedImg = async (imageSrc, cropPixels) => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    canvas.width = cropPixels.width;
+    canvas.height = cropPixels.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(
+      image,
+      cropPixels.x,
+      cropPixels.y,
+      cropPixels.width,
+      cropPixels.height,
+      0,
+      0,
+      cropPixels.width,
+      cropPixels.height
+    );
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, 'image/jpeg');
+    });
+  };
+
+  function createImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.addEventListener('load', () => resolve(img));
+      img.addEventListener('error', (error) => reject(error));
+      img.setAttribute('crossOrigin', 'anonymous');
+      img.src = url;
+    });
+  }
+
+  // On crop complete
+  const onCropComplete = (_, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  // On confirm crop
+  const handleCropConfirm = async () => {
+    if (!cropModal.image || !croppedAreaPixels) return;
+    const blob = await getCroppedImg(cropModal.image, croppedAreaPixels);
+    const file = new File([blob], `${cropModal.type}-cropped.jpg`, { type: 'image/jpeg' });
+    if (cropModal.type === 'profile') {
+      handleProfilePictureUpload(file);
+    } else if (cropModal.type === 'cover') {
+      handleCoverPhotoUpload(file);
+    }
+    setCropModal({ open: false, image: null, type: null });
+  };
+
+  // Helper to calculate profile completion
+  const getProfileCompletion = (profile) => {
+    const requiredFields = [
+      { key: 'profilePicture', label: 'Profile Photo' },
+      { key: 'coverPhoto', label: 'Cover Photo' },
+      { key: 'fullName', label: 'Full Name' },
+      { key: 'headline', label: 'Headline' },
+      { key: 'bio', label: 'About/Bio' },
+      { key: 'height', label: 'Height' },
+      { key: 'bust', label: 'Bust/Chest' },
+      { key: 'waist', label: 'Waist' },
+      { key: 'hips', label: 'Hips' },
+      { key: 'experience', label: 'Experience' },
+      { key: 'photos', label: 'Portfolio Photo' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' },
+    ];
+    let filled = 0;
+    let missing = [];
+    requiredFields.forEach(field => {
+      if (Array.isArray(profile?.[field.key])) {
+        if (profile[field.key].length > 0) filled++;
+        else missing.push(field.label);
+      } else if (typeof profile?.[field.key] === 'string') {
+        if (profile[field.key]?.trim()) filled++;
+        else missing.push(field.label);
+      } else if (profile?.[field.key]) {
+        filled++;
+      } else {
+        missing.push(field.label);
+      }
+    });
+    const percent = Math.round((filled / requiredFields.length) * 100);
+    return { percent, missing };
+  };
+
+  // Add handler for reorder
+  const handlePortfolioReorder = async (result) => {
+    if (!result.destination) return;
+    const items = Array.from(displayPortfolio);
+    const [reordered] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reordered);
+
+    // Update UI immediately
+    if (portfolioFilter === 'photos') {
+      const newPhotos = items.filter(i => i.type === 'photo').map(i => i.url);
+      setProfile(prev => ({ ...prev, photos: newPhotos }));
+      setEditData(prev => ({ ...prev, photos: newPhotos }));
+    } else if (portfolioFilter === 'videos') {
+      const newVideos = items.filter(i => i.type === 'video').map(i => i.url);
+      setProfile(prev => ({ ...prev, videos: newVideos }));
+      setEditData(prev => ({ ...prev, videos: newVideos }));
+    } else {
+      const newPhotos = items.filter(i => i.type === 'photo').map(i => i.url);
+      const newVideos = items.filter(i => i.type === 'video').map(i => i.url);
+      setProfile(prev => ({ ...prev, photos: newPhotos, videos: newVideos }));
+      setEditData(prev => ({ ...prev, photos: newPhotos, videos: newVideos }));
+    }
+
+    // Persist to backend
+    try {
+      setUploading(true);
+      const response = await fetch('/api/professional-profile/reorder-portfolio', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          photos: items.filter(i => i.type === 'photo').map(i => i.url),
+          videos: items.filter(i => i.type === 'video').map(i => i.url)
+        })
+      });
+      if (response.ok) {
+        showNotification('Portfolio order updated!', 'success');
+      } else {
+        showNotification('Failed to save new order', 'error');
+      }
+    } catch (e) {
+      showNotification('Failed to save new order', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1387,7 +1696,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       type="file"
                       id="coverPhoto"
                       accept="image/*"
-                      onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
+                      onChange={(e) => handleCoverPhotoUpload(e.target.files[0])}
                       style={{ display: 'none' }}
                       disabled={uploading}
                     />
@@ -1439,7 +1748,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       type="file"
                       id="profilePicture"
                       accept="image/*"
-                      onChange={(e) => handlePortfolioUpload([e.target.files[0]])}
+                      onChange={(e) => handleProfilePictureUpload(e.target.files[0])}
                       style={{ display: 'none' }}
                       disabled={uploading}
                     />
@@ -1687,16 +1996,131 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                 </div>
 
                 {displayPortfolio && displayPortfolio.length > 0 ? (
-                  <>
+                  isEditing ? (
+                    <DragDropContext onDragEnd={handlePortfolioReorder}>
+                      <Droppable droppableId="portfolio-grid" direction="horizontal">
+                        {(provided) => (
+                          <div className="luxury-portfolio-grid" ref={provided.innerRef} {...provided.droppableProps}>
+                            {displayPortfolio.map((item, index) => (
+                              <Draggable key={item.id} draggableId={item.id} index={index}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="luxury-portfolio-item"
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      boxShadow: snapshot.isDragging ? '0 8px 30px #d4af37' : undefined,
+                                      border: snapshot.isDragging ? '2px solid #d4af37' : undefined
+                                    }}
+                                    onClick={() => {
+                                      if (item.type === 'photo') setActivePhotoIndex(index);
+                                      else setActiveVideoIndex(index);
+                                    }}
+                                  >
+                                    {item.type === 'photo' ? (
+                                      <img 
+                                        src={item.url.startsWith('http') ? item.url : `http://localhost:8001${item.url}`}
+                                        alt={`Portfolio ${index + 1}`} 
+                                      />
+                                    ) : (
+                                      <div style={{ position: 'relative' }}>
+                                        <video 
+                                          src={item.url.startsWith('http') ? item.url : `http://localhost:8001${item.url}`}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          muted
+                                        />
+                                        <div style={{
+                                          position: 'absolute',
+                                          inset: 0,
+                                          background: 'rgba(0, 0, 0, 0.3)',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}>
+                                          <div style={{
+                                            width: '60px',
+                                            height: '60px',
+                                            background: 'rgba(212, 175, 55, 0.9)',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#000'
+                                          }}>
+                                            ▶
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="luxury-portfolio-overlay">
+                                      <div style={{ color: 'white', fontSize: '0.8rem' }}>
+                                        {item.type === 'photo' ? 'View Photo' : 'Play Video'}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Media Type Badge */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '8px',
+                                      left: '8px',
+                                      background: item.type === 'photo' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)',
+                                      color: 'white',
+                                      padding: '4px 8px',
+                                      borderRadius: '12px',
+                                      fontSize: '0.7rem',
+                                      fontWeight: '500'
+                                    }}>
+                                      {item.type === 'photo' ? 'PHOTO' : 'VIDEO'}
+                                    </div>
+                                    
+                                    {isEditing && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemovePortfolioItem(item);
+                                        }}
+                                        style={{
+                                          position: 'absolute',
+                                          top: '8px',
+                                          right: '8px',
+                                          background: 'rgba(239, 68, 68, 0.8)',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '28px',
+                                          height: '28px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
+                  ) : (
                     <div className="luxury-portfolio-grid">
                       {displayPortfolio.map((item, index) => (
-                        <div key={item.id} className="luxury-portfolio-item" onClick={() => {
-                          if (item.type === 'photo') {
-                            setActivePhotoIndex(index);
-                          } else {
-                            setActiveVideoIndex(index);
-                          }
-                        }}>
+                        <div
+                          key={item.id}
+                          className="luxury-portfolio-item"
+                          onClick={() => {
+                            if (item.type === 'photo') setActivePhotoIndex(index);
+                            else setActiveVideoIndex(index);
+                          }}
+                        >
                           {item.type === 'photo' ? (
                             <img 
                               src={item.url.startsWith('http') ? item.url : `http://localhost:8001${item.url}`}
@@ -1732,13 +2156,11 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                               </div>
                             </div>
                           )}
-                          
                           <div className="luxury-portfolio-overlay">
                             <div style={{ color: 'white', fontSize: '0.8rem' }}>
                               {item.type === 'photo' ? 'View Photo' : 'Play Video'}
                             </div>
                           </div>
-                          
                           {/* Media Type Badge */}
                           <div style={{
                             position: 'absolute',
@@ -1753,12 +2175,11 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                           }}>
                             {item.type === 'photo' ? 'PHOTO' : 'VIDEO'}
                           </div>
-                          
                           {isEditing && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Handle remove media
+                                handleRemovePortfolioItem(item);
                               }}
                               style={{
                                 position: 'absolute',
@@ -1782,29 +2203,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                         </div>
                       ))}
                     </div>
-                    
-                    {(getPortfolioPhotos().length + getPortfolioVideos().length > 12) && !showAllPhotos && (
-                      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                        <button 
-                          className="luxury-button luxury-button-secondary"
-                          onClick={() => setShowAllPhotos(true)}
-                        >
-                          Show All Media ({getPortfolioPhotos().length + getPortfolioVideos().length})
-                        </button>
-                      </div>
-                    )}
-                    
-                    {showAllPhotos && (getPortfolioPhotos().length + getPortfolioVideos().length > 12) && (
-                      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                        <button 
-                          className="luxury-button luxury-button-secondary"
-                          onClick={() => setShowAllPhotos(false)}
-                        >
-                          Show Less
-                        </button>
-                      </div>
-                    )}
-                  </>
+                  )
                 ) : (
                   <div className="luxury-empty-state">
                     <div className="luxury-empty-icon">📸</div>
@@ -2001,52 +2400,124 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                     <input
                       type="text"
                       value={editData.height || ''}
-                      onChange={(e) => handleInputChange('height', e.target.value)}
+                      onChange={(e) => handleInputChange('height', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Height (e.g., 173cm or 5'8&quot;)"
+                      placeholder="Height"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.heightUnit || 'cm'}
+                      onChange={e => handleInputChange('heightUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="cm">cm</option>
+                      <option value="in">inches</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.weight || ''}
-                      onChange={(e) => handleInputChange('weight', e.target.value)}
+                      onChange={(e) => handleInputChange('weight', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Weight (optional)"
+                      placeholder="Weight"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.weightUnit || 'kg'}
+                      onChange={e => handleInputChange('weightUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="kg">kg</option>
+                      <option value="lbs">lbs</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.bust || ''}
-                      onChange={(e) => handleInputChange('bust', e.target.value)}
+                      onChange={(e) => handleInputChange('bust', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Bust/Chest measurement"
+                      placeholder="Bust/Chest"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.bustUnit || 'cm'}
+                      onChange={e => handleInputChange('bustUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="cm">cm</option>
+                      <option value="in">inches</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.waist || ''}
-                      onChange={(e) => handleInputChange('waist', e.target.value)}
+                      onChange={(e) => handleInputChange('waist', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Waist measurement"
+                      placeholder="Waist"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.waistUnit || 'cm'}
+                      onChange={e => handleInputChange('waistUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="cm">cm</option>
+                      <option value="in">inches</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.hips || ''}
-                      onChange={(e) => handleInputChange('hips', e.target.value)}
+                      onChange={(e) => handleInputChange('hips', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Hip measurement"
+                      placeholder="Hips"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.hipsUnit || 'cm'}
+                      onChange={e => handleInputChange('hipsUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="cm">cm</option>
+                      <option value="in">inches</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.shoeSize || ''}
-                      onChange={(e) => handleInputChange('shoeSize', e.target.value)}
+                      onChange={(e) => handleInputChange('shoeSize', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Shoe size"
+                      placeholder="Shoe Size"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.shoeSizeUnit || 'EU'}
+                      onChange={e => handleInputChange('shoeSizeUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="EU">EU</option>
+                      <option value="US">US</option>
+                      <option value="UK">UK</option>
+                    </select>
                     <input
                       type="text"
                       value={editData.dressSize || ''}
-                      onChange={(e) => handleInputChange('dressSize', e.target.value)}
+                      onChange={(e) => handleInputChange('dressSize', e.target.value.replace(/[^0-9.]/g, ''))}
                       className="luxury-form-input"
-                      placeholder="Dress size"
+                      placeholder="Dress Size"
+                      style={{ width: '60%', display: 'inline-block', marginRight: '8px' }}
                     />
+                    <select
+                      value={editData.dressSizeUnit || 'EU'}
+                      onChange={e => handleInputChange('dressSizeUnit', e.target.value)}
+                      className="luxury-form-input"
+                      style={{ width: '35%', display: 'inline-block' }}
+                    >
+                      <option value="EU">EU</option>
+                      <option value="US">US</option>
+                      <option value="UK">UK</option>
+                    </select>
                   </div>
                 ) : (
                   <>
@@ -2115,6 +2586,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                 </div>
                 {isEditing ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <label style={{ color: '#ccc', marginBottom: '2px' }}>Eye Color</label>
                     <input
                       type="text"
                       value={editData.eyeColor || ''}
@@ -2122,6 +2594,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       className="luxury-form-input"
                       placeholder="Eye Color"
                     />
+                    <label style={{ color: '#ccc', marginBottom: '2px' }}>Hair Color</label>
                     <input
                       type="text"
                       value={editData.hairColor || ''}
@@ -2129,6 +2602,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       className="luxury-form-input"
                       placeholder="Hair Color"
                     />
+                    <label style={{ color: '#ccc', marginBottom: '2px' }}>Skin Tone</label>
                     <input
                       type="text"
                       value={editData.skinTone || ''}
@@ -2136,6 +2610,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       className="luxury-form-input"
                       placeholder="Skin Tone"
                     />
+                    <label style={{ color: '#ccc', marginBottom: '2px' }}>Nationality/Ethnicity</label>
                     <input
                       type="text"
                       value={editData.nationality || ''}
@@ -2143,6 +2618,7 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                       className="luxury-form-input"
                       placeholder="Nationality/Ethnicity"
                     />
+                    <label style={{ color: '#ccc', marginBottom: '2px' }}>Body Type</label>
                     <input
                       type="text"
                       value={editData.bodyType || ''}
@@ -2566,6 +3042,49 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
                   </>
                 )}
               </div>
+
+              {/* Looking For */}
+              <div className="luxury-card" style={{ '--delay': '1.55s' }}>
+                <div className="luxury-card-header">
+                  <h2 className="luxury-card-title">
+                    <Check className="w-5 h-5" />
+                    Looking For
+                  </h2>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {['Full Time', 'Part Time', 'Freelance', 'Collaboration', 'Commercial', 'Runway', 'Editorial'].map(option => (
+                      <label key={option} style={{ color: 'white', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={Array.isArray(editData.lookingFor) && editData.lookingFor.includes(option)}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setEditData(prev => {
+                              const arr = Array.isArray(prev.lookingFor) ? [...prev.lookingFor] : [];
+                              if (checked && !arr.includes(option)) arr.push(option);
+                              if (!checked && arr.includes(option)) arr.splice(arr.indexOf(option), 1);
+                              return { ...prev, lookingFor: arr };
+                            });
+                          }}
+                        />
+                        {option}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {(currentProfile?.lookingFor && currentProfile.lookingFor.length > 0
+                      ? currentProfile.lookingFor
+                      : ['Full Time']).map((option, idx) => (
+                      <div key={idx} className="luxury-badge">
+                        <Check className="w-3 h-3" />
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2683,6 +3202,66 @@ const ModelProfile = ({ profileId, user, targetUser, profileData, onBack, onConn
               <X className="w-6 h-6" />
             </button>
           </div>
+        </div>
+      )}
+
+      {cropModal.open && (
+        <div className="luxury-modal" style={{ zIndex: 2000 }}>
+          <div className="luxury-modal-content" style={{ maxWidth: 500, width: '90vw', padding: 0, background: '#111' }}>
+            <div style={{ position: 'relative', width: '100%', height: 350, background: '#222', borderRadius: 12, overflow: 'hidden' }}>
+              <Cropper
+                image={cropModal.image}
+                crop={crop}
+                zoom={zoom}
+                aspect={cropModal.type === 'cover' ? 3.5 : 1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.01}
+                value={zoom}
+                onChange={e => setZoom(Number(e.target.value))}
+                style={{ width: '60%' }}
+              />
+              <button className="luxury-button luxury-button-secondary" onClick={() => setCropModal({ open: false, image: null, type: null })}>
+                Cancel
+              </button>
+              <button className="luxury-button luxury-button-primary" onClick={handleCropConfirm}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Completion Indicator */}
+      <div className="luxury-card" style={{ margin: '2rem auto 1rem', maxWidth: 600, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: 8 }}>
+          <span style={{ fontWeight: 500, color: '#d4af37', fontSize: '1.1rem' }}>Profile Completion</span>
+          <span style={{ color: getProfileCompletion(currentProfile || {}).percent === 100 ? '#22c55e' : '#fff', fontWeight: 600 }}>{getProfileCompletion(currentProfile || {}).percent}%</span>
+        </div>
+        <div style={{ width: '100%', height: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ width: `${getProfileCompletion(currentProfile || {}).percent}%`, height: '100%', background: getProfileCompletion(currentProfile || {}).percent === 100 ? 'linear-gradient(90deg,#22c55e,#d4af37)' : 'linear-gradient(90deg,#d4af37,#f7d794)', borderRadius: 8, transition: 'width 0.4s' }} />
+        </div>
+        {getProfileCompletion(currentProfile || {}).percent < 100 && (
+          <div style={{ color: '#fff', fontSize: '0.95rem', marginTop: 4 }}>
+            <span style={{ color: '#f87171', fontWeight: 500 }}>Missing:</span> {getProfileCompletion(currentProfile || {}).missing.join(', ')}
+          </div>
+        )}
+      </div>
+
+      {uploading && uploadProgress > 0 && uploadProgress < 100 && (
+        <div style={{ width: '100%', maxWidth: 400, margin: '1rem auto' }}>
+          <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ width: `${uploadProgress}%`, height: '100%', background: 'linear-gradient(90deg,#d4af37,#f7d794)', borderRadius: 8, transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ color: '#d4af37', fontSize: '0.95rem', marginTop: 4, textAlign: 'center' }}>{uploadProgress}%</div>
         </div>
       )}
     </>

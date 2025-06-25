@@ -60,6 +60,17 @@ const modelProfileSchema = new mongoose.Schema({
   },
   agencies: { type: String, trim: true },
   unionMembership: { type: String, trim: true },
+
+  // Experience (array of objects)
+  experience: [
+    {
+      role: { type: String, trim: true },
+      company: { type: String, trim: true },
+      duration: { type: String, trim: true },
+      description: { type: String, trim: true },
+      current: { type: Boolean, default: false }
+    }
+  ],
   
   // Portfolio & Media
   portfolioWebsite: { type: String, trim: true },

@@ -167,7 +167,7 @@ const Home = ({ setCurrentPage }) => {
         </div>
       </div>
     </div>
-  );;
+  );
 };
 
 export default Home;

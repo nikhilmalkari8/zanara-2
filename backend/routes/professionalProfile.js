@@ -12,7 +12,7 @@ const StylistProfile = require('../models/StylistProfile');
 const Connection = require('../models/Connection');
 const ActivityService = require('../services/activityService');
 const auth = require('../middleware/auth');
-const { uploadMiddleware } = require('../middleware/upload');
+const { uploadMiddleware, portfolioVideos } = require('../middleware/upload');
 const router = express.Router();
 
 // Professional type to model mapping
@@ -262,6 +262,12 @@ router.post('/complete', auth, async (req, res) => {
     const userId = req.userId;
     const profileData = req.body;
 
+    // Add logging for debugging
+    console.log('--- Profile Completion Debug ---');
+    console.log('User ID:', userId);
+    console.log('User professionalType:', (await User.findById(userId)).professionalType);
+    console.log('Profile data received:', JSON.stringify(profileData, null, 2));
+
     // Get user to determine professional type
     const user = await User.findById(userId);
     if (!user) {
@@ -270,6 +276,30 @@ router.post('/complete', auth, async (req, res) => {
 
     console.log('Creating profile for professional type:', user.professionalType);
     console.log('Profile data received:', JSON.stringify(profileData, null, 2));
+
+    // Defensive: Check for mismatched fields
+    if (user.professionalType === 'photographer') {
+      const modelFields = ['modelType', 'experienceLevel', 'height', 'weight', 'gender', 'dateOfBirth'];
+      for (const field of modelFields) {
+        if (profileData[field] !== undefined) {
+          return res.status(400).json({
+            success: false,
+            message: `Field '${field}' is not allowed for photographers. Please use a photographer account and form.`
+          });
+        }
+      }
+    }
+    if (user.professionalType === 'model') {
+      const photographerFields = ['photographyTypes', 'cameraEquipment', 'lensCollection', 'lightingEquipment', 'editingSoftware', 'technicalSkills', 'specializations', 'shootingStyles', 'teamCollaboration', 'deliverables', 'portfolioWebsite'];
+      for (const field of photographerFields) {
+        if (profileData[field] !== undefined) {
+          return res.status(400).json({
+            success: false,
+            message: `Field '${field}' is not allowed for models. Please use a model account and form.`
+          });
+        }
+      }
+    }
 
     // Add default values and validation based on professional type
     switch (user.professionalType) {
@@ -612,6 +642,27 @@ router.put('/picture', auth, uploadMiddleware.profilePicture, async (req, res) =
   }
 });
 
+// PUT /cover-photo - Upload cover photo
+router.put('/cover-photo', auth, uploadMiddleware.coverPhoto, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No cover photo provided' });
+    }
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const ProfileModel = getProfileModel(user.professionalType);
+    const coverPhotoUrl = `/uploads/profiles/${req.file.filename}`;
+    const profile = await ProfileModel.findOneAndUpdate(
+      { userId: req.userId },
+      { coverPhoto: coverPhotoUrl, updatedAt: new Date() },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, message: 'Cover photo updated successfully', coverPhoto: profile.coverPhoto });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error updating cover photo', error: error.message });
+  }
+});
+
 // Add portfolio photos - Universal endpoint
 router.post('/photos', auth, uploadMiddleware.portfolioPhotos, async (req, res) => {
   try {
@@ -672,6 +723,71 @@ router.post('/photos', auth, uploadMiddleware.portfolioPhotos, async (req, res) 
     res.status(500).json({
       success: false,
       message: 'Server error uploading photos',
+      error: error.message
+    });
+  }
+});
+
+// Add portfolio videos - Universal endpoint
+router.post('/videos', auth, portfolioVideos, async (req, res) => {
+  try {
+    console.log('Portfolio videos upload request received');
+    console.log('Files:', req.files);
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No videos provided'
+      });
+    }
+
+    // Get user to determine professional type
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get the appropriate model for this professional type
+    const ProfileModel = getProfileModel(user.professionalType);
+    const profile = await ProfileModel.findOne({ userId: req.userId });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+
+    // Check total video limit
+    const currentVideoCount = profile.videos ? profile.videos.length : 0;
+    if (currentVideoCount + req.files.length > 10) {
+      return res.status(400).json({
+        success: false,
+        message: `Video limit exceeded. You can upload ${10 - currentVideoCount} more videos.`
+      });
+    }
+
+    const newVideos = req.files.map(file => `/uploads/portfolios/${file.filename}`);
+    console.log('New videos:', newVideos);
+
+    // Add new videos to existing array
+    profile.videos = [...(profile.videos || []), ...newVideos];
+    await profile.save();
+
+    console.log('Portfolio updated with videos. Total videos:', profile.videos.length);
+
+    res.json({
+      success: true,
+      message: 'Videos uploaded successfully',
+      videos: newVideos,
+      totalVideos: profile.videos.length
+    });
+
+  } catch (error) {
+    console.error('Error uploading videos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error uploading videos',
       error: error.message
     });
   }

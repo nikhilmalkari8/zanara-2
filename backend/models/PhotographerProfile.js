@@ -125,6 +125,49 @@ const photographerProfileSchema = new mongoose.Schema({
   exhibitions: { type: String, trim: true },
   notableClients: { type: String, trim: true },
 
+  // --- Advanced Professional Fields (added) ---
+  // Professional Experience (CRITICAL MISSING)
+  experience: [{
+    role: { type: String, trim: true },        // "Lead Photographer"
+    company: { type: String, trim: true },     // "Vogue Magazine" 
+    duration: { type: String, trim: true },    // "2020-2023"
+    description: { type: String, trim: true }, // Project details
+    current: { type: Boolean, default: false }
+  }],
+
+  // Video Portfolio Support
+  videos: [{ type: String, trim: true }], // For behind-the-scenes, showreels
+
+  // Specialized Photography Fields
+  specializations: [{ type: String, trim: true }], // "Wedding", "Fashion", "Portrait", "Commercial"
+  shootingStyles: [{ type: String, trim: true }],  // "Natural Light", "Studio", "Outdoor", "Editorial"
+
+  // Professional Credentials (Enhanced)
+  certifications: [{ type: String, trim: true }], // "Adobe Certified Expert", "PPA Certified"
+  education: { type: String, trim: true },        // Photography degree/training
+
+  // Project & Collaboration Details
+  typicalProjectDuration: { 
+    type: String, 
+    enum: ['half-day', 'full-day', 'multi-day', 'weekly', 'flexible'],
+    trim: true 
+  },
+  teamCollaboration: [{ type: String, trim: true }], // "Works with makeup artists", "Styling teams"
+  deliverables: {
+    editedPhotos: { type: Number, min: 0 },    // How many edited photos included
+    rawFiles: { type: Boolean, default: false }, // Provides raw files?
+    turnaroundTime: { type: String, trim: true }  // "3-5 business days"
+  },
+
+  // Booking & Availability (Enhanced)
+  bookingLeadTime: { type: String, trim: true },     // "2 weeks notice preferred"
+  travelWillingness: { 
+    type: String, 
+    enum: ['local-only', 'regional', 'national', 'international'],
+    default: 'local-only'
+  },
+  weekendAvailability: { type: Boolean, default: true },
+
   // Profile Assets
   photos: [{ type: String, trim: true }],
   profilePicture: { type: String, trim: true },

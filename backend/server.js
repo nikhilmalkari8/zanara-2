@@ -48,6 +48,8 @@ const activityRoutes = require('./routes/activity');
 const notificationRoutes = require('./routes/notifications');
 const contentRoutes = require('./routes/content');
 const professionalProfileRoutes = require('./routes/professionalProfile');
+const bookingRoutes = require('./routes/bookings');
+const availabilityRoutes = require('./routes/availability');
 
 // Route middleware
 app.use('/api/auth', authRoutes);
@@ -61,6 +63,8 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/professional-profile', professionalProfileRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/availability', availabilityRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

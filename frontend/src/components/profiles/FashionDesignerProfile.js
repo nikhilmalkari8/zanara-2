@@ -30,7 +30,7 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
     user.id === profileId
   );
 
-  // Fetch profile data
+  // Fetch profile dataI c
   useEffect(() => {
     fetchDesignerProfile();
     if (!isOwnProfile && profileId) {
@@ -80,17 +80,23 @@ const FashionDesignerProfile = ({ profileId, user, targetUser, onBack, onConnect
 
   // Handle portfolio upload
   const handlePortfolioUpload = async (files) => {
-    if (files.length === 0) return;
-
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('portfolioPhotos', file));
     try {
-      setUploading(true);
-      const data = await profileService.uploadPortfolioPhotos(files);
-      const updatedPhotos = [...(profile.photos || []), ...data.photos];
-      setProfile({ ...profile, photos: updatedPhotos });
-      setEditData({ ...editData, photos: updatedPhotos });
-      showNotification(`${files.length} designs uploaded successfully!`, 'success');
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8001/api/professional-profile/photos', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // update state with new photos
+      }
     } catch (error) {
-      showNotification('Failed to upload designs', 'error');
+      // handle error
     } finally {
       setUploading(false);
     }
