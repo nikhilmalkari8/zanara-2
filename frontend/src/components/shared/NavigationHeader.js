@@ -84,6 +84,16 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       color: '#F44336',
       hasNotification: unreadCount > 0
     },
+    {
+      key: 'messages',
+      label: '💬 Messages',
+      color: '#00BCD4'
+    },
+    {
+      key: 'subscription-plans',
+      label: '⭐ Upgrade',
+      color: '#FFD700'
+    },
     // Show both opportunities and browse talent for all users
     {
       key: 'opportunities',

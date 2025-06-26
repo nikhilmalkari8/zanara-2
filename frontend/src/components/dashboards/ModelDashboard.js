@@ -83,32 +83,80 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
       try {
         await new Promise(resolve => setTimeout(resolve, 1200));
         
+        // Fetch real analytics data
+        const token = localStorage.getItem('token');
+        
+        // Fetch analytics data
+        const analyticsResponse = await fetch('/api/analytics/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        let analyticsData = {};
+        if (analyticsResponse.ok) {
+          const result = await analyticsResponse.json();
+          analyticsData = result.data || {};
+        } else {
+          console.warn('Could not fetch analytics data, using defaults');
+        }
+        
+        // Fetch user profile data
+        const profileResponse = await fetch('/api/profile/my-complete', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        let profileData = {};
+        if (profileResponse.ok) {
+          profileData = await profileResponse.json();
+        }
+        
         setProfile({
           userId: user,
-          profilePicture: '/api/placeholder/150/150',
-          headline: 'Professional Model & Creative Visionary',
-          location: 'New York, NY',
+          profilePicture: profileData.profilePicture || '/api/placeholder/150/150',
+          headline: profileData.headline || 'Professional Model & Creative',
+          location: profileData.location || 'New York, NY',
           tier: 'Professional',
-          verified: true,
-          socialMedia: {
+          verified: profileData.verified || true,
+          socialMedia: profileData.socialMedia || {
             instagram: '@model_pro',
             youtube: 'Creative Channel'
           }
         });
         
+        // Use real analytics data with fallbacks
         setStats({
-          profileViews: 28470,
-          applications: 45,
-          bookings: 23,
-          portfolioPhotos: 89,
-          connections: 1560,
-          earnings: 185000,
-          completionRate: 95,
-          avgRating: 4.8,
-          responseRate: 98,
-          monthlyGrowth: 24,
-          brandScore: 92
+          profileViews: analyticsData.profileViews || 0,
+          applications: analyticsData.applications || 0,
+          bookings: analyticsData.bookings || 0,
+          portfolioPhotos: analyticsData.portfolioPhotos || 0,
+          connections: analyticsData.connections || 0,
+          earnings: analyticsData.earnings || 0,
+          completionRate: analyticsData.completionRate || 95,
+          avgRating: analyticsData.avgRating || 4.8,
+          responseRate: analyticsData.responseRate || 98,
+          monthlyGrowth: analyticsData.monthlyGrowth || 0,
+          brandScore: analyticsData.brandScore || 85
         });
+        
+        // Update portfolio count in analytics (fire and forget)
+        if (profileData.photos && profileData.photos.length > 0) {
+          fetch('/api/analytics/portfolio-update', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              photoCount: profileData.photos.length,
+              videoCount: 0
+            })
+          }).catch(err => console.log('Analytics update failed:', err));
+        }
         
         setRecentActivity([
           { id: 1, type: 'booking', title: 'Fashion Campaign Confirmed', client: 'Studio Brand', time: '2 hours ago', status: 'confirmed', value: '$8,500' },
@@ -168,6 +216,20 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
         ]);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Set fallback data on error
+        setStats({
+          profileViews: 0,
+          applications: 0,
+          bookings: 0,
+          portfolioPhotos: 0,
+          connections: 0,
+          earnings: 0,
+          completionRate: 95,
+          avgRating: 4.8,
+          responseRate: 98,
+          monthlyGrowth: 0,
+          brandScore: 85
+        });
       } finally {
         setIsLoading(false);
       }

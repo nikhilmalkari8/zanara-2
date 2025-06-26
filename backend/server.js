@@ -2,6 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const socketIo = require('socket.io');
+const fs = require('fs');
 
 // Load environment variables
 require('dotenv').config();
@@ -17,21 +20,59 @@ if (!process.env.MONGODB_URI) {
   process.env.MONGODB_URI = 'mongodb://localhost:27017/zanara';
 }
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.log('⚠️  STRIPE_SECRET_KEY not found - payments will not work');
+}
+
 // Confirm environment is properly set
 console.log('🔧 Environment Status:');
 console.log('   JWT_SECRET:', !!process.env.JWT_SECRET ? '✅ Set' : '❌ Missing');
 console.log('   MONGODB_URI:', !!process.env.MONGODB_URI ? '✅ Set' : '❌ Missing');
+console.log('   STRIPE_SECRET_KEY:', !!process.env.STRIPE_SECRET_KEY ? '✅ Set' : '❌ Missing');
 console.log('   PORT:', process.env.PORT || '8001 (default)');
 
 const app = express();
+const server = http.createServer(app);
+
+// Socket.IO setup
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Make io available to routes
+app.set('io', io);
 
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Special middleware for Stripe webhooks (must be before express.json())
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Ensure upload directories exist
+const uploadDirs = [
+  'uploads',
+  'uploads/profiles',
+  'uploads/portfolios',
+  'uploads/messages',
+  'uploads/companies'
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`📁 Created directory: ${dir}`);
+  }
+});
 
 // Static file serving for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -50,6 +91,9 @@ const contentRoutes = require('./routes/content');
 const professionalProfileRoutes = require('./routes/professionalProfile');
 const bookingRoutes = require('./routes/bookings');
 const availabilityRoutes = require('./routes/availability');
+const paymentsRoutes = require('./routes/payments');
+const messagesRoutes = require('./routes/messages');
+const analyticsRoutes = require('./routes/analytics');
 
 // Route middleware
 app.use('/api/auth', authRoutes);
@@ -65,6 +109,9 @@ app.use('/api/content', contentRoutes);
 app.use('/api/professional-profile', professionalProfileRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/availability', availabilityRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -75,7 +122,9 @@ app.get('/api/health', (req, res) => {
     environment: {
       nodeEnv: process.env.NODE_ENV || 'development',
       jwtConfigured: !!process.env.JWT_SECRET,
-      databaseConfigured: !!process.env.MONGODB_URI
+      databaseConfigured: !!process.env.MONGODB_URI,
+      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+      socketIOEnabled: true
     }
   });
 });
@@ -122,18 +171,39 @@ mongoose.connection.on('disconnected', () => {
   console.warn('MongoDB disconnected');
 });
 
+// Initialize Socket.IO service
+const SocketService = require('./services/socketService');
+let socketService;
+
+mongoose.connection.once('open', () => {
+  console.log('🔌 Initializing Socket.IO service...');
+  socketService = new SocketService(io);
+  console.log('✅ Socket.IO service initialized');
+});
+
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  
+  // Close Socket.IO connections
+  if (socketService) {
+    console.log('🔌 Closing Socket.IO connections...');
+    io.close();
+  }
+  
+  // Close MongoDB connection
   await mongoose.connection.close();
+  console.log('✅ Graceful shutdown complete');
   process.exit(0);
 });
 
 const PORT = process.env.PORT || 8001;
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Zanara API Server running on port ${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 Socket.IO enabled`);
+  console.log(`💳 Stripe payments: ${!!process.env.STRIPE_SECRET_KEY ? 'Enabled' : 'Disabled'}`);
 });
 
 // Handle server errors
@@ -146,4 +216,4 @@ server.on('error', (error) => {
   }
 });
 
-module.exports = app;
+module.exports = { app, server, io };

@@ -83,77 +83,125 @@ const PhotographerDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProf
       try {
         await new Promise(resolve => setTimeout(resolve, 1200));
         
-        setProfile({
-          userId: user,
-          profilePicture: '/api/placeholder/150/150',
-          headline: 'Professional Photographer & Creative Visionary',
-          location: 'New York, NY',
-          tier: 'Professional',
-          verified: true,
-          socialMedia: {
-            instagram: '@model_pro',
-            youtube: 'Creative Channel'
+        // Fetch real analytics data
+        const token = localStorage.getItem('token');
+        
+        // Fetch analytics data
+        const analyticsResponse = await fetch('/api/analytics/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         
-        setStats({
-          profileViews: 28470,
-          applications: 45,
-          bookings: 23,
-          portfolioPhotos: 89,
-          connections: 1560,
-          earnings: 185000,
-          completionRate: 95,
-          avgRating: 4.8,
-          responseRate: 98,
-          monthlyGrowth: 24,
-          brandScore: 92
+        let analyticsData = {};
+        if (analyticsResponse.ok) {
+          const result = await analyticsResponse.json();
+          analyticsData = result.data || {};
+        } else {
+          console.warn('Could not fetch analytics data, using defaults');
+        }
+        
+        // Fetch user profile data
+        const profileResponse = await fetch('/api/profile/my-complete', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         
+        let profileData = {};
+        if (profileResponse.ok) {
+          profileData = await profileResponse.json();
+        }
+        
+        setProfile({
+          userId: user,
+          profilePicture: profileData.profilePicture || '/api/placeholder/150/150',
+          headline: profileData.headline || 'Professional Photographer & Visual Artist',
+          location: profileData.location || 'New York, NY',
+          tier: 'Professional',
+          verified: profileData.verified || true,
+          socialMedia: profileData.socialMedia || {
+            instagram: '@photographer_pro',
+            youtube: 'Photography Channel'
+          }
+        });
+        
+        // Use real analytics data with fallbacks
+        setStats({
+          profileViews: analyticsData.profileViews || 0,
+          applications: analyticsData.applications || 0,
+          bookings: analyticsData.bookings || 0,
+          portfolioPhotos: analyticsData.portfolioPhotos || 0,
+          connections: analyticsData.connections || 0,
+          earnings: analyticsData.earnings || 0,
+          completionRate: analyticsData.completionRate || 95,
+          avgRating: analyticsData.avgRating || 4.8,
+          responseRate: analyticsData.responseRate || 98,
+          monthlyGrowth: analyticsData.monthlyGrowth || 0,
+          brandScore: analyticsData.brandScore || 85
+        });
+        
+        // Update portfolio count in analytics (fire and forget)
+        if (profileData.photos && profileData.photos.length > 0) {
+          fetch('/api/analytics/portfolio-update', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              photoCount: profileData.photos.length,
+              videoCount: 0
+            })
+          }).catch(err => console.log('Analytics update failed:', err));
+        }
+        
         setRecentActivity([
-          { id: 1, type: 'booking', title: 'Fashion Campaign Confirmed', client: 'Studio Brand', time: '2 hours ago', status: 'confirmed', value: '$8,500' },
-          { id: 2, type: 'view', title: 'Portfolio Featured in Showcase', time: '5 hours ago', status: 'featured', value: '+850 views' },
-          { id: 3, type: 'application', title: 'Commercial Casting Application', client: 'Production Co', time: '1 day ago', status: 'pending', value: '$12,000' },
-          { id: 4, type: 'connection', title: 'New Photographer Contact', time: '2 days ago', status: 'accepted', value: 'Professional' },
-          { id: 5, type: 'achievement', title: 'Portfolio Milestone Reached', time: '3 days ago', status: 'milestone', value: '100 Photos' }
+          { id: 1, type: 'booking', title: 'Fashion Shoot Completed', client: 'Fashion Magazine', time: '1 hour ago', status: 'completed', value: '$12,500' },
+          { id: 2, type: 'view', title: 'Portfolio Featured in Gallery', time: '4 hours ago', status: 'featured', value: '+1,200 views' },
+          { id: 3, type: 'application', title: 'Editorial Campaign Application', client: 'Creative Agency', time: '1 day ago', status: 'pending', value: '$18,000' },
+          { id: 4, type: 'connection', title: 'New Model Contact', time: '2 days ago', status: 'accepted', value: 'Professional' },
+          { id: 5, type: 'achievement', title: 'Photography Award Received', time: '3 days ago', status: 'milestone', value: 'Industry Recognition' }
         ]);
         
         setOpportunities([
           {
             id: 1,
-            title: 'Editorial Fashion Campaign',
-            client: 'Fashion Magazine',
+            title: 'High Fashion Editorial',
+            client: 'Luxury Magazine',
             type: 'Editorial',
-            location: 'Los Angeles, CA',
-            pay: '$15,000',
-            deadline: '3 days',
-            match: 94,
-            urgent: false,
+            location: 'Paris, France',
+            pay: '$25,000',
+            deadline: '5 days',
+            match: 96,
+            urgent: true,
             tier: 'Professional',
             exclusivity: 'Premium'
           },
           {
             id: 2,
-            title: 'Luxury Brand Campaign',
-            client: 'Lifestyle Brand',
+            title: 'Brand Campaign Photography',
+            client: 'Global Brand',
             type: 'Commercial',
-            location: 'New York, NY',
-            pay: '$22,000',
+            location: 'Los Angeles, CA',
+            pay: '$30,000',
             deadline: '1 week',
-            match: 88,
-            urgent: true,
+            match: 89,
+            urgent: false,
             tier: 'Professional',
             exclusivity: 'Invite Only'
           },
           {
             id: 3,
-            title: 'Fashion Week Feature',
-            client: 'Designer House',
-            type: 'Runway',
+            title: 'Fashion Week Coverage',
+            client: 'Fashion House',
+            type: 'Event',
             location: 'Milan, Italy',
-            pay: '$35,000',
+            pay: '$40,000',
             deadline: '2 weeks',
-            match: 91,
+            match: 93,
             urgent: false,
             tier: 'Professional',
             exclusivity: 'Exclusive'
@@ -161,13 +209,27 @@ const PhotographerDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProf
         ]);
         
         setConnections([
-          { id: 1, name: 'Sarah Chen', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
-          { id: 2, name: 'Mike Torres', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
-          { id: 3, name: 'Lisa Park', role: 'Stylist', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
-          { id: 4, name: 'James Wilson', role: 'Brand Manager', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
+          { id: 1, name: 'Emma Rodriguez', role: 'Fashion Model', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
+          { id: 2, name: 'David Kim', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
+          { id: 3, name: 'Sophie Chen', role: 'Stylist', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
+          { id: 4, name: 'Marcus Johnson', role: 'Brand Manager', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
         ]);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Set fallback data on error
+        setStats({
+          profileViews: 0,
+          applications: 0,
+          bookings: 0,
+          portfolioPhotos: 0,
+          connections: 0,
+          earnings: 0,
+          completionRate: 95,
+          avgRating: 4.8,
+          responseRate: 98,
+          monthlyGrowth: 0,
+          brandScore: 85
+        });
       } finally {
         setIsLoading(false);
       }

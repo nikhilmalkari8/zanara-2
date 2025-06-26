@@ -85,7 +85,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
   ];
 
   // Get available filters based on selected professional types
-  const getAvailableFilters = useCallback(() => {
+  const getAvailableFilters = () => {
     const selectedTypes = professionalTypes.filter(type => 
       selectedProfessionalTypes.includes(type.id)
     );
@@ -97,7 +97,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       hasGender: selectedTypes.some(type => type.hasGender),
       availableSkills: [...new Set(selectedTypes.flatMap(type => type.commonSkills))]
     };
-  }, [selectedProfessionalTypes]);
+  };
 
   const availableFilters = getAvailableFilters();
 
@@ -153,7 +153,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     
     try {
       const queryParams = new URLSearchParams();
-      queryParams.append('page', currentPage.toString());
+      queryParams.append('page', currentPage);
       queryParams.append('limit', '20');
       queryParams.append('professionalTypes', selectedProfessionalTypes.join(','));
       
@@ -182,8 +182,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       
       const response = await fetch(`http://localhost:8001/api/professional-profile/browse?${queryParams}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -214,7 +213,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     setSavedTalent(saved);
   }, [fetchTalent]);
 
-  const handleProfessionalTypeToggle = useCallback((typeId) => {
+  const handleProfessionalTypeToggle = (typeId) => {
     setSelectedProfessionalTypes(prev => {
       if (prev.includes(typeId)) {
         return prev.filter(id => id !== typeId);
@@ -225,28 +224,30 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     setCurrentPageNum(1);
     
     // Reset filters that don't apply to newly selected types
-    setTimeout(() => {
-      const newAvailableFilters = getAvailableFilters();
-      setFilters(prev => ({
-        ...prev,
-        gender: newAvailableFilters.hasGender ? prev.gender : 'all',
-        bodyType: newAvailableFilters.hasPhysicalAttributes ? prev.bodyType : 'all',
-        hairColor: newAvailableFilters.hasPhysicalAttributes ? prev.hairColor : '',
-        eyeColor: newAvailableFilters.hasPhysicalAttributes ? prev.eyeColor : '',
-        ageMin: newAvailableFilters.hasAge ? prev.ageMin : '',
-        ageMax: newAvailableFilters.hasAge ? prev.ageMax : '',
-        heightMin: newAvailableFilters.hasHeight ? prev.heightMin : '',
-        heightMax: newAvailableFilters.hasHeight ? prev.heightMax : ''
+    const newAvailableFilters = getAvailableFilters();
+    if (!newAvailableFilters.hasGender) {
+      setFilters(prev => ({ ...prev, gender: 'all' }));
+    }
+    if (!newAvailableFilters.hasPhysicalAttributes) {
+      setFilters(prev => ({ 
+        ...prev, 
+        bodyType: 'all', 
+        hairColor: '', 
+        eyeColor: '',
+        ageMin: '',
+        ageMax: '',
+        heightMin: '',
+        heightMax: ''
       }));
-    }, 0);
-  }, [getAvailableFilters]);
+    }
+  };
 
-  const handleFilterChange = useCallback((key, value) => {
+  const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPageNum(1);
-  }, []);
+  };
 
-  const handleSkillToggle = useCallback((skill) => {
+  const handleSkillToggle = (skill) => {
     setFilters(prev => {
       const skills = [...prev.skills];
       if (skills.includes(skill)) {
@@ -256,9 +257,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       }
     });
     setCurrentPageNum(1);
-  }, []);
+  };
 
-  const resetFilters = useCallback(() => {
+  const resetFilters = () => {
     setFilters({
       search: '',
       location: '',
@@ -276,9 +277,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       sort: 'newest'
     });
     setCurrentPageNum(1);
-  }, []);
+  };
 
-  const calculateAge = useCallback((dateOfBirth) => {
+  const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return 'N/A';
     const birthDate = new Date(dateOfBirth);
     const today = new Date();
@@ -288,9 +289,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       age--;
     }
     return age;
-  }, []);
+  };
 
-  const getTimeAgo = useCallback((date) => {
+  const getTimeAgo = (date) => {
     if (!date) return 'Unknown';
     const now = new Date();
     const lastActive = new Date(date);
@@ -301,9 +302,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
     return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
-  }, []);
+  };
 
-  const handleSaveTalent = useCallback((talentId) => {
+  const handleSaveTalent = (talentId) => {
     setSavedTalent(prev => {
       const newSaved = prev.includes(talentId)
         ? prev.filter(id => id !== talentId)
@@ -312,37 +313,16 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       localStorage.setItem('savedTalent', JSON.stringify(newSaved));
       return newSaved;
     });
-  }, []);
+  };
 
   // Updated function to navigate to profile instead of modal
-  const openTalentProfile = useCallback((talent) => {
+  const openTalentProfile = (talent) => {
     const profileUserId = talent.userId?._id || talent.userId;
     
     console.log('Opening profile for:', profileUserId);
     
-    // Track profile view (fire and forget)
-    const token = localStorage.getItem('token');
-    if (token && profileUserId) {
-      fetch('/api/analytics/profile-view', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          profileOwnerId: profileUserId,
-          viewType: 'profile',
-          source: 'browse-talent'
-        })
-      }).catch(err => {
-        console.log('Profile view tracking failed:', err);
-      });
-    }
-    
     // Navigate to profile page
-    if (typeof setCurrentPage === 'function') {
-      setCurrentPage('view-profile');
-    }
+    setCurrentPage('view-profile');
     
     // Set the viewing profile ID for ProfileRouter
     if (typeof setViewingProfileId === 'function') {
@@ -353,25 +333,40 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     if (typeof onViewProfile === 'function') {
       onViewProfile(profileUserId);
     }
-  }, [setCurrentPage, setViewingProfileId, onViewProfile]);
+  };
 
   // Optional: Keep modal approach as fallback
-  const openTalentProfileModal = useCallback((talent) => {
+  const openTalentProfileModal = (talent) => {
     setSelectedModel(talent);
-  }, []);
+  };
 
-  const closeTalentProfile = useCallback(() => {
+  const closeTalentProfile = () => {
     setSelectedModel(null);
-  }, []);
+  };
 
-  const handlePageChange = useCallback((newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPageNum(newPage);
-    }
-  }, [totalPages]);
+  const inputStyle = {
+    width: '100%',
+    padding: '10px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    background: 'rgba(255, 255, 255, 0.1)',
+    color: 'white',
+    fontSize: '14px',
+    outline: 'none'
+  };
+
+  const selectStyle = {
+    ...inputStyle,
+    appearance: 'none',
+    backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px top 50%',
+    backgroundSize: '12px auto',
+    paddingRight: '30px'
+  };
 
   // Render talent grid
-  const renderGrid = useCallback(() => (
+  const renderGrid = () => (
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
@@ -491,7 +486,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
               fontWeight: '600',
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
             }}>
-              {talent.userId?.firstName || ''} {talent.userId?.lastName || ''} {talent.fullName || ''}
+              {talent.userId?.firstName} {talent.userId?.lastName} {talent.fullName || ''}
             </h3>
 
             {/* Location */}
@@ -632,7 +627,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
         </div>
       ))}
     </div>
-  ), [models, savedTalent, professionalTypes, calculateAge, getTimeAgo, handleSaveTalent, openTalentProfile]);
+  );
 
   return (
     <div style={{
@@ -674,7 +669,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
             <button
-              onClick={() => setCurrentPage && setCurrentPage('company-dashboard')}
+              onClick={() => setCurrentPage('company-dashboard')}
               style={{
                 padding: '12px 24px',
                 background: 'rgba(255, 255, 255, 0.15)',
@@ -999,7 +994,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
 
             {/* Dynamic Filters Panel */}
             {showFilters && (
-              <div>
+              <>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -1192,7 +1187,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
 
                 {/* Model-specific filters - only show if models are selected */}
                 {availableFilters.hasGender && (
-                  <div style={{ marginBottom: '20px' }}>
+                  <div>
                     <label style={{ 
                       display: 'block', 
                       color: 'rgba(255, 255, 255, 0.9)', 
@@ -1242,360 +1237,391 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                 )}
 
                 {availableFilters.hasPhysicalAttributes && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '20px',
-                    marginBottom: '25px'
-                  }}>
-                    <div>
-                      <label style={{ 
-                        display: 'block', 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.95rem'
-                      }}>
-                        Body Type
-                      </label>
-                      <select
-                        value={filters.bodyType}
-                        onChange={(e) => handleFilterChange('bodyType', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          fontSize: '15px',
-                          outline: 'none',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease',
-                          appearance: 'none',
-                          backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 16px top 50%',
-                          backgroundSize: '12px auto',
-                          paddingRight: '40px'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                      >
-                        {bodyTypeOptions.map(option => (
-                          <option key={option.value} value={option.value} style={{ background: '#333', color: 'white' }}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ 
-                        display: 'block', 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.95rem'
-                      }}>
-                        Hair Color
-                      </label>
-                      <input
-                        type="text"
-                        value={filters.hairColor}
-                        onChange={(e) => handleFilterChange('hairColor', e.target.value)}
-                        placeholder="e.g., Blonde, Brunette"
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          fontSize: '15px',
-                          outline: 'none',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ 
-                        display: 'block', 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.95rem'
-                      }}>
-                        Eye Color
-                      </label>
-                      <input
-                        type="text"
-                        value={filters.eyeColor}
-                        onChange={(e) => handleFilterChange('eyeColor', e.target.value)}
-                        placeholder="e.g., Blue, Brown"
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          fontSize: '15px',
-                          outline: 'none',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Age and Height filters - only for models */}
-                {availableFilters.hasAge && (
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '20px',
-                    marginBottom: '25px'
-                  }}>
-                    <div>
-                      <label style={{ 
-                        display: 'block', 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.95rem'
-                      }}>
-                        Age Range
-                      </label>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          value={filters.ageMin}
-                          onChange={(e) => handleFilterChange('ageMin', e.target.value)}
-                          placeholder="Min"
-                          style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '15px',
-                            outline: 'none',
-                            backdropFilter: 'blur(10px)',
-                            transition: 'all 0.3s ease'
-                          }}
-                          min="16"
-                          max="99"
-                          onFocus={(e) => {
-                            e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }}
-                        />
-                        <span style={{ color: 'white', fontWeight: '600' }}>-</span>
-                        <input
-                          type="number"
-                          value={filters.ageMax}
-                          onChange={(e) => handleFilterChange('ageMax', e.target.value)}
-                          placeholder="Max"
-                          style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '15px',
-                            outline: 'none',
-                            backdropFilter: 'blur(10px)',
-                            transition: 'all 0.3s ease'
-                          }}
-                          min="16"
-                          max="99"
-                          onFocus={(e) => {
-                            e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={{ 
-                        display: 'block', 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.95rem'
-                      }}>
-                        Height Range
-                      </label>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          value={filters.heightMin}
-                          onChange={(e) => handleFilterChange('heightMin', e.target.value)}
-                          placeholder="Min (e.g. 5'6)"
-                          style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '15px',
-                            outline: 'none',
-                            backdropFilter: 'blur(10px)',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }}
-                        />
-                        <span style={{ color: 'white', fontWeight: '600' }}>-</span>
-                        <input
-                          type="text"
-                          value={filters.heightMax}
-                          onChange={(e) => handleFilterChange('heightMax', e.target.value)}
-                          placeholder="Max (e.g. 6'0)"
-                          style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            fontSize: '15px',
-                            outline: 'none',
-                            backdropFilter: 'blur(10px)',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                            e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Skills Filter */}
-                {availableFilters.availableSkills.length > 0 && (
                   <div>
                     <label style={{ 
                       display: 'block', 
                       color: 'rgba(255, 255, 255, 0.9)', 
-                      marginBottom: '12px',
+                      marginBottom: '8px',
                       fontWeight: '600',
                       fontSize: '0.95rem'
                     }}>
-                      Skills ({selectedProfessionalTypes.map(type => 
-                        professionalTypes.find(pt => pt.id === type)?.label
-                      ).join(', ')})
+                      Body Type
                     </label>
-                    <div style={{ 
-                      display: 'flex', 
-                      flexWrap: 'wrap', 
-                      gap: '10px', 
-                      marginBottom: '20px' 
-                    }}>
-                      {availableFilters.availableSkills.map(skill => (
-                        <div
-                          key={skill}
-                          onClick={() => handleSkillToggle(skill)}
-                          style={{
-                            padding: '8px 16px',
-                            background: filters.skills.includes(skill) 
-                              ? 'rgba(78, 205, 196, 0.4)' 
-                              : 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            borderRadius: '20px',
-                            fontSize: '0.9rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: filters.skills.includes(skill)
-                              ? '1px solid rgba(78, 205, 196, 0.6)'
-                              : '1px solid rgba(255, 255, 255, 0.2)',
-                            fontWeight: '500'
-                          }}
-                          onMouseOver={(e) => {
-                            if (!filters.skills.includes(skill)) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (!filters.skills.includes(skill)) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }
-                          }}
-                        >
-                          {skill}
-                        </div>
+                    <select
+                      value={filters.bodyType}
+                      onChange={(e) => handleFilterChange('bodyType', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '15px',
+                        outline: 'none',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.3s ease',
+                        appearance: 'none',
+                        backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 16px top 50%',
+                        backgroundSize: '12px auto',
+                        paddingRight: '40px'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                      }}
+                    >
+                      {bodyTypeOptions.map(option => (
+                        <option key={option.value} value={option.value} style={{ background: '#333', color: 'white' }}>
+                          {option.label}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                 )}
 
+                {availableFilters.hasPhysicalAttributes && (
+                  <div>
+                    <label style={{ 
+                      display: 'block', 
+                      color: 'rgba(255, 255, 255, 0.9)', 
+                      marginBottom: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.95rem'
+                    }}>
+                      Hair Color
+                    </label>
+                    <input
+                      type="text"
+                      value={filters.hairColor}
+                      onChange={(e) => handleFilterChange('hairColor', e.target.value)}
+                      placeholder="e.g., Blonde, Brunette"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '15px',
+                        outline: 'none',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                      }}
+                    />
+                  </div>
+                )}
+
+                {availableFilters.hasPhysicalAttributes && (
+                  <div>
+                    <label style={{ 
+                      display: 'block', 
+                      color: 'rgba(255, 255, 255, 0.9)', 
+                      marginBottom: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.95rem'
+                    }}>
+                      Eye Color
+                    </label>
+                    <input
+                      type="text"
+                      value={filters.eyeColor}
+                      onChange={(e) => handleFilterChange('eyeColor', e.target.value)}
+                      placeholder="e.g., Blue, Brown"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '15px',
+                        outline: 'none',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Age and Height filters - only for models */}
+              {availableFilters.hasAge && (
                 <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                  paddingTop: '20px'
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '20px',
+                  marginBottom: '25px'
                 }}>
+                  <div>
+                    <label style={{ 
+                      display: 'block', 
+                      color: 'rgba(255, 255, 255, 0.9)', 
+                      marginBottom: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.95rem'
+                    }}>
+                      Age Range
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        value={filters.ageMin}
+                        onChange={(e) => handleFilterChange('ageMin', e.target.value)}
+                        placeholder="Min"
+                        style={{
+                          flex: 1,
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          fontSize: '15px',
+                          outline: 'none',
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        min="16"
+                        max="99"
+                        onFocus={(e) => {
+                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      />
+                      <span style={{ color: 'white', fontWeight: '600' }}>-</span>
+                      <input
+                        type="number"
+                        value={filters.ageMax}
+                        onChange={(e) => handleFilterChange('ageMax', e.target.value)}
+                        placeholder="Max"
+                        style={{
+                          flex: 1,
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          fontSize: '15px',
+                          outline: 'none',
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        min="16"
+                        max="99"
+                        onFocus={(e) => {
+                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ 
+                      display: 'block', 
+                      color: 'rgba(255, 255, 255, 0.9)', 
+                      marginBottom: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.95rem'
+                    }}>
+                      Height Range
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={filters.heightMin}
+                        onChange={(e) => handleFilterChange('heightMin', e.target.value)}
+                        placeholder="Min (e.g. 5'6)"
+                        style={{
+                          flex: 1,
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          fontSize: '15px',
+                          outline: 'none',
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      />
+                      <span style={{ color: 'white', fontWeight: '600' }}>-</span>
+                      <input
+                        type="text"
+                        value={filters.heightMax}
+                        onChange={(e) => handleFilterChange('heightMax', e.target.value)}
+                        placeholder="Max (e.g. 6'0)"
+                        style={{
+                          flex: 1,
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          fontSize: '15px',
+                          outline: 'none',
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Skills Filter */}
+              {availableFilters.availableSkills.length > 0 && (
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    color: 'rgba(255, 255, 255, 0.9)', 
+                    marginBottom: '12px',
+                    fontWeight: '600',
+                    fontSize: '0.95rem'
+                  }}>
+                    Skills ({selectedProfessionalTypes.map(type => 
+                      professionalTypes.find(pt => pt.id === type)?.label
+                    ).join(', ')})
+                  </label>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: '10px', 
+                    marginBottom: '20px' 
+                  }}>
+                    {availableFilters.availableSkills.map(skill => (
+                      <div
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill)}
+                        style={{
+                          padding: '8px 16px',
+                          background: filters.skills.includes(skill) 
+                            ? 'rgba(78, 205, 196, 0.4)' 
+                            : 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          borderRadius: '20px',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          border: filters.skills.includes(skill)
+                            ? '1px solid rgba(78, 205, 196, 0.6)'
+                            : '1px solid rgba(255, 255, 255, 0.2)',
+                          fontWeight: '500'
+                        }}
+                        onMouseOver={(e) => {
+                          if (!filters.skills.includes(skill)) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!filters.skills.includes(skill)) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }
+                        }}
+                      >
+                        {skill}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                paddingTop: '20px'
+              }}>
+                <button
+                  onClick={resetFilters}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  Reset Filters
+                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px', fontWeight: '500' }}>
+                    View as:
+                  </div>
                   <button
-                    onClick={resetFilters}
+                    onClick={() => setViewMode('grid')}
                     style={{
-                      padding: '10px 20px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'rgba(255, 255, 255, 0.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '12px',
+                      padding: '8px 16px',
+                      background: viewMode === 'grid' 
+                        ? 'rgba(78, 205, 196, 0.4)' 
+                        : 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: viewMode === 'grid'
+                        ? '1px solid rgba(78, 205, 196, 0.6)'
+                        : '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '10px',
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: '500',
@@ -1603,91 +1629,57 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                       backdropFilter: 'blur(10px)'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      if (viewMode !== 'grid') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.transform = 'translateY(0)';
+                      if (viewMode !== 'grid') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }
                     }}
                   >
-                    Reset Filters
+                    Grid
                   </button>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px', fontWeight: '500' }}>
-                      View as:
-                    </div>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      style={{
-                        padding: '8px 16px',
-                        background: viewMode === 'grid' 
-                          ? 'rgba(78, 205, 196, 0.4)' 
-                          : 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: viewMode === 'grid'
-                          ? '1px solid rgba(78, 205, 196, 0.6)'
-                          : '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        transition: 'all 0.3s ease',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      onMouseOver={(e) => {
-                        if (viewMode !== 'grid') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (viewMode !== 'grid') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }
-                      }}
-                    >
-                      Grid
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      style={{
-                        padding: '8px 16px',
-                        background: viewMode === 'list' 
-                          ? 'rgba(78, 205, 196, 0.4)' 
-                          : 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: viewMode === 'list'
-                          ? '1px solid rgba(78, 205, 196, 0.6)'
-                          : '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        transition: 'all 0.3s ease',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      onMouseOver={(e) => {
-                        if (viewMode !== 'list') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (viewMode !== 'list') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }
-                      }}
-                    >
-                      List
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    style={{
+                      padding: '8px 16px',
+                      background: viewMode === 'list' 
+                        ? 'rgba(78, 205, 196, 0.4)' 
+                        : 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: viewMode === 'list'
+                        ? '1px solid rgba(78, 205, 196, 0.6)'
+                        : '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      transition: 'all 0.3s ease',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onMouseOver={(e) => {
+                      if (viewMode !== 'list') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (viewMode !== 'list') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }
+                    }}
+                  >
+                    List
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          </>
         </div>
       )}
 
@@ -1854,7 +1846,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
               </button>
             </div>
           ) : (
-            <React.Fragment>
+            <>
               {/* Talent Grid */}
               {renderGrid()}
 
@@ -1868,7 +1860,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                   marginBottom: '30px'
                 }}>
                   <button
-                    onClick={() => handlePageChange(currentPage - 1)}
+                    onClick={() => setCurrentPageNum(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     style={{
                       padding: '12px 24px',
@@ -1909,7 +1901,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                   </span>
 
                   <button
-                    onClick={() => handlePageChange(currentPage + 1)}
+                    onClick={() => setCurrentPageNum(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     style={{
                       padding: '12px 24px',
@@ -1941,7 +1933,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                   </button>
                 </div>
               )}
-            </React.Fragment>
+            </>
           )}
         </div>
       )}
@@ -2048,7 +2040,7 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                     fontSize: '1.8rem',
                     fontWeight: '600'
                   }}>
-                    {selectedModel.userId?.firstName || ''} {selectedModel.userId?.lastName || ''}
+                    {selectedModel.userId?.firstName} {selectedModel.userId?.lastName}
                   </h2>
                   <div style={{ 
                     color: 'rgba(255, 255, 255, 0.9)', 

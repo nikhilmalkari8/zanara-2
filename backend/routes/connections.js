@@ -116,7 +116,7 @@ router.post('/request', auth, async (req, res) => {
     // Create activity for connection request
     try {
       if (ActivityService && ActivityService.createConnectionActivity) {
-        await ActivityService.createConnectionActivity(senderId, receiverId, 'request');
+        await ActivityService.createConnectionActivity(connection._id, senderId, receiverId);
       }
     } catch (activityError) {
       console.error('Error creating connection activity:', activityError);
@@ -205,7 +205,7 @@ router.put('/:id/accept', auth, async (req, res) => {
     // Create activity for connection acceptance
     try {
       if (ActivityService && ActivityService.createConnectionActivity) {
-        await ActivityService.createConnectionActivity(connection.sender._id, connection.receiver._id, 'accepted');
+        await ActivityService.createConnectionActivity(connection._id, connection.sender._id, connection.receiver._id);
       }
     } catch (activityError) {
       console.error('Error creating connection activity:', activityError);

@@ -227,6 +227,7 @@ router.put('/update', auth, async (req, res) => {
 router.get('/model/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
+    const viewerId = req.userId;
     
     // Get user basic info
     const user = await User.findById(id);
@@ -238,6 +239,18 @@ router.get('/model/:id', auth, async (req, res) => {
     const modelProfile = await ModelProfile.findOne({ userId: id });
     if (!modelProfile) {
       return res.status(404).json({ message: 'Model profile not found' });
+    }
+
+    // Track profile view (don't wait for it to complete)
+    if (viewerId !== id) {
+      const ProfileView = require('../models/ProfileView');
+      ProfileView.recordView(viewerId, id, {
+        viewType: 'profile',
+        source: req.get('referer') ? 'browse-talent' : 'direct-link',
+        userAgent: req.get('User-Agent')
+      }).catch(err => {
+        console.error('Error recording profile view:', err);
+      });
     }
 
     // Get connections count

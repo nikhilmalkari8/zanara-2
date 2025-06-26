@@ -55,6 +55,12 @@ import ContentBrowser from './components/content/ContentBrowser';
 // Profile Components
 import ProfileRouter from './components/profile/ProfileRouter';
 
+// Messaging Components
+import MessagingCenter from './components/messaging/MessagingCenter';
+
+// Payment Components
+import SubscriptionPlans from './components/payments/SubscriptionPlans';
+
 import './App.css';
 
 function App() {
@@ -575,6 +581,15 @@ function App() {
             onLogout={handleLogout} 
             setCurrentPage={setCurrentPage} 
         />
+        )}
+
+        {currentPage === 'messages' && (
+          <MessagingCenter user={user} />
+        )}
+
+        {/* Payment Components */}
+        {currentPage === 'subscription-plans' && (
+          <SubscriptionPlans user={user} />
         )}
       </div>
     </div>

@@ -83,77 +83,125 @@ const MakeupArtistDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProf
       try {
         await new Promise(resolve => setTimeout(resolve, 1200));
         
-        setProfile({
-          userId: user,
-          profilePicture: '/api/placeholder/150/150',
-          headline: 'Makeup Artist & Creative Visionary',
-          location: 'New York, NY',
-          tier: 'Professional',
-          verified: true,
-          socialMedia: {
-            instagram: '@model_pro',
-            youtube: 'Creative Channel'
+        // Fetch real analytics data
+        const token = localStorage.getItem('token');
+        
+        // Fetch analytics data
+        const analyticsResponse = await fetch('/api/analytics/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         
-        setStats({
-          profileViews: 28470,
-          applications: 45,
-          bookings: 23,
-          portfolioPhotos: 89,
-          connections: 1560,
-          earnings: 185000,
-          completionRate: 95,
-          avgRating: 4.8,
-          responseRate: 98,
-          monthlyGrowth: 24,
-          brandScore: 92
+        let analyticsData = {};
+        if (analyticsResponse.ok) {
+          const result = await analyticsResponse.json();
+          analyticsData = result.data || {};
+        } else {
+          console.warn('Could not fetch analytics data, using defaults');
+        }
+        
+        // Fetch user profile data
+        const profileResponse = await fetch('/api/profile/my-complete', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         
+        let profileData = {};
+        if (profileResponse.ok) {
+          profileData = await profileResponse.json();
+        }
+        
+        setProfile({
+          userId: user,
+          profilePicture: profileData.profilePicture || '/api/placeholder/150/150',
+          headline: profileData.headline || 'Makeup Artist & Beauty Creative',
+          location: profileData.location || 'New York, NY',
+          tier: 'Professional',
+          verified: profileData.verified || true,
+          socialMedia: profileData.socialMedia || {
+            instagram: '@makeup_pro',
+            youtube: 'Beauty Channel'
+          }
+        });
+        
+        // Use real analytics data with fallbacks
+        setStats({
+          profileViews: analyticsData.profileViews || 0,
+          applications: analyticsData.applications || 0,
+          bookings: analyticsData.bookings || 0,
+          portfolioPhotos: analyticsData.portfolioPhotos || 0,
+          connections: analyticsData.connections || 0,
+          earnings: analyticsData.earnings || 0,
+          completionRate: analyticsData.completionRate || 95,
+          avgRating: analyticsData.avgRating || 4.8,
+          responseRate: analyticsData.responseRate || 98,
+          monthlyGrowth: analyticsData.monthlyGrowth || 0,
+          brandScore: analyticsData.brandScore || 92
+        });
+        
+        // Update portfolio count in analytics (fire and forget)
+        if (profileData.photos && profileData.photos.length > 0) {
+          fetch('/api/analytics/portfolio-update', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              photoCount: profileData.photos.length,
+              videoCount: 0
+            })
+          }).catch(err => console.log('Analytics update failed:', err));
+        }
+        
         setRecentActivity([
-          { id: 1, type: 'booking', title: 'Fashion Campaign Confirmed', client: 'Studio Brand', time: '2 hours ago', status: 'confirmed', value: '$8,500' },
-          { id: 2, type: 'view', title: 'Portfolio Featured in Showcase', time: '5 hours ago', status: 'featured', value: '+850 views' },
-          { id: 3, type: 'application', title: 'Commercial Casting Application', client: 'Production Co', time: '1 day ago', status: 'pending', value: '$12,000' },
-          { id: 4, type: 'connection', title: 'New Photographer Contact', time: '2 days ago', status: 'accepted', value: 'Professional' },
-          { id: 5, type: 'achievement', title: 'Portfolio Milestone Reached', time: '3 days ago', status: 'milestone', value: '100 Photos' }
+          { id: 1, type: 'booking', title: 'Bridal Makeup Session', client: 'Wedding Planner', time: '1 hour ago', status: 'confirmed', value: '$2,500' },
+          { id: 2, type: 'view', title: 'Beauty Portfolio Featured', time: '3 hours ago', status: 'featured', value: '+650 views' },
+          { id: 3, type: 'application', title: 'Fashion Show Makeup', client: 'Fashion Week', time: '1 day ago', status: 'pending', value: '$8,000' },
+          { id: 4, type: 'connection', title: 'New Model Contact', time: '2 days ago', status: 'accepted', value: 'Professional' },
+          { id: 5, type: 'achievement', title: 'Beauty Award Recognition', time: '4 days ago', status: 'milestone', value: 'Industry Award' }
         ]);
         
         setOpportunities([
           {
             id: 1,
-            title: 'Editorial Fashion Campaign',
-            client: 'Fashion Magazine',
-            type: 'Editorial',
+            title: 'Celebrity Makeup Session',
+            client: 'Entertainment Agency',
+            type: 'Celebrity',
             location: 'Los Angeles, CA',
             pay: '$15,000',
-            deadline: '3 days',
-            match: 94,
-            urgent: false,
+            deadline: '5 days',
+            match: 97,
+            urgent: true,
             tier: 'Professional',
             exclusivity: 'Premium'
           },
           {
             id: 2,
-            title: 'Luxury Brand Campaign',
-            client: 'Lifestyle Brand',
+            title: 'Beauty Campaign Shoot',
+            client: 'Cosmetics Brand',
             type: 'Commercial',
             location: 'New York, NY',
-            pay: '$22,000',
+            pay: '$12,000',
             deadline: '1 week',
-            match: 88,
-            urgent: true,
+            match: 93,
+            urgent: false,
             tier: 'Professional',
             exclusivity: 'Invite Only'
           },
           {
             id: 3,
-            title: 'Fashion Week Feature',
+            title: 'Fashion Week Runway',
             client: 'Designer House',
             type: 'Runway',
-            location: 'Milan, Italy',
-            pay: '$35,000',
+            location: 'Paris, France',
+            pay: '$20,000',
             deadline: '2 weeks',
-            match: 91,
+            match: 95,
             urgent: false,
             tier: 'Professional',
             exclusivity: 'Exclusive'
@@ -161,13 +209,27 @@ const MakeupArtistDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProf
         ]);
         
         setConnections([
-          { id: 1, name: 'Sarah Chen', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
-          { id: 2, name: 'Mike Torres', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
-          { id: 3, name: 'Lisa Park', role: 'Stylist', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
-          { id: 4, name: 'James Wilson', role: 'Brand Manager', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
+          { id: 1, name: 'Aria Thompson', role: 'Fashion Model', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
+          { id: 2, name: 'Carlos Martinez', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
+          { id: 3, name: 'Emma Wilson', role: 'Beauty Brand Rep', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
+          { id: 4, name: 'Ryan Park', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
         ]);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Set fallback data on error
+        setStats({
+          profileViews: 0,
+          applications: 0,
+          bookings: 0,
+          portfolioPhotos: 0,
+          connections: 0,
+          earnings: 0,
+          completionRate: 95,
+          avgRating: 4.8,
+          responseRate: 98,
+          monthlyGrowth: 0,
+          brandScore: 92
+        });
       } finally {
         setIsLoading(false);
       }
