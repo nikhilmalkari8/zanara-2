@@ -114,17 +114,67 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
         if (profileResponse.ok) {
           profileData = await profileResponse.json();
         }
+
+        // Fetch real connections data
+        let connectionsData = [];
+        try {
+          const connectionsResponse = await fetch('/api/connections/my-connections', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (connectionsResponse.ok) {
+            connectionsData = await connectionsResponse.json();
+          }
+        } catch (err) {
+          console.warn('Could not fetch connections data:', err);
+        }
+
+        // Fetch real opportunities data
+        let opportunitiesData = [];
+        try {
+          const opportunitiesResponse = await fetch('/api/opportunities/browse?limit=3&sort=newest', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (opportunitiesResponse.ok) {
+            const result = await opportunitiesResponse.json();
+            opportunitiesData = result.opportunities || [];
+          }
+        } catch (err) {
+          console.warn('Could not fetch opportunities data:', err);
+        }
+
+        // Fetch real activity feed data
+        let activityData = [];
+        try {
+          const activityResponse = await fetch('/api/activity/feed?limit=5', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (activityResponse.ok) {
+            const result = await activityResponse.json();
+            activityData = result.data || [];
+          }
+        } catch (err) {
+          console.warn('Could not fetch activity data:', err);
+        }
         
         setProfile({
           userId: user,
           profilePicture: profileData.profilePicture || '/api/placeholder/150/150',
-          headline: profileData.headline || 'Professional Model & Creative',
+          headline: profileData.headline || 'Fashion Model & Creative',
           location: profileData.location || 'New York, NY',
           tier: 'Professional',
           verified: profileData.verified || true,
           socialMedia: profileData.socialMedia || {
             instagram: '@model_pro',
-            youtube: 'Creative Channel'
+            youtube: 'Model Channel'
           }
         });
         
@@ -140,7 +190,7 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
           avgRating: analyticsData.avgRating || 4.8,
           responseRate: analyticsData.responseRate || 98,
           monthlyGrowth: analyticsData.monthlyGrowth || 0,
-          brandScore: analyticsData.brandScore || 85
+          brandScore: analyticsData.brandScore || 92
         });
         
         // Update portfolio count in analytics (fire and forget)
@@ -158,62 +208,94 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
           }).catch(err => console.log('Analytics update failed:', err));
         }
         
-        setRecentActivity([
-          { id: 1, type: 'booking', title: 'Fashion Campaign Confirmed', client: 'Studio Brand', time: '2 hours ago', status: 'confirmed', value: '$8,500' },
-          { id: 2, type: 'view', title: 'Portfolio Featured in Showcase', time: '5 hours ago', status: 'featured', value: '+850 views' },
-          { id: 3, type: 'application', title: 'Commercial Casting Application', client: 'Production Co', time: '1 day ago', status: 'pending', value: '$12,000' },
-          { id: 4, type: 'connection', title: 'New Photographer Contact', time: '2 days ago', status: 'accepted', value: 'Professional' },
-          { id: 5, type: 'achievement', title: 'Portfolio Milestone Reached', time: '3 days ago', status: 'milestone', value: '100 Photos' }
-        ]);
+        setRecentActivity(activityData.length > 0 ? formatActivityData(activityData) : []);
         
-        setOpportunities([
-          {
-            id: 1,
-            title: 'Editorial Fashion Campaign',
-            client: 'Fashion Magazine',
-            type: 'Editorial',
-            location: 'Los Angeles, CA',
-            pay: '$15,000',
-            deadline: '3 days',
-            match: 94,
-            urgent: false,
-            tier: 'Professional',
-            exclusivity: 'Premium'
-          },
-          {
-            id: 2,
-            title: 'Luxury Brand Campaign',
-            client: 'Lifestyle Brand',
-            type: 'Commercial',
-            location: 'New York, NY',
-            pay: '$22,000',
-            deadline: '1 week',
-            match: 88,
-            urgent: true,
-            tier: 'Professional',
-            exclusivity: 'Invite Only'
-          },
-          {
-            id: 3,
-            title: 'Fashion Week Feature',
-            client: 'Designer House',
-            type: 'Runway',
-            location: 'Milan, Italy',
-            pay: '$35,000',
-            deadline: '2 weeks',
-            match: 91,
-            urgent: false,
-            tier: 'Professional',
-            exclusivity: 'Exclusive'
-          }
-        ]);
+        // Transform real opportunities data or use fallback
+        const transformedOpportunities = opportunitiesData.length > 0 
+          ? opportunitiesData.slice(0, 3).map((opp, index) => ({
+              id: opp._id || index + 1,
+              title: opp.title || 'Fashion Opportunity',
+              client: opp.company?.companyName || 'Fashion Client',
+              type: opp.type || 'Fashion Shoot',
+              location: opp.location?.city || 'New York, NY',
+              pay: opp.compensation?.type === 'paid' 
+                ? `$${opp.compensation.amount?.min || 5000}` 
+                : opp.compensation?.type?.toUpperCase() || 'TFP',
+              deadline: opp.applicationDeadline 
+                ? `${Math.ceil((new Date(opp.applicationDeadline) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                : '1 week',
+              match: Math.floor(Math.random() * 20) + 80, // Random match score
+              urgent: Math.random() > 0.7,
+              tier: 'Professional',
+              exclusivity: Math.random() > 0.5 ? 'Premium' : 'Standard'
+            }))
+          : [
+              {
+                id: 1,
+                title: 'High Fashion Editorial',
+                client: 'Vogue Magazine',
+                type: 'Editorial',
+                location: 'New York, NY',
+                pay: '$8,000',
+                deadline: '3 days',
+                match: 98,
+                urgent: true,
+                tier: 'Professional',
+                exclusivity: 'Premium'
+              },
+              {
+                id: 2,
+                title: 'Luxury Brand Campaign',
+                client: 'Designer House',
+                type: 'Commercial',
+                location: 'Paris, France',
+                pay: '$15,000',
+                deadline: '1 week',
+                match: 95,
+                urgent: false,
+                tier: 'Professional',
+                exclusivity: 'Exclusive'
+              },
+              {
+                id: 3,
+                title: 'Fashion Week Runway',
+                client: 'Fashion Council',
+                type: 'Runway',
+                location: 'Milan, Italy',
+                pay: '$12,000',
+                deadline: '2 weeks',
+                match: 92,
+                urgent: false,
+                tier: 'Professional',
+                exclusivity: 'Invite Only'
+              }
+            ];
+
+        setOpportunities(transformedOpportunities);
         
-        setConnections([
-          { id: 1, name: 'Sarah Chen', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
-          { id: 2, name: 'Mike Torres', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
-          { id: 3, name: 'Lisa Park', role: 'Stylist', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
-          { id: 4, name: 'James Wilson', role: 'Brand Manager', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
-        ]);
+        // Transform real connections data or use fallback
+        const transformedConnections = connectionsData.length > 0
+          ? connectionsData.slice(0, 4).map(conn => {
+              const otherUser = conn.sender._id === user._id || conn.sender._id === user.id 
+                ? conn.receiver 
+                : conn.sender;
+              return {
+                id: conn._id,
+                name: otherUser.fullName || `${otherUser.firstName} ${otherUser.lastName}`,
+                role: otherUser.professionalType?.replace('-', ' ') || 'Professional',
+                avatar: otherUser.profilePicture || '/api/placeholder/40/40',
+                verified: otherUser.verified || false,
+                tier: 'Professional'
+              };
+            })
+          : [
+              { id: 1, name: 'Sophia Martinez', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
+              { id: 2, name: 'James Wilson', role: 'Creative Director', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
+              { id: 3, name: 'Emma Thompson', role: 'Fashion Designer', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
+              { id: 4, name: 'Lucas Brown', role: 'Brand Manager', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
+            ];
+
+        setConnections(transformedConnections);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         // Set fallback data on error
@@ -228,8 +310,27 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
           avgRating: 4.8,
           responseRate: 98,
           monthlyGrowth: 0,
-          brandScore: 85
+          brandScore: 92
         });
+        // Keep hardcoded fallbacks for opportunities and connections
+        setOpportunities([
+          {
+            id: 1,
+            title: 'High Fashion Editorial',
+            client: 'Vogue Magazine',
+            type: 'Editorial',
+            location: 'New York, NY',
+            pay: '$8,000',
+            deadline: '3 days',
+            match: 98,
+            urgent: true,
+            tier: 'Professional',
+            exclusivity: 'Premium'
+          }
+        ]);
+        setConnections([
+          { id: 1, name: 'Sophia Martinez', role: 'Photographer', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' }
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -242,6 +343,61 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
     if (user && (user._id || user.id)) {
       if (setViewingProfileId) setViewingProfileId(user._id || user.id);
       if (setCurrentPage) setCurrentPage('my-profile');
+    }
+  };
+
+  // Helper function to format activity data from API
+  const formatActivityData = (activities) => {
+    return activities.map(activity => {
+      const timeAgo = getTimeAgo(activity.createdAt);
+      const actorName = activity.actor ? `${activity.actor.firstName} ${activity.actor.lastName}` : 'System';
+      
+      return {
+        id: activity._id,
+        type: activity.type,
+        title: activity.title,
+        time: timeAgo,
+        client: actorName !== 'System' ? actorName : null,
+        value: getActivityValue(activity),
+        status: getActivityStatus(activity.type)
+      };
+    });
+  };
+
+  // Helper function to get time ago string
+  const getTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
+  };
+
+  // Helper function to get activity value
+  const getActivityValue = (activity) => {
+    switch (activity.type) {
+      case 'profile_view': return '+1 view';
+      case 'new_connection': return 'Connected';
+      case 'opportunity_applied': return 'Applied';
+      case 'achievement_added': return 'Achievement';
+      case 'portfolio_update': return 'Updated';
+      case 'content_published': return 'Published';
+      default: return 'Activity';
+    }
+  };
+
+  // Helper function to get activity status
+  const getActivityStatus = (type) => {
+    switch (type) {
+      case 'profile_view': return 'featured';
+      case 'new_connection': return 'confirmed';
+      case 'opportunity_applied': return 'pending';
+      case 'achievement_added': return 'milestone';
+      case 'portfolio_update': return 'confirmed';
+      case 'content_published': return 'featured';
+      default: return 'confirmed';
     }
   };
 
@@ -492,11 +648,14 @@ const ModelDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
                     <div key={activity.id} className="flex items-center justify-between py-4 border-b border-white/5 last:border-b-0">
                       <div className="flex items-center space-x-4">
                         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                          {activity.type === 'booking' && <Calendar className="w-5 h-5 text-green-400" />}
-                          {activity.type === 'view' && <Eye className="w-5 h-5 text-blue-400" />}
-                          {activity.type === 'application' && <Briefcase className="w-5 h-5 text-purple-400" />}
-                          {activity.type === 'connection' && <Users className="w-5 h-5 text-indigo-400" />}
-                          {activity.type === 'achievement' && <Award className="w-5 h-5 text-yellow-500" />}
+                          {(activity.type === 'opportunity_applied' || activity.type === 'booking') && <Calendar className="w-5 h-5 text-green-400" />}
+                          {(activity.type === 'profile_view' || activity.type === 'view') && <Eye className="w-5 h-5 text-blue-400" />}
+                          {(activity.type === 'opportunity_applied' || activity.type === 'application') && <Briefcase className="w-5 h-5 text-purple-400" />}
+                          {(activity.type === 'new_connection' || activity.type === 'connection') && <Users className="w-5 h-5 text-indigo-400" />}
+                          {(activity.type === 'achievement_added' || activity.type === 'achievement') && <Award className="w-5 h-5 text-yellow-500" />}
+                          {activity.type === 'portfolio_update' && <Camera className="w-5 h-5 text-green-400" />}
+                          {activity.type === 'content_published' && <Star className="w-5 h-5 text-yellow-500" />}
+                          {activity.type === 'profile_update' && <User className="w-5 h-5 text-blue-400" />}
                         </div>
                         <div className="flex-1">
                           <p className="text-white font-light mb-1">{activity.title}</p>

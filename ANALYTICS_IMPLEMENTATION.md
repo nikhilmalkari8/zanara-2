@@ -256,3 +256,5 @@ The analytics system transforms Zanara from a platform with fake metrics to one 
 - 🚀 **Scalable Architecture**: Built for growth
 
 The platform now provides **authentic analytics** that help users understand their professional performance and make informed decisions about their careers in the fashion industry. 
+
+Dashboard Load → Fetch Analytics API → Fetch Profile API → Update Portfolio Analytics → Display Real Data 

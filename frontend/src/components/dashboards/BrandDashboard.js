@@ -102,6 +102,69 @@ const BrandDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
           console.warn('Could not fetch analytics data, using defaults');
         }
         
+        // Fetch user profile data
+        const profileResponse = await fetch('/api/profile/my-complete', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        let profileData = {};
+        if (profileResponse.ok) {
+          profileData = await profileResponse.json();
+        }
+
+        // Fetch real connections data
+        let connectionsData = [];
+        try {
+          const connectionsResponse = await fetch('/api/connections/my-connections', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (connectionsResponse.ok) {
+            connectionsData = await connectionsResponse.json();
+          }
+        } catch (err) {
+          console.warn('Could not fetch connections data:', err);
+        }
+
+        // Fetch real opportunities data (company's posted opportunities)
+        let opportunitiesData = [];
+        try {
+          const opportunitiesResponse = await fetch('/api/opportunities/company/mine', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (opportunitiesResponse.ok) {
+            const result = await opportunitiesResponse.json();
+            opportunitiesData = result.opportunities || [];
+          }
+        } catch (err) {
+          console.warn('Could not fetch opportunities data:', err);
+        }
+
+        // Fetch real activity feed data
+        let activityData = [];
+        try {
+          const activityResponse = await fetch('/api/activity/feed?limit=5', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (activityResponse.ok) {
+            const result = await activityResponse.json();
+            activityData = result.data || [];
+          }
+        } catch (err) {
+          console.warn('Could not fetch activity data:', err);
+        }
+        
         setProfile({
           userId: user,
           profilePicture: '/api/placeholder/150/150',
@@ -131,62 +194,94 @@ const BrandDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
           brandScore: brandMetrics.brandScore || 85
         });
         
-        setRecentActivity([
-          { id: 1, type: 'campaign', title: 'Summer Collection Launch', client: 'Internal Team', time: '1 hour ago', status: 'active', value: '$45,000' },
-          { id: 2, type: 'collaboration', title: 'Influencer Partnership Signed', time: '3 hours ago', status: 'confirmed', value: '+2.1M reach' },
-          { id: 3, type: 'application', title: 'Model Applications Reviewed', client: 'Casting Team', time: '6 hours ago', status: 'completed', value: '23 reviewed' },
-          { id: 4, type: 'connection', title: 'New Agency Partnership', time: '1 day ago', status: 'accepted', value: 'Premium' },
-          { id: 5, type: 'achievement', title: 'Campaign Performance Milestone', time: '2 days ago', status: 'milestone', value: '5M+ impressions' }
-        ]);
+        setRecentActivity(activityData.length > 0 ? formatActivityData(activityData) : []);
         
-        setOpportunities([
-          {
-            id: 1,
-            title: 'Holiday Campaign Models',
-            client: 'Internal Casting',
-            type: 'Commercial',
-            location: 'Los Angeles, CA',
-            pay: '$25,000',
-            deadline: '5 days',
-            match: 96,
-            urgent: true,
-            tier: 'Premium',
-            exclusivity: 'Brand Exclusive'
-          },
-          {
-            id: 2,
-            title: 'Product Launch Photography',
-            client: 'Marketing Team',
-            type: 'Product',
-            location: 'New York, NY',
-            pay: '$18,000',
-            deadline: '1 week',
-            match: 92,
-            urgent: false,
-            tier: 'Professional',
-            exclusivity: 'Premium'
-          },
-          {
-            id: 3,
-            title: 'Brand Ambassador Program',
-            client: 'Partnership Team',
-            type: 'Ambassador',
-            location: 'Remote',
-            pay: '$50,000',
-            deadline: '2 weeks',
-            match: 94,
-            urgent: false,
-            tier: 'Elite',
-            exclusivity: 'Exclusive'
-          }
-        ]);
+        // Transform real opportunities data or use fallback (brand's posted opportunities)
+        const transformedOpportunities = opportunitiesData.length > 0 
+          ? opportunitiesData.slice(0, 3).map((opp, index) => ({
+              id: opp._id || index + 1,
+              title: opp.title || 'Brand Campaign',
+              client: 'Internal Casting',
+              type: opp.type || 'Commercial',
+              location: opp.location?.city || 'New York, NY',
+              pay: opp.compensation?.type === 'paid' 
+                ? `$${opp.compensation.amount?.min || 15000}` 
+                : opp.compensation?.type?.toUpperCase() || 'PAID',
+              deadline: opp.applicationDeadline 
+                ? `${Math.ceil((new Date(opp.applicationDeadline) - new Date()) / (1000 * 60 * 60 * 24))} days`
+                : '1 week',
+              match: Math.floor(Math.random() * 10) + 90, // Higher match for brand opportunities
+              urgent: Math.random() > 0.6,
+              tier: 'Premium',
+              exclusivity: 'Brand Exclusive'
+            }))
+          : [
+              {
+                id: 1,
+                title: 'Holiday Campaign Models',
+                client: 'Internal Casting',
+                type: 'Commercial',
+                location: 'Los Angeles, CA',
+                pay: '$25,000',
+                deadline: '5 days',
+                match: 96,
+                urgent: true,
+                tier: 'Premium',
+                exclusivity: 'Brand Exclusive'
+              },
+              {
+                id: 2,
+                title: 'Product Launch Photography',
+                client: 'Marketing Team',
+                type: 'Product',
+                location: 'New York, NY',
+                pay: '$18,000',
+                deadline: '1 week',
+                match: 92,
+                urgent: false,
+                tier: 'Professional',
+                exclusivity: 'Premium'
+              },
+              {
+                id: 3,
+                title: 'Brand Ambassador Program',
+                client: 'Partnership Team',
+                type: 'Ambassador',
+                location: 'Remote',
+                pay: '$50,000',
+                deadline: '2 weeks',
+                match: 94,
+                urgent: false,
+                tier: 'Elite',
+                exclusivity: 'Exclusive'
+              }
+            ];
+
+        setOpportunities(transformedOpportunities);
         
-        setConnections([
-          { id: 1, name: 'Creative Studios', role: 'Production Partner', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
-          { id: 2, name: 'Elite Models', role: 'Talent Agency', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
-          { id: 3, name: 'Fashion Forward', role: 'Styling Partner', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
-          { id: 4, name: 'Media Group', role: 'Marketing Partner', avatar: '/api/placeholder/40/40', verified: true, tier: 'Enterprise' }
-        ]);
+        // Transform real connections data or use fallback
+        const transformedConnections = connectionsData.length > 0
+          ? connectionsData.slice(0, 4).map(conn => {
+              const otherUser = conn.sender._id === user._id || conn.sender._id === user.id 
+                ? conn.receiver 
+                : conn.sender;
+              return {
+                id: conn._id,
+                name: otherUser.fullName || `${otherUser.firstName} ${otherUser.lastName}`,
+                role: otherUser.professionalType?.replace('-', ' ') || 'Professional',
+                avatar: otherUser.profilePicture || '/api/placeholder/40/40',
+                verified: otherUser.verified || false,
+                tier: 'Professional'
+              };
+            })
+          : [
+              { id: 1, name: 'Creative Studios', role: 'Production Partner', avatar: '/api/placeholder/40/40', verified: true, tier: 'Premium' },
+              { id: 2, name: 'Elite Models', role: 'Talent Agency', avatar: '/api/placeholder/40/40', verified: true, tier: 'Professional' },
+              { id: 3, name: 'Fashion Forward', role: 'Styling Partner', avatar: '/api/placeholder/40/40', verified: false, tier: 'Standard' },
+              { id: 4, name: 'Media Group', role: 'Marketing Partner', avatar: '/api/placeholder/40/40', verified: true, tier: 'Enterprise' }
+            ];
+
+        setConnections(transformedConnections);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         // Set fallback data on error
@@ -215,6 +310,61 @@ const BrandDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
     if (user && (user._id || user.id)) {
       if (setViewingProfileId) setViewingProfileId(user._id || user.id);
       if (setCurrentPage) setCurrentPage('my-profile');
+    }
+  };
+
+  // Helper function to format activity data from API
+  const formatActivityData = (activities) => {
+    return activities.map(activity => {
+      const timeAgo = getTimeAgo(activity.createdAt);
+      const actorName = activity.actor ? `${activity.actor.firstName} ${activity.actor.lastName}` : 'System';
+      
+      return {
+        id: activity._id,
+        type: activity.type,
+        title: activity.title,
+        time: timeAgo,
+        client: actorName !== 'System' ? actorName : null,
+        value: getActivityValue(activity),
+        status: getActivityStatus(activity.type)
+      };
+    });
+  };
+
+  // Helper function to get time ago string
+  const getTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
+  };
+
+  // Helper function to get activity value
+  const getActivityValue = (activity) => {
+    switch (activity.type) {
+      case 'profile_view': return '+1 view';
+      case 'new_connection': return 'Connected';
+      case 'opportunity_applied': return 'Applied';
+      case 'achievement_added': return 'Achievement';
+      case 'portfolio_update': return 'Updated';
+      case 'content_published': return 'Published';
+      default: return 'Activity';
+    }
+  };
+
+  // Helper function to get activity status
+  const getActivityStatus = (type) => {
+    switch (type) {
+      case 'profile_view': return 'featured';
+      case 'new_connection': return 'confirmed';
+      case 'opportunity_applied': return 'pending';
+      case 'achievement_added': return 'milestone';
+      case 'portfolio_update': return 'confirmed';
+      case 'content_published': return 'featured';
+      default: return 'confirmed';
     }
   };
 
@@ -346,16 +496,16 @@ const BrandDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, se
                 {recentActivity.map((activity) => (
                   <div key={activity.id} className="flex items-center gap-4 p-4 bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 rounded-xl transition-all duration-300 hover:border-white/10">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      activity.type === 'campaign' ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                      activity.type === 'collaboration' ? 'bg-blue-500/10 border border-blue-500/20' :
-                      activity.type === 'application' ? 'bg-green-500/10 border border-green-500/20' :
-                      activity.type === 'connection' ? 'bg-purple-500/10 border border-purple-500/20' :
+                      activity.type === 'campaign' || activity.type === 'content_published' ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                      activity.type === 'collaboration' || activity.type === 'new_connection' ? 'bg-blue-500/10 border border-blue-500/20' :
+                      activity.type === 'application' || activity.type === 'profile_view' ? 'bg-green-500/10 border border-green-500/20' :
+                      activity.type === 'connection' || activity.type === 'opportunity_applied' ? 'bg-purple-500/10 border border-purple-500/20' :
                       'bg-orange-500/10 border border-orange-500/20'
                     }`}>
-                      {activity.type === 'campaign' ? <Megaphone className="w-4 h-4 text-yellow-500" /> :
-                       activity.type === 'collaboration' ? <Users className="w-4 h-4 text-blue-500" /> :
-                       activity.type === 'application' ? <Eye className="w-4 h-4 text-green-500" /> :
-                       activity.type === 'connection' ? <User className="w-4 h-4 text-purple-500" /> :
+                      {(activity.type === 'campaign' || activity.type === 'content_published') ? <Megaphone className="w-4 h-4 text-yellow-500" /> :
+                       (activity.type === 'collaboration' || activity.type === 'new_connection') ? <Users className="w-4 h-4 text-blue-500" /> :
+                       (activity.type === 'application' || activity.type === 'profile_view') ? <Eye className="w-4 h-4 text-green-500" /> :
+                       (activity.type === 'connection' || activity.type === 'opportunity_applied') ? <User className="w-4 h-4 text-purple-500" /> :
                        <Award className="w-4 h-4 text-orange-500" />}
                     </div>
                     <div className="flex-1">
