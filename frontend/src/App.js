@@ -16,6 +16,7 @@ import StylistProfileSetup from './components/setup/StylistProfileSetup';
 import MakeupArtistProfileSetup from './components/setup/MakeupArtistProfileSetup';
 import BrandProfileSetup from './components/setup/BrandProfileSetup';
 import AgencyProfileSetup from './components/setup/AgencyProfileSetup';
+import FashionStudentProfileSetup from './components/setup/FashionStudentProfileSetup';
 import ProfileSetup from './components/setup/ProfileSetup'; // Fallback
 
 // Dashboard Components
@@ -26,6 +27,7 @@ import StylistDashboard from './components/dashboards/StylistDashboard';
 import MakeupArtistDashboard from './components/dashboards/MakeupArtistDashboard';
 import BrandDashboard from './components/dashboards/BrandDashboard';
 import AgencyDashboard from './components/dashboards/AgencyDashboard';
+import FashionStudentDashboard from './components/dashboards/FashionStudentDashboard';
 import Dashboard from './components/dashboards/Dashboard'; // Fallback
 import CompanyDashboard from './components/dashboards/CompanyDashboard'; // Fallback
 
@@ -79,7 +81,8 @@ function App() {
       'stylist': 'stylist-profile-setup',
       'makeup-artist': 'makeup-artist-profile-setup',
       'brand': 'brand-profile-setup',
-      'agency': 'agency-profile-setup'
+      'agency': 'agency-profile-setup',
+      'fashion-student': 'fashion-student-profile-setup'
     };
     
     return setupMapping[professionalType] || 'profile-setup';
@@ -93,7 +96,8 @@ function App() {
         'photographer': 'photographer-dashboard',
         'fashion-designer': 'designer-dashboard',
         'stylist': 'stylist-dashboard',
-        'makeup-artist': 'makeup-artist-dashboard'
+        'makeup-artist': 'makeup-artist-dashboard',
+        'fashion-student': 'fashion-student-dashboard'
       };
       return dashboardMapping[userData.professionalType] || 'dashboard';
     } else if (userData.userType === 'hiring') {
@@ -380,6 +384,14 @@ function App() {
           />
         )}
 
+        {currentPage === 'fashion-student-profile-setup' && (
+          <FashionStudentProfileSetup
+            user={user} 
+            onLogout={handleLogout} 
+            onProfileComplete={handleProfileComplete}
+          />
+        )}
+
         {/* FALLBACK SETUP COMPONENT */}
         {currentPage === 'profile-setup' && (
           <ProfileSetup 
@@ -452,6 +464,16 @@ function App() {
 
         {currentPage === 'agency-dashboard' && (
           <AgencyDashboard 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+            onViewProfile={handleViewMyProfile}
+            setViewingProfileId={setViewingProfileId}
+          />
+        )}
+
+        {currentPage === 'fashion-student-dashboard' && (
+          <FashionStudentDashboard 
             user={user} 
             onLogout={handleLogout} 
             setCurrentPage={setCurrentPage}

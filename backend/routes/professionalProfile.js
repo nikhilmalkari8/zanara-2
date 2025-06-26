@@ -6,6 +6,7 @@ const MakeupArtistProfile = require('../models/MakeupArtistProfile');
 const PhotographerProfile = require('../models/PhotographerProfile');
 const FashionDesignerProfile = require('../models/FashionDesignerProfile');
 const StylistProfile = require('../models/StylistProfile');
+const FashionStudentProfile = require('../models/FashionStudentProfile');
 // Import other professional profile models as you create them
 // const BrandProfile = require('../models/BrandProfile');
 // const AgencyProfile = require('../models/AgencyProfile');
@@ -23,6 +24,7 @@ const getProfileModel = (professionalType) => {
     'photographer': PhotographerProfile,
     'fashion-designer': FashionDesignerProfile,
     'stylist': StylistProfile,
+    'fashion-student': FashionStudentProfile,
     // Add more as you create them
     // 'brand': BrandProfile,
     // 'agency': AgencyProfile
@@ -38,6 +40,7 @@ const getCollectionName = (professionalType) => {
     'photographer': 'photographerprofiles',
     'fashion-designer': 'fashiondesignerprofiles',
     'stylist': 'stylistprofiles',
+    'fashion-student': 'fashionstudentprofiles',
     // Add more as you create them
     // 'brand': 'brandprofiles',
     // 'agency': 'agencyprofiles'
@@ -57,6 +60,8 @@ router.get('/browse', auth, async (req, res) => {
       experience,
       availability,
       skills,
+      workStatus, // NEW: Work status filter
+      services, // NEW: Specialized services filter
       // Model-specific filters
       gender,
       bodyType,
@@ -86,13 +91,22 @@ router.get('/browse', auth, async (req, res) => {
       // Text search
       if (search) {
         const searchRegex = new RegExp(search, 'i');
-        const matchingUsers = await User.find({
+        
+        // Build user query with work status filter
+        let userQuery = {
           professionalType: profType,
           $or: [
             { firstName: searchRegex },
             { lastName: searchRegex }
           ]
-        }).select('_id');
+        };
+        
+        // Add work status filter to user query
+        if (workStatus && workStatus !== 'all') {
+          userQuery.workStatus = workStatus;
+        }
+        
+        const matchingUsers = await User.find(userQuery).select('_id');
         const matchingUserIds = matchingUsers.map(user => user._id);
         
         query.$or = [
@@ -101,6 +115,14 @@ router.get('/browse', auth, async (req, res) => {
           { specializations: searchRegex },
           { location: searchRegex }
         ];
+      } else if (workStatus && workStatus !== 'all') {
+        // If no search but work status filter, get matching users
+        const matchingUsers = await User.find({
+          professionalType: profType,
+          workStatus: workStatus
+        }).select('_id');
+        const matchingUserIds = matchingUsers.map(user => user._id);
+        query.userId = { $in: matchingUserIds };
       }
 
       // Location filter
@@ -123,6 +145,17 @@ router.get('/browse', auth, async (req, res) => {
       if (skills) {
         const skillsArray = skills.split(',').map(s => s.trim());
         query.skills = { $in: skillsArray };
+      }
+
+      // Work status filter
+      if (workStatus && workStatus !== 'all') {
+        query['user.workStatus'] = workStatus;
+      }
+
+      // Services filter
+      if (services && services !== 'all') {
+        const servicesList = services.split(',').map(s => s.trim());
+        query.specializedServices = { $in: servicesList };
       }
 
       // Model-specific filters
@@ -149,7 +182,7 @@ router.get('/browse', auth, async (req, res) => {
       try {
         // Execute query for this professional type
         let profiles = await ProfileModel.find(query)
-          .populate('userId', 'firstName lastName email professionalType')
+          .populate('userId', 'firstName lastName email professionalType workStatus')
           .lean();
 
         // Add professional type and computed fields
@@ -159,7 +192,8 @@ router.get('/browse', auth, async (req, res) => {
           displayName: profType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
           profileViews: Math.floor(Math.random() * 1000) + 50, // Mock data
           lastActive: new Date(Date.now() - Math.floor(Math.random() * 604800000)), // Random within last week
-          location: profile.preferredLocations?.[0] || profile.location || 'Location not specified'
+          location: profile.preferredLocations?.[0] || profile.location || 'Location not specified',
+          workStatus: profile.userId?.workStatus || 'not-specified'
         }));
 
         allProfiles = allProfiles.concat(profiles);
@@ -202,6 +236,13 @@ router.get('/browse', auth, async (req, res) => {
       hasMore: page < totalPages,
       breakdown,
       searchedTypes: typesToSearch,
+      filters: {
+        workStatus: workStatus || 'all',
+        location: location || '',
+        experience: experience || 'all',
+        availability: availability || 'all',
+        skills: skills || ''
+      },
       searchContext: {
         searcherType: req.user?.userType || 'talent',
         searcherProfession: req.user?.professionalType,

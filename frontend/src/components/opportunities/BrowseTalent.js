@@ -9,7 +9,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     location: '',
     experience: 'all',
     availability: 'all',
+    workStatus: 'all',
     skills: [],
+    services: [],
     // Model-specific filters
     gender: 'all',
     bodyType: 'all',
@@ -81,6 +83,16 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       hasHeight: false,
       hasGender: false,
       commonSkills: ['Bridal Makeup', 'Editorial', 'SFX', 'Beauty', 'Airbrush', 'Color Correction']
+    },
+    { 
+      id: 'fashion-student', 
+      label: 'Fashion Students', 
+      icon: '🎓',
+      hasPhysicalAttributes: false,
+      hasAge: false,
+      hasHeight: false,
+      hasGender: false,
+      commonSkills: ['Design Research', 'Sketching', 'Portfolio Development', 'Trend Analysis', 'Academic Projects']
     }
   ];
 
@@ -134,6 +146,29 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
     { value: 'project-based', label: 'Project Based' }
   ];
 
+  const workStatusOptions = [
+    { value: 'all', label: 'All Work Status' },
+    { value: 'freelancer', label: 'Freelancer' },
+    { value: 'full-time', label: 'Full-time Employee' },
+    { value: 'part-time', label: 'Part-time Employee' },
+    { value: 'contract', label: 'Contract Worker' },
+    { value: 'seeking-work', label: 'Seeking Work' },
+    { value: 'student', label: 'Student' },
+    { value: 'not-specified', label: 'Not Specified' }
+  ];
+
+  const servicesOptions = [
+    'Fashion Modeling', 'Commercial Modeling', 'Editorial Modeling', 'Runway Modeling',
+    'Fitness Modeling', 'Beauty Modeling', 'Plus-Size Modeling', 'Petite Modeling',
+    'Mature Modeling', 'Alternative Modeling', 'Swimwear Modeling', 'Lingerie Modeling',
+    'Hand Modeling', 'Foot Modeling', 'Hair Modeling', 'Product Modeling',
+    'Lifestyle Modeling', 'E-commerce Modeling', 'Catalog Modeling', 'Brand Ambassador',
+    'Trade Show Modeling', 'Promotional Modeling', 'Fashion Photography', 'Portrait Photography',
+    'Commercial Photography', 'Editorial Photography', 'Beauty Photography', 'Product Photography',
+    'Bridal Makeup', 'Editorial Makeup', 'Fashion Makeup', 'Beauty Makeup', 'Commercial Makeup',
+    'Special Effects Makeup', 'Custom Design', 'Alterations', 'Pattern Making', 'Styling Services'
+  ];
+
   const sortOptions = [
     { value: 'newest', label: 'Newest Profiles' },
     { value: 'relevance', label: 'Most Relevant' },
@@ -161,7 +196,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       if (filters.location.trim()) queryParams.append('location', filters.location.trim());
       if (filters.experience !== 'all') queryParams.append('experience', filters.experience);
       if (filters.availability !== 'all') queryParams.append('availability', filters.availability);
+      if (filters.workStatus !== 'all') queryParams.append('workStatus', filters.workStatus);
       if (filters.skills.length > 0) queryParams.append('skills', filters.skills.join(','));
+      if (filters.services.length > 0) queryParams.append('services', filters.services.join(','));
       if (filters.sort) queryParams.append('sort', filters.sort);
 
       // Only add model-specific filters if models are selected
@@ -264,7 +301,9 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
       location: '',
       experience: 'all',
       availability: 'all',
+      workStatus: 'all',
       skills: [],
+      services: [],
       gender: 'all',
       bodyType: 'all',
       hairColor: '',
@@ -564,7 +603,69 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                   </div>
                 </>
               )}
+              
+              {/* Work Status - Show for all professional types */}
+              <div style={{ 
+                color: 'rgba(255, 255, 255, 0.9)', 
+                fontSize: '0.95rem',
+                fontWeight: '500',
+                gridColumn: talent.professionalType === 'model' ? 'span 2' : 'span 1'
+              }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Status:</span> {
+                  talent.workStatus ? 
+                    workStatusOptions.find(option => option.value === talent.workStatus)?.label || talent.workStatus
+                    : 'Not specified'
+                }
+              </div>
             </div>
+
+            {/* Specialized Services */}
+            {talent.specializedServices && talent.specializedServices.length > 0 && (
+              <div style={{
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  color: 'rgba(255, 255, 255, 0.6)', 
+                  fontSize: '0.85rem',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Services:
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px'
+                }}>
+                  {talent.specializedServices.slice(0, 4).map((service, index) => (
+                    <span key={index} style={{
+                      padding: '4px 10px',
+                      background: 'rgba(78, 205, 196, 0.2)',
+                      color: '#4ECDCC',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      fontWeight: '500',
+                      border: '1px solid rgba(78, 205, 196, 0.3)'
+                    }}>
+                      {service}
+                    </span>
+                  ))}
+                  {talent.specializedServices.length > 4 && (
+                    <span style={{
+                      padding: '4px 10px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      fontWeight: '500',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}>
+                      +{talent.specializedServices.length - 4} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Skills/Tags */}
             <div style={{
@@ -1096,6 +1197,54 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                       }}
                     >
                       {availabilityOptions.map(option => (
+                        <option key={option.value} value={option.value} style={{ background: '#333', color: 'white' }}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ 
+                      display: 'block', 
+                      color: 'rgba(255, 255, 255, 0.9)', 
+                      marginBottom: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.95rem'
+                    }}>
+                      Work Status
+                    </label>
+                    <select
+                      value={filters.workStatus}
+                      onChange={(e) => handleFilterChange('workStatus', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '15px',
+                        outline: 'none',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.3s ease',
+                        appearance: 'none',
+                        backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 16px top 50%',
+                        backgroundSize: '12px auto',
+                        paddingRight: '40px'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.border = '1px solid rgba(78, 205, 196, 0.6)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                      }}
+                    >
+                      {workStatusOptions.map(option => (
                         <option key={option.value} value={option.value} style={{ background: '#333', color: 'white' }}>
                           {option.label}
                         </option>
@@ -1683,6 +1832,54 @@ const BrowseTalent = ({ user, onLogout, setCurrentPage, onViewProfile, setViewin
                     >
                       List
                     </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    color: 'rgba(255, 255, 255, 0.9)', 
+                    marginBottom: '8px',
+                    fontWeight: '600',
+                    fontSize: '0.95rem'
+                  }}>
+                    Specialized Services
+                  </label>
+                  <div style={{
+                    maxHeight: '120px',
+                    overflowY: 'auto',
+                    padding: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    {servicesOptions.map(service => (
+                      <label key={service} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 0',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        color: 'rgba(255, 255, 255, 0.9)'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={filters.services.includes(service)}
+                          onChange={(e) => {
+                            const newServices = e.target.checked
+                              ? [...filters.services, service]
+                              : filters.services.filter(s => s !== service);
+                            handleFilterChange('services', newServices);
+                          }}
+                          style={{
+                            marginRight: '8px',
+                            accentColor: '#4ECDCC'
+                          }}
+                        />
+                        {service}
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>

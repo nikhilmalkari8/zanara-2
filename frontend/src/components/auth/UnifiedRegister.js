@@ -36,6 +36,13 @@ const PROFESSIONAL_TYPES = {
     icon: '✧',
     features: ['Fashion Modeling', 'Commercial Work', 'Editorial Shoots', 'Runway Shows']
   },
+  'fashion-student': {
+    label: 'Fashion Student',
+    description: 'Future innovator. Master the foundations while building your unique creative voice in the fashion industry.',
+    gradient: 'linear-gradient(135deg, #00d2d3 0%, #54a0ff 100%)',
+    icon: '◈',
+    features: ['Academic Projects', 'Portfolio Development', 'Internship Opportunities', 'Skill Building']
+  },
   'brand': {
     label: 'Fashion House',
     description: 'Vision architects. Build legacy brands that define cultural moments and shape industry standards.',
@@ -102,11 +109,23 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
     email: '',
     phoneNumber: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    workStatus: 'not-specified'
   });
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
+
+  // Work status options
+  const workStatusOptions = [
+    { value: 'freelancer', label: 'Freelancer' },
+    { value: 'full-time', label: 'Full-time Employee' },
+    { value: 'part-time', label: 'Part-time Employee' },
+    { value: 'contract', label: 'Contract Worker' },
+    { value: 'seeking-work', label: 'Seeking Work' },
+    { value: 'student', label: 'Student' },
+    { value: 'not-specified', label: 'Prefer not to specify' }
+  ];
 
   const handleTypeSelection = useCallback((type) => {
     setSelectedType(type);
@@ -154,7 +173,8 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
           phoneNumber: formData.phoneNumber,
           password: formData.password,
           professionalType: selectedType,
-          userType: ['brand', 'agency'].includes(selectedType) ? 'hiring' : 'talent'
+          userType: ['brand', 'agency'].includes(selectedType) ? 'hiring' : 'talent',
+          workStatus: formData.workStatus
         }),
       });
       
@@ -558,6 +578,20 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
               placeholder="Confirm Password"
               required
             />
+            
+            <select
+              name="workStatus"
+              value={formData.workStatus}
+              onChange={handleInputChange}
+              className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10"
+              required
+            >
+              {workStatusOptions.map((option) => (
+                <option key={option.value} value={option.value} style={{ backgroundColor: '#1a1a1a', color: 'white' }}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             
             {message && (
               <div className={`message p-3 rounded-lg text-center text-sm ${message.includes('successful') ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>

@@ -134,7 +134,7 @@ const FormCheckboxGroup = React.memo(function FormCheckboxGroup({
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-300">{label}</label>
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${columns} gap-3`}>
+      <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-3`}>
         {options.map((option) => {
           const isSelected = selectedValues.includes(option);
           return (
@@ -223,6 +223,7 @@ const ModelProfileSetup = ({
       twitter: '' 
     },
     availability: '',
+    workStatus: 'freelancer',
     travelWillingness: '',
     preferredLocations: [],
     workTypes: [],
@@ -237,6 +238,7 @@ const ModelProfileSetup = ({
     wardrobe: '',
     props: '',
     modelType: '',
+    specializedServices: [],
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -317,6 +319,14 @@ const ModelProfileSetup = ({
       'Yoga/Pilates', 'Musical Instruments', 'Languages', 'Acrobatics',
       'Horseback Riding', 'Swimming/Diving', 'Rock Climbing', 'Skateboarding'
     ],
+    specializedServices: [
+      'Fashion Modeling', 'Commercial Modeling', 'Editorial Modeling', 'Runway Modeling',
+      'Fitness Modeling', 'Beauty Modeling', 'Plus-Size Modeling', 'Petite Modeling',
+      'Mature Modeling', 'Alternative Modeling', 'Swimwear Modeling', 'Lingerie Modeling',
+      'Hand Modeling', 'Foot Modeling', 'Hair Modeling', 'Product Modeling',
+      'Lifestyle Modeling', 'E-commerce Modeling', 'Catalog Modeling', 'Brand Ambassador',
+      'Trade Show Modeling', 'Promotional Modeling'
+    ],
     genders: [
       { value: 'female', label: 'Female' },
       { value: 'male', label: 'Male' },
@@ -352,6 +362,15 @@ const ModelProfileSetup = ({
       { value: 'freelance', label: 'Freelance/Project Based' },
       { value: 'weekends-only', label: 'Weekends Only' },
       { value: 'seasonal', label: 'Seasonal' }
+    ],
+    workStatus: [
+      { value: 'freelancer', label: 'Freelancer' },
+      { value: 'full-time', label: 'Full-time Employee' },
+      { value: 'part-time', label: 'Part-time Employee' },
+      { value: 'contract', label: 'Contract Worker' },
+      { value: 'seeking-work', label: 'Seeking Work' },
+      { value: 'student', label: 'Student' },
+      { value: 'not-specified', label: 'Prefer not to specify' }
     ],
     travel: [
       { value: 'local-only', label: 'Local Only' },
@@ -893,6 +912,15 @@ const ModelProfileSetup = ({
                  required
                />
                <FormSelect
+                 label="Work Status"
+                 value={profileData.workStatus}
+                 onChange={(e) => handleInputChange('workStatus', e.target.value)}
+                 options={options.workStatus}
+                 placeholder="Select work status"
+                 error={errors.workStatus}
+                 required
+               />
+               <FormSelect
                  label="Travel Willingness"
                  value={profileData.travelWillingness}
                  onChange={(e) => handleInputChange('travelWillingness', e.target.value)}
@@ -1001,6 +1029,14 @@ const ModelProfileSetup = ({
                columns={3}
              />
 
+             <FormCheckboxGroup
+               label="Specialized Modeling Services"
+               options={options.specializedServices}
+               selectedValues={profileData.specializedServices}
+               onChange={(values) => handleInputChange('specializedServices', values)}
+               columns={3}
+             />
+
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <FormTextarea
                  label="Wardrobe Description"
@@ -1076,8 +1112,10 @@ const ModelProfileSetup = ({
                <div className="space-y-3 text-sm">
                  <div><span className="text-gray-400">Headline:</span> <span className="text-white">{profileData.headline}</span></div>
                  <div><span className="text-gray-400">Experience:</span> <span className="text-white">{profileData.experienceLevel} ({profileData.yearsExperience})</span></div>
+                 <div><span className="text-gray-400">Work Status:</span> <span className="text-white">{options.workStatus.find(option => option.value === profileData.workStatus)?.label || profileData.workStatus}</span></div>
                  <div><span className="text-gray-400">Model Type:</span> <span className="text-white">{profileData.modelType}</span></div>
                  <div><span className="text-gray-400">Specialties:</span> <span className="text-white">{profileData.modelingTypes.join(', ')}</span></div>
+                 <div><span className="text-gray-400">Services:</span> <span className="text-white">{profileData.specializedServices.length > 0 ? profileData.specializedServices.join(', ') : 'None specified'}</span></div>
                  {profileData.bio && (
                    <div><span className="text-gray-400">Bio:</span> <span className="text-white">{profileData.bio.substring(0, 200)}...</span></div>
                  )}

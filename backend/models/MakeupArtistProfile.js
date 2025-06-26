@@ -62,6 +62,40 @@ const makeupArtistProfileSchema = new mongoose.Schema({
   studioAccess: { type: String, trim: true },
   equipmentOwned: [{ type: String, trim: true }],
   
+  // Specialized Services
+  specializedServices: [{
+    type: String,
+    enum: [
+      'Bridal Makeup',
+      'Wedding Party Makeup',
+      'Editorial Makeup',
+      'Fashion Makeup',
+      'Beauty Makeup',
+      'Commercial Makeup',
+      'Special Effects Makeup',
+      'Theatrical Makeup',
+      'Film/TV Makeup',
+      'Photoshoot Makeup',
+      'Event Makeup',
+      'Party Makeup',
+      'Prom Makeup',
+      'Graduation Makeup',
+      'Corporate Headshots',
+      'Red Carpet Makeup',
+      'Airbrush Makeup',
+      'HD Makeup',
+      'Mature Skin Makeup',
+      'Men\'s Grooming',
+      'Makeup Lessons',
+      'Makeup Consultation',
+      'Color Analysis',
+      'Skincare Consultation',
+      'Lash Extensions',
+      'Brow Shaping'
+    ],
+    trim: true
+  }],
+  
   // Rates & Services
   rates: {
     bridal: { type: String, trim: true },

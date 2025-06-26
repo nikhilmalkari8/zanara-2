@@ -94,6 +94,44 @@ const photographerProfileSchema = new mongoose.Schema({
     trim: true
   }],
 
+  // Specialized Services
+  specializedServices: [{
+    type: String,
+    enum: [
+      'Fashion Photography',
+      'Portrait Photography',
+      'Commercial Photography',
+      'Editorial Photography',
+      'Beauty Photography',
+      'Product Photography',
+      'Lifestyle Photography',
+      'Event Photography',
+      'Wedding Photography',
+      'Engagement Photography',
+      'Headshot Photography',
+      'Corporate Photography',
+      'Brand Photography',
+      'E-commerce Photography',
+      'Catalog Photography',
+      'Lookbook Photography',
+      'Campaign Photography',
+      'Street Style Photography',
+      'Behind-the-Scenes Photography',
+      'Studio Photography',
+      'Location Photography',
+      'Natural Light Photography',
+      'Fine Art Photography',
+      'Conceptual Photography',
+      'Model Portfolio Photography',
+      'Actor Headshots',
+      'Business Portraits',
+      'Creative Direction',
+      'Photo Retouching',
+      'Photo Editing'
+    ],
+    trim: true
+  }],
+
   // Portfolio & Social Media
   portfolioWebsite: { type: String, trim: true },
   instagramBusiness: { type: String, trim: true },

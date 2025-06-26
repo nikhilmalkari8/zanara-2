@@ -23,7 +23,8 @@ router.post('/register', async (req, res) => {
       phoneNumber, 
       password, 
       professionalType,
-      userType 
+      userType,
+      workStatus
     } = req.body;
 
     // Validate required fields
@@ -36,12 +37,24 @@ router.post('/register', async (req, res) => {
     // Validate professional type
     const validTypes = [
       'fashion-designer', 'stylist', 'photographer', 
-      'makeup-artist', 'model', 'brand', 'agency'
+      'makeup-artist', 'model', 'brand', 'agency', 'fashion-student'
     ];
     
     if (!validTypes.includes(professionalType)) {
       return res.status(400).json({
         message: 'Invalid professional type'
+      });
+    }
+
+    // Validate work status if provided
+    const validWorkStatuses = [
+      'freelancer', 'full-time', 'part-time', 'contract', 
+      'seeking-work', 'student', 'not-specified'
+    ];
+    
+    if (workStatus && !validWorkStatuses.includes(workStatus)) {
+      return res.status(400).json({
+        message: 'Invalid work status'
       });
     }
 
@@ -59,6 +72,18 @@ router.post('/register', async (req, res) => {
       finalUserType = ['brand', 'agency'].includes(professionalType) ? 'hiring' : 'talent';
     }
 
+    // Set default work status based on professional type if not provided
+    let finalWorkStatus = workStatus || 'not-specified';
+    if (!workStatus) {
+      if (professionalType === 'fashion-student') {
+        finalWorkStatus = 'student';
+      } else if (['brand', 'agency'].includes(professionalType)) {
+        finalWorkStatus = 'full-time';
+      } else {
+        finalWorkStatus = 'freelancer'; // Default for creative professionals
+      }
+    }
+
     // Create new user
     const user = new User({
       firstName: firstName.trim(),
@@ -68,6 +93,7 @@ router.post('/register', async (req, res) => {
       password,
       professionalType,
       userType: finalUserType,
+      workStatus: finalWorkStatus,
       headline: `${professionalType.split('-').map(word => 
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ')} | New to Zanara`,
@@ -93,6 +119,7 @@ router.post('/register', async (req, res) => {
         phoneNumber: user.phoneNumber,
         professionalType: user.professionalType,
         userType: user.userType,
+        workStatus: user.workStatus,
         headline: user.headline,
         profileComplete: user.profileComplete,
         profileCompletionScore: user.profileCompletionScore,
@@ -209,6 +236,7 @@ router.post('/login', async (req, res) => {
         phoneNumber: user.phoneNumber,
         professionalType: user.professionalType,
         userType: user.userType,
+        workStatus: user.workStatus,
         headline: user.headline,
         bio: user.bio,
         location: user.location,
@@ -262,6 +290,7 @@ router.get('/me', auth, async (req, res) => {
       phoneNumber: user.phoneNumber,
       professionalType: user.professionalType,
       userType: user.userType,
+      workStatus: user.workStatus,
       headline: user.headline,
       bio: user.bio,
       location: user.location,
@@ -297,6 +326,7 @@ router.put('/profile', auth, async (req, res) => {
       bio, 
       location, 
       website,
+      workStatus,
       profileVisibility,
       notificationSettings 
     } = req.body;
@@ -313,6 +343,7 @@ router.put('/profile', auth, async (req, res) => {
     if (bio) user.bio = bio.trim();
     if (location) user.location = location.trim();
     if (website) user.website = website.trim();
+    if (workStatus) user.workStatus = workStatus;
     if (profileVisibility) user.profileVisibility = profileVisibility;
     if (notificationSettings) {
       user.notificationSettings = { ...user.notificationSettings, ...notificationSettings };

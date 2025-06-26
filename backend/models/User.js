@@ -37,7 +37,8 @@ const userSchema = new mongoose.Schema({
       'makeup-artist',
       'model',
       'brand',
-      'agency'
+      'agency',
+      'fashion-student'
     ],
     required: true
   },
@@ -81,6 +82,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['public', 'connections', 'private'],
     default: 'public'
+  },
+  // NEW: Work Status Field
+  workStatus: {
+    type: String,
+    enum: ['freelancer', 'full-time', 'part-time', 'contract', 'seeking-work', 'student', 'not-specified'],
+    default: 'not-specified'
   },
   // NEW: Professional Information
   headline: {
@@ -266,11 +273,13 @@ userSchema.index({ profileComplete: 1 });
 userSchema.index({ verificationTier: 1 });
 userSchema.index({ subscriptionTier: 1 });
 userSchema.index({ location: 1 });
+userSchema.index({ workStatus: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ lastActiveAt: -1 });
 
 // NEW: Compound indexes
 userSchema.index({ professionalType: 1, profileComplete: 1 });
 userSchema.index({ userType: 1, verificationTier: 1 });
+userSchema.index({ professionalType: 1, workStatus: 1 });
 
 module.exports = mongoose.model('User', userSchema);

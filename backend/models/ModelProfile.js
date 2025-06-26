@@ -115,6 +115,36 @@ const modelProfileSchema = new mongoose.Schema({
   wardrobe: { type: String, trim: true },
   props: { type: String, trim: true },
   
+  // Specialized Services
+  specializedServices: [{
+    type: String,
+    enum: [
+      'Fashion Modeling',
+      'Commercial Modeling', 
+      'Editorial Modeling',
+      'Runway Modeling',
+      'Fitness Modeling',
+      'Beauty Modeling',
+      'Plus-Size Modeling',
+      'Petite Modeling',
+      'Mature Modeling',
+      'Alternative Modeling',
+      'Swimwear Modeling',
+      'Lingerie Modeling',
+      'Hand Modeling',
+      'Foot Modeling',
+      'Hair Modeling',
+      'Product Modeling',
+      'Lifestyle Modeling',
+      'E-commerce Modeling',
+      'Catalog Modeling',
+      'Brand Ambassador',
+      'Trade Show Modeling',
+      'Promotional Modeling'
+    ],
+    trim: true
+  }],
+  
   // Status & Analytics
   isComplete: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
