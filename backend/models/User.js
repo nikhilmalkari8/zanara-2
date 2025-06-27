@@ -259,7 +259,86 @@ const userSchema = new mongoose.Schema({
     imageUrl: String,
     verificationUrl: String,
     isPublic: { type: Boolean, default: true }
-  }]
+  }],
+  // NEW: Personal Information
+  dateOfBirth: {
+    type: Date
+  },
+  birthdayPrivacy: {
+    type: String,
+    enum: ['public', 'connections', 'private'],
+    default: 'connections'
+  },
+  
+  // Phase 4: User Activity Patterns for Smart Timing
+  activityPatterns: {
+    // Track when user is most active (hourly patterns)
+    activeHours: [{
+      hour: { type: Number, min: 0, max: 23 },
+      activityScore: { type: Number, default: 0 },
+      lastUpdated: { type: Date, default: Date.now }
+    }],
+    // Track days of week activity
+    activeDays: [{
+      dayOfWeek: { type: Number, min: 0, max: 6 }, // 0 = Sunday
+      activityScore: { type: Number, default: 0 },
+      lastUpdated: { type: Date, default: Date.now }
+    }],
+    // Timezone for smart delivery
+    timezone: {
+      type: String,
+      default: 'UTC'
+    },
+    // Preferred notification times
+    preferredNotificationTimes: [{
+      hour: { type: Number, min: 0, max: 23 },
+      minute: { type: Number, min: 0, max: 59, default: 0 },
+      enabled: { type: Boolean, default: true }
+    }],
+    // Last activity analysis
+    lastAnalyzed: { type: Date, default: Date.now },
+    // Engagement patterns
+    engagementHistory: {
+      preferredHours: [{ type: Number, min: 0, max: 23 }],
+      preferredContentLength: { type: Number, default: 500 },
+      preferredHashtags: [String],
+      avgSessionDuration: { type: Number, default: 0 }, // in minutes
+      totalSessions: { type: Number, default: 0 }
+    }
+  },
+
+  // Phase 4: Notification Delivery Preferences
+  notificationDelivery: {
+    smartTiming: {
+      enabled: { type: Boolean, default: true },
+      respectQuietHours: { type: Boolean, default: true },
+      quietHoursStart: { type: Number, default: 22 }, // 10 PM
+      quietHoursEnd: { type: Number, default: 8 }, // 8 AM
+    },
+    digestPreferences: {
+      daily: {
+        enabled: { type: Boolean, default: false },
+        time: { hour: { type: Number, default: 9 }, minute: { type: Number, default: 0 } }
+      },
+      weekly: {
+        enabled: { type: Boolean, default: true },
+        dayOfWeek: { type: Number, default: 1 }, // Monday
+        time: { hour: { type: Number, default: 9 }, minute: { type: Number, default: 0 } }
+      },
+      monthly: {
+        enabled: { type: Boolean, default: false },
+        dayOfMonth: { type: Number, default: 1 },
+        time: { hour: { type: Number, default: 9 }, minute: { type: Number, default: 0 } }
+      }
+    },
+    // Batch notification settings
+    batchingPreferences: {
+      enabled: { type: Boolean, default: true },
+      maxBatchSize: { type: Number, default: 10 },
+      batchWindow: { type: Number, default: 60 }, // minutes
+      priorityTypes: [{ type: String }] // notification types that should never be batched
+    }
+  }
 }, {
   timestamps: true
 });

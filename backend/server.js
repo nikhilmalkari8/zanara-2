@@ -148,10 +148,9 @@ app.use('*', (req, res) => {
   });
 });
 
-// Initialize Socket.IO service
-socketService.initialize(server);
-socketService.setupMiddleware();
-socketService.setupEventHandlers();
+// Initialize congratulations automation
+const congratulationsService = require('./services/congratulationsService');
+congratulationsService.scheduleAutomation();
 
 // MongoDB connection with better error handling
 mongoose.connect(process.env.MONGODB_URI, {
@@ -180,13 +179,15 @@ mongoose.connection.on('disconnected', () => {
   console.warn('MongoDB disconnected');
 });
 
-// Initialize congratulations automation
-const congratulationsService = require('./services/congratulationsService');
-congratulationsService.scheduleAutomation();
+// Phase 4: Initialize Intelligent Notification Scheduler
+const notificationScheduler = require('./services/notificationScheduler');
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  
+  // Stop notification scheduler
+  await notificationScheduler.stopScheduler();
   
   // Close MongoDB connection
   await mongoose.connection.close();
@@ -195,12 +196,33 @@ process.on('SIGINT', async () => {
 });
 
 const PORT = process.env.PORT || 8001;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Zanara API Server running on port ${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔌 Socket.IO enabled`);
   console.log(`💳 Stripe payments: ${!!process.env.STRIPE_SECRET_KEY ? 'Enabled' : 'Disabled'}`);
+  
+  // Start Phase 4 Intelligent Notification Scheduler
+  console.log('🔌 Initializing Socket.IO service...');
+  try {
+    socketService.initialize(server);
+    socketService.setupMiddleware();
+    socketService.setupEventHandlers();
+    console.log('✅ Socket.IO service initialized');
+    
+    // Start notification scheduler after a short delay to ensure everything is ready
+    setTimeout(async () => {
+      try {
+        await notificationScheduler.startScheduler();
+      } catch (error) {
+        console.error('❌ Failed to start notification scheduler:', error);
+      }
+    }, 3000); // 3 second delay
+    
+  } catch (error) {
+    console.error('❌ Socket.IO initialization error:', error);
+  }
 });
 
 // Handle server errors

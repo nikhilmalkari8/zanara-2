@@ -41,7 +41,19 @@ const notificationSchema = new mongoose.Schema({
       'recommendation_received',
       'recommendation_approved',
       'congratulation_suggestion',
-      'congratulation_received'
+      'congratulation_received',
+      // Phase 4: Intelligent Notifications
+      'test_notification',
+      'birthday_wish_received',
+      'birthday_suggestion',
+      'daily_digest',
+      'weekly_digest',
+      'monthly_digest',
+      'celebrate_milestone_suggestion',
+      'congratulate_job_suggestion',
+      'mutual_connection_suggestion',
+      'reconnection_suggestion',
+      'industry_introduction_suggestion'
     ]
   },
   
@@ -82,7 +94,7 @@ const notificationSchema = new mongoose.Schema({
   status: {
     type: String,
     default: 'unread',
-    enum: ['unread', 'read', 'archived']
+    enum: ['unread', 'read', 'archived', 'scheduled']
   },
   
   // Priority level

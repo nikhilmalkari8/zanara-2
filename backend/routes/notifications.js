@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
+const notificationScheduler = require('../services/notificationScheduler');
+const smartTimingService = require('../services/smartTimingService');
+const birthdayService = require('../services/birthdayService');
+const digestService = require('../services/digestService');
+const contextualSuggestionsService = require('../services/contextualSuggestionsService');
 
 // Get user notifications
 router.get('/', auth, async (req, res) => {
@@ -447,6 +453,295 @@ router.put('/settings', auth, async (req, res) => {
       success: false,
       message: 'Error updating notification settings',
       error: error.message
+    });
+  }
+});
+
+// Phase 4: Intelligent Notification Management Routes
+
+// Get scheduler status
+router.get('/scheduler/status', async (req, res) => {
+  try {
+    const status = notificationScheduler.getSchedulerStatus();
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    console.error('Error getting scheduler status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get scheduler status'
+    });
+  }
+});
+
+// Get comprehensive notification statistics
+router.get('/scheduler/stats', async (req, res) => {
+  try {
+    const stats = await notificationScheduler.getComprehensiveStats();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error getting notification stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notification statistics'
+    });
+  }
+});
+
+// Manually run a specific notification task
+router.post('/scheduler/run/:taskName', async (req, res) => {
+  try {
+    const { taskName } = req.params;
+    const result = await notificationScheduler.runTaskManually(taskName);
+    
+    res.json({
+      success: result.success,
+      data: result,
+      message: result.success ? `Task ${taskName} completed successfully` : `Task ${taskName} failed`
+    });
+  } catch (error) {
+    console.error('Error running manual task:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to run task'
+    });
+  }
+});
+
+// Start/stop scheduler
+router.post('/scheduler/:action', async (req, res) => {
+  try {
+    const { action } = req.params;
+    
+    let result;
+    switch (action) {
+      case 'start':
+        await notificationScheduler.startScheduler();
+        result = { message: 'Notification scheduler started' };
+        break;
+      case 'stop':
+        await notificationScheduler.stopScheduler();
+        result = { message: 'Notification scheduler stopped' };
+        break;
+      case 'restart':
+        await notificationScheduler.restartScheduler();
+        result = { message: 'Notification scheduler restarted' };
+        break;
+      case 'emergency-stop':
+        result = await notificationScheduler.emergencyStop();
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid action. Use: start, stop, restart, or emergency-stop'
+        });
+    }
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error controlling scheduler:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to control scheduler'
+    });
+  }
+});
+
+// Test all notification services
+router.post('/scheduler/test', async (req, res) => {
+  try {
+    const testResults = await notificationScheduler.testAllServices();
+    res.json({
+      success: testResults.overall === 'passed',
+      data: testResults
+    });
+  } catch (error) {
+    console.error('Error testing services:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to test services'
+    });
+  }
+});
+
+// Get user's activity patterns
+router.get('/activity-patterns', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId).select('activityPatterns notificationDelivery');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        activityPatterns: user.activityPatterns,
+        notificationDelivery: user.notificationDelivery
+      }
+    });
+  } catch (error) {
+    console.error('Error getting activity patterns:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get activity patterns'
+    });
+  }
+});
+
+// Update user's notification preferences
+router.put('/preferences', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { notificationDelivery } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { notificationDelivery },
+      { new: true, runValidators: true }
+    ).select('notificationDelivery');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user.notificationDelivery,
+      message: 'Notification preferences updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update notification preferences'
+    });
+  }
+});
+
+// Trigger activity pattern analysis for current user
+router.post('/analyze-patterns', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const result = await smartTimingService.analyzeUserActivityPatterns(userId);
+    
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found or insufficient activity data'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        activityPatterns: result.activityPatterns,
+        message: 'Activity patterns analyzed successfully'
+      }
+    });
+  } catch (error) {
+    console.error('Error analyzing activity patterns:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to analyze activity patterns'
+    });
+  }
+});
+
+// Get upcoming birthdays for user's connections
+router.get('/birthdays/upcoming', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { days = 7 } = req.query;
+    
+    const upcomingBirthdays = await birthdayService.getUpcomingBirthdays(userId, parseInt(days));
+    
+    res.json({
+      success: true,
+      data: upcomingBirthdays
+    });
+  } catch (error) {
+    console.error('Error getting upcoming birthdays:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get upcoming birthdays'
+    });
+  }
+});
+
+// Send birthday wish
+router.post('/birthdays/wish', auth, async (req, res) => {
+  try {
+    const fromUserId = req.userId;
+    const { toUserId, message } = req.body;
+    
+    if (!toUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'toUserId is required'
+      });
+    }
+    
+    const result = await birthdayService.sendBirthdayWish(fromUserId, toUserId, message);
+    
+    res.json({
+      success: result,
+      message: result ? 'Birthday wish sent successfully' : 'Failed to send birthday wish'
+    });
+  } catch (error) {
+    console.error('Error sending birthday wish:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send birthday wish'
+    });
+  }
+});
+
+// Get notification digest preview
+router.get('/digest/preview/:type', auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { type } = req.params; // daily, weekly, monthly
+    
+    let digestContent;
+    switch (type) {
+      case 'daily':
+        digestContent = await digestService.generateDailyDigestContent(userId);
+        break;
+      case 'weekly':
+        digestContent = await digestService.generateWeeklyDigestContent(userId);
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid digest type. Use: daily or weekly'
+        });
+    }
+    
+    res.json({
+      success: true,
+      data: digestContent || { message: 'No digest content available' }
+    });
+  } catch (error) {
+    console.error('Error generating digest preview:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate digest preview'
     });
   }
 });
