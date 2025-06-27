@@ -3,11 +3,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
-const socketIo = require('socket.io');
 const fs = require('fs');
 
 // Load environment variables
 require('dotenv').config();
+
+// Import socket service
+const socketService = require('./services/socketService');
 
 // Ensure critical environment variables are set
 if (!process.env.JWT_SECRET) {
@@ -33,18 +35,6 @@ console.log('   PORT:', process.env.PORT || '8001 (default)');
 
 const app = express();
 const server = http.createServer(app);
-
-// Socket.IO setup
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
-
-// Make io available to routes
-app.set('io', io);
 
 // Middleware
 app.use(cors({
@@ -99,6 +89,7 @@ const analyticsRoutes = require('./routes/analytics');
 const jobsRoutes = require('./routes/jobs');
 const collaborationRoutes = require('./routes/collaboration');
 const designToolsRoutes = require('./routes/design-tools');
+const smartFeedRoutes = require('./routes/smartFeed');
 
 // Route middleware
 app.use('/api/auth', authRoutes);
@@ -120,6 +111,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/collaboration', collaborationRoutes);
 app.use('/api/design-tools', designToolsRoutes);
+app.use('/api/smart-feed', smartFeedRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -156,6 +148,11 @@ app.use('*', (req, res) => {
   });
 });
 
+// Initialize Socket.IO service
+socketService.initialize(server);
+socketService.setupMiddleware();
+socketService.setupEventHandlers();
+
 // MongoDB connection with better error handling
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -183,25 +180,13 @@ mongoose.connection.on('disconnected', () => {
   console.warn('MongoDB disconnected');
 });
 
-// Initialize Socket.IO service
-const SocketService = require('./services/socketService');
-let socketService;
-
-mongoose.connection.once('open', () => {
-  console.log('🔌 Initializing Socket.IO service...');
-  socketService = new SocketService(io);
-  console.log('✅ Socket.IO service initialized');
-});
+// Initialize congratulations automation
+const congratulationsService = require('./services/congratulationsService');
+congratulationsService.scheduleAutomation();
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-  
-  // Close Socket.IO connections
-  if (socketService) {
-    console.log('🔌 Closing Socket.IO connections...');
-    io.close();
-  }
   
   // Close MongoDB connection
   await mongoose.connection.close();
@@ -228,4 +213,4 @@ server.on('error', (error) => {
   }
 });
 
-module.exports = { app, server, io };
+module.exports = { app, server };

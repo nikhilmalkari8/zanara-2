@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Zanara Tokens</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 20px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Clear Zanara Tokens</h1>
+        <p>This will clear all stored authentication tokens.</p>
+        <button onclick="clearTokens()">Clear All Tokens</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function clearTokens() {
+            try {
+                // Clear localStorage
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('profile');
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userData');
+                localStorage.removeItem('profileData');
+                
+                // Clear sessionStorage
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
+                sessionStorage.removeItem('profile');
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('userData');
+                sessionStorage.removeItem('profileData');
+                
+                // Clear all localStorage items that might contain tokens
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('token') || key.includes('auth') || key.includes('jwt'))) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                
+                document.getElementById('result').innerHTML = '<p class="success">✅ All tokens cleared successfully!</p><p>You can now close this tab and refresh the main application.</p>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p class="error">❌ Error clearing tokens: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html> 

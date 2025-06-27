@@ -9,6 +9,29 @@ const auth = require('../middleware/auth');
 const { uploadMiddleware } = require('../middleware/upload');
 const router = express.Router();
 
+// Get current user's profile
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get the model profile
+    const profile = await ModelProfile.findOne({ userId: req.userId });
+
+    res.json({
+      user: user,
+      profile: profile,
+      hasProfile: !!profile,
+      profileComplete: user.profileComplete
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error while fetching profile' });
+  }
+});
+
 // Complete profile
 router.post('/complete', auth, async (req, res) => {
   try {
@@ -1047,27 +1070,6 @@ router.get('/browse', auth, async (req, res) => {
   }
 });
 
-// GET /api/prof le/me - Get current user's profile
-router.get('/me', auth, async (req, res) => {
-  try {
-    const userId = req.userId;
-    const profile = await ModelProfile.findOne({ userId }).populate('userId', 'firstName lastName email');
-    
-    if (!profile) {
-      return res.status(404).json({
-        message: 'Profile not found'
-      });
-    }
-    
-    res.json(profile);
-  } catch (error) {
-    console.error('Profile fetch error:', error);
-    res.status(500).json({
-      message: 'Server error fetching profile'
-    });
-  }
-});
-
 // GET /api/profile/all - Get all profiles (for testing)
 router.get('/all', async (req, res) => {
   try {
@@ -1593,6 +1595,299 @@ router.get('/view-insights', auth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching view insights:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/profile/endorse-skill - Endorse a skill for another user
+router.post('/endorse-skill', auth, async (req, res) => {
+  try {
+    const { userId, skillName, note = '' } = req.body;
+    const endorserId = req.userId;
+
+    if (!userId || !skillName) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and skill name are required'
+      });
+    }
+
+    if (userId === endorserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot endorse your own skills'
+      });
+    }
+
+    // Check if connection exists
+    const Connection = require('../models/Connection');
+    const connection = await Connection.findOne({
+      $or: [
+        { requester: endorserId, recipient: userId, status: 'accepted' },
+        { requester: userId, recipient: endorserId, status: 'accepted' }
+      ]
+    });
+
+    if (!connection) {
+      return res.status(403).json({
+        success: false,
+        message: 'Can only endorse skills of connected users'
+      });
+    }
+
+    // Get the user to endorse
+    const userToEndorse = await User.findById(userId);
+    if (!userToEndorse) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Endorse the skill
+    await userToEndorse.endorseSkill(skillName, endorserId, note);
+
+    // Create notification
+    const Notification = require('../models/Notification');
+    const endorser = await User.findById(endorserId);
+    
+    await Notification.createOrBatchNotification({
+      recipient: userId,
+      sender: endorserId,
+      type: 'skill_endorsed',
+      title: 'Skill Endorsed',
+      message: `${endorser.firstName} ${endorser.lastName} endorsed you for ${skillName}`,
+      batchType: 'endorsements'
+    });
+
+    res.json({
+      success: true,
+      message: 'Skill endorsed successfully'
+    });
+
+  } catch (error) {
+    console.error('Endorse skill error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error endorsing skill',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/profile/:userId/skills - Get user's skills with endorsements
+router.get('/:userId/skills', auth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId)
+      .populate('skills.endorsements.endorsedBy', 'firstName lastName professionalType profilePicture')
+      .select('skills firstName lastName');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Sort skills by endorsement count
+    const skillsWithCounts = user.skills.map(skill => ({
+      ...skill.toObject(),
+      endorsementCount: skill.endorsements.length,
+      recentEndorsements: skill.endorsements
+        .sort((a, b) => new Date(b.endorsedAt) - new Date(a.endorsedAt))
+        .slice(0, 5)
+    })).sort((a, b) => b.endorsementCount - a.endorsementCount);
+
+    res.json({
+      success: true,
+      skills: skillsWithCounts,
+      userName: `${user.firstName} ${user.lastName}`
+    });
+
+  } catch (error) {
+    console.error('Get skills error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching skills',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/profile/recommendation - Write a recommendation
+router.post('/recommendation', auth, async (req, res) => {
+  try {
+    const { recipientId, relationship, content, skills = [], projects = [] } = req.body;
+    const authorId = req.userId;
+
+    if (!recipientId || !relationship || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient, relationship, and content are required'
+      });
+    }
+
+    if (recipientId === authorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot write recommendation for yourself'
+      });
+    }
+
+    // Check if connection exists
+    const Connection = require('../models/Connection');
+    const connection = await Connection.findOne({
+      $or: [
+        { requester: authorId, recipient: recipientId, status: 'accepted' },
+        { requester: recipientId, recipient: authorId, status: 'accepted' }
+      ]
+    });
+
+    if (!connection) {
+      return res.status(403).json({
+        success: false,
+        message: 'Can only write recommendations for connected users'
+      });
+    }
+
+    // Create recommendation
+    const Recommendation = require('../models/Recommendation');
+    const recommendation = new Recommendation({
+      author: authorId,
+      recipient: recipientId,
+      relationship,
+      content,
+      skills,
+      projects,
+      status: 'pending'
+    });
+
+    await recommendation.save();
+
+    // Create notification
+    const Notification = require('../models/Notification');
+    const author = await User.findById(authorId);
+    
+    await Notification.createOrBatchNotification({
+      recipient: recipientId,
+      sender: authorId,
+      type: 'recommendation_received',
+      title: 'New Recommendation',
+      message: `${author.firstName} ${author.lastName} wrote you a recommendation`,
+      relatedObjects: {
+        recommendation: recommendation._id
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Recommendation submitted successfully',
+      recommendation: recommendation._id
+    });
+
+  } catch (error) {
+    console.error('Write recommendation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error writing recommendation',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/profile/:userId/recommendations - Get user's recommendations
+router.get('/:userId/recommendations', auth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { type = 'received' } = req.query; // 'received' or 'given'
+
+    const Recommendation = require('../models/Recommendation');
+    
+    const query = type === 'received' 
+      ? { recipient: userId, status: 'approved' }
+      : { author: userId, status: 'approved' };
+
+    const recommendations = await Recommendation.find(query)
+      .populate('author', 'firstName lastName professionalType profilePicture headline')
+      .populate('recipient', 'firstName lastName professionalType profilePicture headline')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      recommendations,
+      type
+    });
+
+  } catch (error) {
+    console.error('Get recommendations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching recommendations',
+      error: error.message
+    });
+  }
+});
+
+// PUT /api/profile/recommendation/:id/approve - Approve/reject recommendation
+router.put('/recommendation/:id/approve', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // 'approve' or 'reject'
+
+    const Recommendation = require('../models/Recommendation');
+    const recommendation = await Recommendation.findById(id);
+
+    if (!recommendation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recommendation not found'
+      });
+    }
+
+    // Only recipient can approve/reject
+    if (recommendation.recipient.toString() !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only recipient can approve recommendations'
+      });
+    }
+
+    recommendation.status = action === 'approve' ? 'approved' : 'rejected';
+    recommendation.respondedAt = new Date();
+    await recommendation.save();
+
+    // Create activity if approved
+    if (action === 'approve') {
+      const Activity = require('../models/Activity');
+      const author = await User.findById(recommendation.author);
+      const recipient = await User.findById(recommendation.recipient);
+
+      await Activity.createActivity({
+        actor: recommendation.recipient,
+        type: 'recommendation_approved',
+        title: `${recipient.firstName} ${recipient.lastName} approved a recommendation`,
+        description: `Received a recommendation from ${author.firstName} ${author.lastName}`,
+        metadata: {
+          recommendationId: recommendation._id,
+          relationship: recommendation.relationship
+        },
+        visibility: 'public'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Recommendation ${action}d successfully`
+    });
+
+  } catch (error) {
+    console.error('Approve recommendation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing recommendation',
+      error: error.message
+    });
   }
 });
 

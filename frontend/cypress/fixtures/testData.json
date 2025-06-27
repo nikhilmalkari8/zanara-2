@@ -1,0 +1,214 @@
+{
+  "userTypes": {
+    "model": {
+      "userType": "talent",
+      "professionalType": "model",
+      "workStatus": "freelancer",
+      "profile": {
+        "fullName": "Jane Model",
+        "experienceLevel": "intermediate",
+        "modelType": "fashion",
+        "yearsExperience": "3-5",
+        "height": "5'8\"",
+        "weight": "120 lbs",
+        "gender": "female",
+        "nationality": "American",
+        "dateOfBirth": "1995-01-01",
+        "skills": ["Fashion Modeling", "Photography", "Runway"],
+        "bio": "Professional fashion model with experience in runway and editorial work.",
+        "location": "New York, NY"
+      }
+    },
+    "photographer": {
+      "userType": "talent",
+      "professionalType": "photographer",
+      "workStatus": "freelancer",
+      "profile": {
+        "fullName": "John Photographer",
+        "experienceLevel": "expert",
+        "photographyType": "fashion",
+        "yearsExperience": "10+",
+        "equipment": ["Canon 5D Mark IV", "Lighting Kit", "Studio"],
+        "skills": ["Fashion Photography", "Portrait", "Editorial"],
+        "bio": "Professional fashion photographer specializing in editorial and commercial work.",
+        "location": "Los Angeles, CA"
+      }
+    },
+    "designer": {
+      "userType": "talent",
+      "professionalType": "fashion-designer",
+      "workStatus": "full-time",
+      "profile": {
+        "fullName": "Maria Designer",
+        "experienceLevel": "senior",
+        "designSpecialty": "Fashion Design",
+        "yearsExperience": "10+",
+        "skills": ["Fashion Design", "Pattern Making", "Textile Selection"],
+        "bio": "Senior fashion designer with expertise in sustainable fashion and innovative designs.",
+        "location": "Milan, Italy"
+      }
+    },
+    "brand": {
+      "userType": "hiring",
+      "professionalType": "brand",
+      "workStatus": "not-specified",
+      "profile": {
+        "fullName": "Fashion Brand Corp",
+        "companySize": "medium",
+        "industry": "Fashion",
+        "yearsInBusiness": "5-10",
+        "skills": ["Brand Management", "Marketing", "Product Development"],
+        "bio": "Innovative fashion brand focused on sustainable and ethical fashion.",
+        "location": "Paris, France"
+      }
+    }
+  },
+  
+  "testContent": {
+    "posts": [
+      {
+        "type": "content_published",
+        "title": "New Fashion Collection Launch",
+        "description": "Excited to share my latest fashion collection inspired by sustainable materials.",
+        "content": "Just launched my new sustainable fashion collection! 🌿 #SustainableFashion #EcoFriendly #Fashion",
+        "hashtags": ["SustainableFashion", "EcoFriendly", "Fashion"],
+        "visibility": "public"
+      },
+      {
+        "type": "portfolio_update",
+        "title": "Portfolio Update - Editorial Shoot",
+        "description": "Added new editorial photos from recent magazine shoot.",
+        "content": "New editorial shoot for Vogue! Amazing collaboration with talented team. #Editorial #Fashion #Photography",
+        "hashtags": ["Editorial", "Fashion", "Photography"],
+        "visibility": "public"
+      }
+    ],
+    
+    "comments": [
+      "Amazing work! Love the composition.",
+      "This is incredible! How did you achieve this lighting?",
+      "Stunning! Would love to collaborate.",
+      "Beautiful shot! The styling is perfect.",
+      "This is inspiring! Keep up the great work."
+    ],
+    
+    "messages": [
+      "Hi! I saw your portfolio and would love to discuss a potential collaboration.",
+      "Your work is amazing! Are you available for a shoot next month?",
+      "I'm organizing a fashion show and think you'd be perfect. Let's chat!",
+      "Love your style! Would you be interested in working together?",
+      "Hi there! I have an exciting opportunity that might interest you."
+    ]
+  },
+  
+  "testScenarios": {
+    "authentication": {
+      "validCredentials": {
+        "email": "test@zanara.com",
+        "password": "TestPassword123!"
+      },
+      "invalidCredentials": {
+        "email": "invalid@email.com",
+        "password": "wrongpassword"
+      }
+    },
+    
+    "profileCompletion": {
+      "requiredFields": ["firstName", "lastName", "bio", "location"],
+      "optionalFields": ["website", "socialMedia", "skills"]
+    },
+    
+    "networking": {
+      "connectionReasons": [
+        "Professional collaboration",
+        "Industry networking",
+        "Potential project opportunity",
+        "Mutual connections",
+        "Similar interests"
+      ]
+    },
+    
+    "registration": {
+      "validEmails": [
+        "test@example.com",
+        "user.name@domain.co.uk",
+        "test+tag@gmail.com"
+      ],
+      "invalidEmails": [
+        "invalid-email",
+        "@domain.com",
+        "test@",
+        "test..email@domain.com"
+      ],
+      "strongPasswords": [
+        "TestPassword123!",
+        "SecurePass456#",
+        "MyStr0ngP@ssw0rd"
+      ],
+      "weakPasswords": [
+        "123",
+        "password",
+        "abc"
+      ],
+      "validPhoneNumbers": [
+        "+1234567890",
+        "+44 20 7946 0958",
+        "+33 1 42 68 53 00"
+      ],
+      "invalidPhoneNumbers": [
+        "123",
+        "abc",
+        "12345"
+      ]
+    },
+    
+    "validation": {
+      "requiredFields": [
+        "firstName",
+        "lastName",
+        "email",
+        "password",
+        "phoneNumber",
+        "professionalType",
+        "userType"
+      ],
+      "optionalFields": [
+        "bio",
+        "location",
+        "website",
+        "workStatus"
+      ]
+    }
+  },
+  
+  "apiEndpoints": {
+    "auth": {
+      "register": "/api/auth/register",
+      "login": "/api/auth/login",
+      "logout": "/api/auth/logout",
+      "verify": "/api/auth/verify",
+      "refresh": "/api/auth/refresh"
+    },
+    "profile": {
+      "get": "/api/profile/me",
+      "update": "/api/profile/update",
+      "complete": "/api/professional-profile/complete",
+      "upload": "/api/profile/upload"
+    },
+    "posts": {
+      "create": "/api/posts/create",
+      "feed": "/api/posts/feed",
+      "like": "/api/posts/like",
+      "comment": "/api/posts/comment"
+    },
+    "connections": {
+      "request": "/api/connections/request",
+      "accept": "/api/connections/accept",
+      "list": "/api/connections/list"
+    },
+    "search": {
+      "profiles": "/api/search/profiles",
+      "posts": "/api/search/posts"
+    }
+  }
+} 

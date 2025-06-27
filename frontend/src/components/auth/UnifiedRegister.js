@@ -526,6 +526,7 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
                 onChange={handleInputChange}
                 className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
                 placeholder="First Name"
+                data-cy="first-name-input"
                 required
               />
               <input
@@ -535,6 +536,7 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
                 onChange={handleInputChange}
                 className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
                 placeholder="Last Name"
+                data-cy="last-name-input"
                 required
               />
             </div>
@@ -545,7 +547,8 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
               value={formData.email}
               onChange={handleInputChange}
               className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
-              placeholder="Professional Email"
+              placeholder="Email Address"
+              data-cy="email-input"
               required
             />
             
@@ -556,34 +559,39 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
               onChange={handleInputChange}
               className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
               placeholder="Phone Number"
+              data-cy="phone-input"
               required
             />
             
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
-              placeholder="Create Password"
-              required
-            />
-            
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
-              placeholder="Confirm Password"
-              required
-            />
+            <div className="input-group grid grid-cols-1 md:grid-cols-2 gap-5">
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
+                placeholder="Password"
+                data-cy="password-input"
+                required
+              />
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10 placeholder-white/50"
+                placeholder="Confirm Password"
+                data-cy="confirm-password-input"
+                required
+              />
+            </div>
             
             <select
               name="workStatus"
               value={formData.workStatus}
               onChange={handleInputChange}
               className="form-input w-full px-4 py-3 bg-white/5 border-2 border-white/10 rounded-xl text-white transition-all duration-300 focus:outline-none focus:border-accent-gold/60 focus:bg-white/10"
+              data-cy="work-status-select"
               required
             >
               {workStatusOptions.map((option) => (
@@ -594,7 +602,7 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
             </select>
             
             {message && (
-              <div className={`message p-3 rounded-lg text-center text-sm ${message.includes('successful') ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
+              <div className={`message p-3 rounded-lg text-center text-sm ${message.includes('successful') ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`} data-cy="registration-message">
                 {message}
               </div>
             )}
@@ -603,6 +611,7 @@ const UnifiedRegister = ({ setCurrentPage = () => {} }) => {
               type="submit" 
               disabled={isLoading}
               className="submit-button w-full p-4 text-base font-semibold text-gray-900 bg-gradient-to-r from-accent-gold to-yellow-400 border-none rounded-xl cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-accent-gold/20 disabled:opacity-70 disabled:cursor-not-allowed"
+              data-cy="register-button"
             >
               {isLoading ? 'Joining...' : `Join as ${selectedTypeData.label}`}
             </button>

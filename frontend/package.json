@@ -17,9 +17,13 @@
         "socket.io-client": "^4.8.1"
     },
     "devDependencies": {
+        "@cypress/grep": "^4.1.0",
         "@testing-library/cypress": "^10.0.1",
         "cypress": "^12.17.4",
         "cypress-file-upload": "^5.0.8",
+        "mochawesome": "^7.1.3",
+        "mochawesome-merge": "^5.0.0",
+        "mochawesome-report-generator": "^6.2.0",
         "start-server-and-test": "^2.0.12"
     },
     "scripts": {
@@ -29,8 +33,27 @@
         "eject": "react-scripts eject",
         "cypress:open": "cypress open",
         "cypress:run": "cypress run",
+        "cypress:run:headless": "cypress run --headless",
         "test:e2e": "start-server-and-test start http://localhost:3000 cypress:run",
-        "test:e2e:watch": "start-server-and-test start http://localhost:3000 cypress:open"
+        "test:e2e:watch": "start-server-and-test start http://localhost:3000 cypress:open",
+        "test:smoke": "cypress run --spec 'cypress/e2e/01-smoke-tests/**/*.cy.js' --headless",
+        "test:auth": "cypress run --spec 'cypress/e2e/02-authentication/**/*.cy.js' --headless",
+        "test:profiles": "cypress run --spec 'cypress/e2e/03-profiles/**/*.cy.js' --headless",
+        "test:content": "cypress run --spec 'cypress/e2e/04-content/**/*.cy.js' --headless",
+        "test:networking": "cypress run --spec 'cypress/e2e/05-networking/**/*.cy.js' --headless",
+        "test:messaging": "cypress run --spec 'cypress/e2e/06-messaging/**/*.cy.js' --headless",
+        "test:advanced": "cypress run --spec 'cypress/e2e/07-advanced/**/*.cy.js' --headless",
+        "test:regression": "cypress run --spec 'cypress/e2e/**/*.cy.js' --headless",
+        "test:mobile": "cypress run --config viewportWidth=375,viewportHeight=667",
+        "test:tablet": "cypress run --config viewportWidth=768,viewportHeight=1024",
+        "test:desktop": "cypress run --config viewportWidth=1280,viewportHeight=720",
+        "test:chrome": "cypress run --browser chrome --headless",
+        "test:firefox": "cypress run --browser firefox --headless",
+        "test:edge": "cypress run --browser edge --headless",
+        "test:record": "cypress run --record --key $CYPRESS_RECORD_KEY",
+        "test:parallel": "cypress run --parallel --record --key $CYPRESS_RECORD_KEY",
+        "test:report": "cypress run --reporter mochawesome --reporter-options reportDir=cypress/reports/mocha,overwrite=false,html=false,json=true",
+        "test:clean": "rm -rf cypress/videos cypress/screenshots cypress/reports"
     },
     "eslintConfig": {
         "extends": [

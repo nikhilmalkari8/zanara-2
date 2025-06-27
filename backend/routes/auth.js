@@ -443,4 +443,24 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// NEW: Logout endpoint
+router.post('/logout', auth, async (req, res) => {
+  try {
+    // In a stateless JWT system, logout is handled client-side by removing the token
+    // But we can track logout events for analytics
+    const user = await User.findById(req.userId);
+    if (user) {
+      user.lastActiveAt = new Date();
+      await user.save();
+    }
+
+    res.json({
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Server error during logout' });
+  }
+});
+
 module.exports = router;

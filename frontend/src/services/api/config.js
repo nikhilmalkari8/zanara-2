@@ -1,5 +1,5 @@
 // src/services/api/config.js
-import { validateAndCleanupToken } from '../components/shared/TokenCleanup';
+import { validateAndCleanupToken } from '../../components/shared/TokenCleanup';
 
 const API_BASE_URL = 'http://localhost:8001/api';
 
@@ -81,7 +81,7 @@ export const apiRequest = async (endpoint, options = {}) => {
       if (response.status === 401) {
         console.warn('Authentication failed, clearing all tokens...');
         // Import and use force cleanup
-        const { forceCleanupAllTokens } = await import('../components/shared/TokenCleanup');
+        const { forceCleanupAllTokens } = await import('../../components/shared/TokenCleanup');
         forceCleanupAllTokens();
         
         // Redirect to login if we're not already there

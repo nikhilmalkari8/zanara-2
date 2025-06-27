@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import EnhancedActivityFeed from './EnhancedActivityFeed';
+import SmartActivityFeed from './SmartActivityFeed';
 import PeopleYouMayKnow from './PeopleYouMayKnow';
 import ProfileViewers from './ProfileViewers';
 import TrendingHashtags from './TrendingHashtags';
-import { Users, Eye, Activity, TrendingUp, Plus } from 'lucide-react';
+import { Users, Eye, Activity, TrendingUp, Plus, Brain } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 import MultiImageUpload from './MultiImageUpload';
 import ConnectionStrengthAnalytics from '../connections/ConnectionStrengthAnalytics';
 import Notifications from '../shared/Notifications';
 
 const ActivityHub = ({ user, onUserClick }) => {
-  const [activeTab, setActiveTab] = useState('feed');
+  const [activeTab, setActiveTab] = useState('smart-feed');
   const [showConnectionAnalytics, setShowConnectionAnalytics] = useState(false);
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
   const [postImages, setPostImages] = useState([]);
@@ -20,10 +21,11 @@ const ActivityHub = ({ user, onUserClick }) => {
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   const tabs = [
-    { id: 'feed', label: 'Activity Feed', icon: Activity },
-    { id: 'people', label: 'People You May Know', icon: Users },
-    { id: 'viewers', label: 'Profile Viewers', icon: Eye },
-    { id: 'trending', label: 'Trending', icon: TrendingUp },
+    { id: 'smart-feed', label: 'Smart Feed', icon: Brain, description: 'AI-powered personalized content' },
+    { id: 'feed', label: 'Activity Feed', icon: Activity, description: 'All recent activities' },
+    { id: 'people', label: 'People You May Know', icon: Users, description: 'Expand your network' },
+    { id: 'viewers', label: 'Profile Viewers', icon: Eye, description: 'Who viewed your profile' },
+    { id: 'trending', label: 'Trending', icon: TrendingUp, description: 'What\'s popular now' },
   ];
 
   const handleConnect = (userId) => {
@@ -276,6 +278,52 @@ const ActivityHub = ({ user, onUserClick }) => {
             <div className="lg:col-span-1">
               <ProfileViewers user={user} />
             </div>
+          </div>
+        )}
+
+        {activeTab === 'smart-feed' && (
+          <div className="space-y-6">
+            {/* Smart Feed Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center">
+                    <Brain className="w-8 h-8 mr-3" />
+                    Smart Feed
+                  </h1>
+                  <p className="text-purple-100 mt-1">
+                    AI-powered personalized content just for you
+                  </p>
+                </div>
+                
+                <div className="text-right">
+                  <div className="text-3xl font-bold">🧠</div>
+                  <div className="text-sm text-purple-100">Phase 2</div>
+                </div>
+              </div>
+              
+              {/* Feature Highlights */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-lg font-semibold">Connection Strength</div>
+                  <div className="text-sm text-purple-100">Content ranked by your relationships</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-lg font-semibold">Industry Relevance</div>
+                  <div className="text-sm text-purple-100">Tailored to your professional interests</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-4">
+                  <div className="text-lg font-semibold">A/B Testing</div>
+                  <div className="text-sm text-purple-100">Continuously improving algorithms</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Smart Feed Component */}
+            <SmartActivityFeed 
+              user={user}
+              onUserClick={onUserClick}
+            />
           </div>
         )}
 

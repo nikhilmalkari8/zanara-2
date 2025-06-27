@@ -492,38 +492,27 @@ router.post('/complete', auth, async (req, res) => {
   }
 });
 
-// Get profile - Universal endpoint
+// Get current user's profile
 router.get('/me', auth, async (req, res) => {
   try {
-    const userId = req.userId;
-
-    // Get user to determine professional type
-    const user = await User.findById(userId);
+    const user = await User.findById(req.userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get the appropriate model for this professional type
+    // Get the professional profile based on user's professional type
     const ProfileModel = getProfileModel(user.professionalType);
-    const profile = await ProfileModel.findOne({ userId }).populate('userId', 'firstName lastName email');
-
-    if (!profile) {
-      return res.status(404).json({
-        message: 'Profile not found',
-        professionalType: user.professionalType
-      });
-    }
+    const profile = await ProfileModel.findOne({ userId: req.userId });
 
     res.json({
-      ...profile.toObject(),
-      professionalType: user.professionalType
+      user: user,
+      profile: profile,
+      hasProfile: !!profile,
+      profileComplete: user.profileComplete
     });
-
   } catch (error) {
-    console.error('Profile fetch error:', error);
-    res.status(500).json({
-      message: 'Server error fetching profile'
-    });
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error while fetching profile' });
   }
 });
 

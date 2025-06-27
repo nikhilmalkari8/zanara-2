@@ -203,15 +203,9 @@ const Login = ({ setCurrentPage, onLogin }) => {
               </div>
             </div>
 
-            {/* Form */}
-            <div className="space-y-6">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <label className={`block text-sm font-medium tracking-wide transition-colors duration-300 ${
-                  focusedField === 'email' ? 'text-accent-gold' : 'text-gray-300'
-                }`}>
-                  Email Address
-                </label>
+            {/* Login Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
                 <div className="relative">
                   <input
                     type="email"
@@ -220,56 +214,32 @@ const Login = ({ setCurrentPage, onLogin }) => {
                     onChange={handleInputChange}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full px-4 py-4 pr-12 bg-gray-800/30 backdrop-blur-sm border-2 rounded-xl text-white transition-all duration-300 ease-out focus:outline-none placeholder-gray-500 will-change-transform ${
-                      focusedField === 'email' 
-                        ? 'border-accent-gold/60 bg-gray-800/50 shadow-lg shadow-accent-gold/10 -translate-y-0.5' 
-                        : 'border-gray-700/50 hover:border-gray-600/50 hover:bg-gray-800/40'
-                    }`}
-                    placeholder="Enter your email address"
+                    className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-400 transition-all duration-300 ease-out focus:outline-none focus:border-accent-gold/50 focus:bg-white/10 focus:shadow-lg focus:shadow-accent-gold/5"
+                    placeholder="Email address"
+                    data-cy="email-input"
                     required
                   />
-                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg 
-                      className={`w-5 h-5 transition-colors duration-300 ${
-                        focusedField === 'email' ? 'text-accent-gold' : 'text-gray-500'
-                      }`}
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                  </div>
+                  <div className={`absolute inset-0 rounded-2xl border-2 pointer-events-none transition-all duration-300 ${focusedField === 'email' ? 'border-accent-gold/30 shadow-lg shadow-accent-gold/10' : 'border-transparent'}`} />
                 </div>
-              </div>
 
-              {/* Password Field */}
-              <div className="space-y-2">
-                <label className={`block text-sm font-medium tracking-wide transition-colors duration-300 ${
-                  focusedField === 'password' ? 'text-accent-gold' : 'text-gray-300'
-                }`}>
-                  Password
-                </label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
                     onFocus={() => setFocusedField('password')}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full px-4 py-4 pr-12 bg-gray-800/30 backdrop-blur-sm border-2 rounded-xl text-white transition-all duration-300 ease-out focus:outline-none placeholder-gray-500 will-change-transform ${
-                      focusedField === 'password' 
-                        ? 'border-accent-gold/60 bg-gray-800/50 shadow-lg shadow-accent-gold/10 -translate-y-0.5' 
-                        : 'border-gray-700/50 hover:border-gray-600/50 hover:bg-gray-800/40'
-                    }`}
-                    placeholder="Enter your password"
+                    className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-400 transition-all duration-300 ease-out focus:outline-none focus:border-accent-gold/50 focus:bg-white/10 focus:shadow-lg focus:shadow-accent-gold/5 pr-12"
+                    placeholder="Password"
+                    data-cy="password-input"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1 rounded-md text-gray-500 hover:text-accent-gold transition-colors duration-300"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-accent-gold transition-colors duration-300 focus:outline-none"
+                    data-cy="show-password-button"
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,62 +252,53 @@ const Login = ({ setCurrentPage, onLogin }) => {
                       </svg>
                     )}
                   </button>
+                  <div className={`absolute inset-0 rounded-2xl border-2 pointer-events-none transition-all duration-300 ${focusedField === 'password' ? 'border-accent-gold/30 shadow-lg shadow-accent-gold/10' : 'border-transparent'}`} />
                 </div>
               </div>
 
-              {/* Message */}
+              {/* Remember Me */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-accent-gold bg-white/5 border-white/20 rounded focus:ring-accent-gold/50 focus:ring-2 transition-all duration-300"
+                    data-cy="remember-me-checkbox"
+                  />
+                  <span className="text-sm text-gray-400 group-hover:text-white transition-colors duration-300">Remember me</span>
+                </label>
+                <button
+                  type="button"
+                  className="text-sm text-accent-gold hover:text-yellow-300 transition-colors duration-300 focus:outline-none"
+                  data-cy="forgot-password-link"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {/* Error Message */}
               {message && (
-                <div className={`p-4 rounded-xl backdrop-blur-sm border transition-all duration-300 animate-fade-in-up ${
-                  message.includes('successful') 
-                    ? 'bg-green-900/30 border-green-700/50 text-green-300' 
-                    : 'bg-red-900/30 border-red-700/50 text-red-300'
-                }`}>
-                  <div className="flex items-center space-x-2">
-                    {message.includes('successful') ? (
-                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                    <span className="text-sm font-medium">{message}</span>
-                  </div>
+                <div className={`p-4 rounded-2xl text-sm text-center transition-all duration-300 ${message.includes('successful') ? 'bg-green-500/10 text-green-300 border border-green-500/20' : 'bg-red-500/10 text-red-300 border border-red-500/20'}`} data-cy="login-error">
+                  {message}
                 </div>
               )}
 
               {/* Submit Button */}
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isLoading}
-                onClick={handleSubmit}
-                className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 ease-out transform focus:outline-none will-change-transform ${
-                  isLoading 
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed scale-95' 
-                    : 'bg-gradient-to-r from-accent-gold to-accent-gold-light hover:from-accent-gold-light hover:to-accent-gold-dark text-black cursor-pointer hover:scale-105 hover:shadow-lg hover:shadow-accent-gold/25 active:scale-100'
-                }`}
+                className="w-full py-4 px-6 bg-gradient-to-r from-accent-gold via-yellow-400 to-accent-gold text-primary-black font-semibold rounded-2xl transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-2xl hover:shadow-accent-gold/20 focus:outline-none focus:ring-4 focus:ring-accent-gold/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+                data-cy="login-button"
               >
-                <div className="flex items-center justify-center space-x-2">
-                  {isLoading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Signing in...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Sign In</span>
-                      <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </>
-                  )}
-                </div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-5 h-5 border-2 border-primary-black/30 border-t-primary-black rounded-full animate-spin" />
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  'Sign in to Zanara'
+                )}
               </button>
-            </div>
+            </form>
 
             {/* Links */}
             <div className="mt-8 space-y-4 text-center">

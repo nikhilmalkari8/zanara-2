@@ -1,15 +1,68 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const socketIo = require('socket.io');
 
 class SocketService {
-  constructor(io) {
-    this.io = io;
+  constructor() {
+    this.io = null;
     this.connectedUsers = new Map(); // userId -> socketId
     this.userSockets = new Map(); // socketId -> userId
     this.typingUsers = new Map(); // conversationId -> Set of userIds
+  }
+
+  initialize(server) {
+    console.log('🔌 Initializing Socket.IO service...');
     
-    this.setupMiddleware();
-    this.setupEventHandlers();
+    this.io = socketIo(server, {
+      cors: {
+        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        methods: ['GET', 'POST'],
+        credentials: true
+      }
+    });
+
+    this.io.on('connection', (socket) => {
+      console.log(`📱 User connected: ${socket.id}`);
+
+      // Handle user authentication
+      socket.on('authenticate', (userData) => {
+        if (userData && userData.userId) {
+          this.connectedUsers.set(socket.id, userData.userId);
+          socket.join(`user_${userData.userId}`);
+          console.log(`✅ User authenticated: ${userData.userId}`);
+        }
+      });
+
+      // Handle real-time notifications
+      socket.on('join_notifications', (userId) => {
+        socket.join(`notifications_${userId}`);
+        console.log(`🔔 User ${userId} joined notifications room`);
+      });
+
+      // Handle activity feed updates
+      socket.on('join_feed', (userId) => {
+        socket.join(`feed_${userId}`);
+        console.log(`📰 User ${userId} joined feed room`);
+      });
+
+      // Handle messaging
+      socket.on('join_conversation', (conversationId) => {
+        socket.join(`conversation_${conversationId}`);
+        console.log(`💬 User joined conversation: ${conversationId}`);
+      });
+
+      // Handle disconnection
+      socket.on('disconnect', () => {
+        const userId = this.connectedUsers.get(socket.id);
+        if (userId) {
+          console.log(`📱 User disconnected: ${userId}`);
+          this.connectedUsers.delete(socket.id);
+        }
+      });
+    });
+
+    console.log('✅ Socket.IO service initialized');
+    return this.io;
   }
 
   setupMiddleware() {
@@ -283,6 +336,39 @@ class SocketService {
       timestamp: new Date()
     });
   }
+
+  // Send notification to specific user
+  sendNotificationToSpecificUser(userId, notification) {
+    if (this.io) {
+      this.io.to(`notifications_${userId}`).emit('new_notification', notification);
+    }
+  }
+
+  // Send activity update to user's feed
+  sendActivityUpdate(userId, activity) {
+    if (this.io) {
+      this.io.to(`feed_${userId}`).emit('activity_update', activity);
+    }
+  }
+
+  // Send message to conversation
+  sendMessage(conversationId, message) {
+    if (this.io) {
+      this.io.to(`conversation_${conversationId}`).emit('new_message', message);
+    }
+  }
+
+  // Broadcast to all connected users
+  broadcast(event, data) {
+    if (this.io) {
+      this.io.emit(event, data);
+    }
+  }
+
+  // Get connected users count
+  getConnectedUsersCount() {
+    return this.connectedUsers.size;
+  }
 }
 
-module.exports = SocketService; 
+module.exports = new SocketService(); 

@@ -36,7 +36,12 @@ const notificationSchema = new mongoose.Schema({
       'batched_reactions',
       'batched_comments',
       'batched_profile_views',
-      'batched_connections'
+      'batched_connections',
+      'skill_endorsed',
+      'recommendation_received',
+      'recommendation_approved',
+      'congratulation_suggestion',
+      'congratulation_received'
     ]
   },
   

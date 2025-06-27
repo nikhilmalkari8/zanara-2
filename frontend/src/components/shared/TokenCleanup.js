@@ -142,8 +142,10 @@ export const debugTokenInfo = () => {
   return info;
 };
 
-export default {
+const TokenCleanupUtils = {
   validateAndCleanupToken,
   forceCleanupAllTokens,
   debugTokenInfo
-}; 
+};
+
+export default TokenCleanupUtils; 
