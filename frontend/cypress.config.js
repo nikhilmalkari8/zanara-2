@@ -1,4 +1,6 @@
 const { defineConfig } = require('cypress')
+const fs = require('fs')
+const path = require('path')
 
 module.exports = defineConfig({
   e2e: {
@@ -17,6 +19,12 @@ module.exports = defineConfig({
         log(message) {
           console.log(message);
           return null;
+        },
+        
+        // Task to check if file exists
+        fileExists(filePath) {
+          const fullPath = path.join(__dirname, filePath);
+          return fs.existsSync(fullPath);
         },
         
         // Task for generating test data

@@ -1,0 +1,58 @@
+{
+  "activities": [
+    {
+      "id": "activity_1",
+      "type": "post",
+      "user": {
+        "id": "user_1",
+        "name": "Sarah Johnson",
+        "professionalType": "model",
+        "profileImage": "https://via.placeholder.com/50"
+      },
+      "content": {
+        "text": "Just finished an amazing photoshoot for a major fashion brand! The creative team was incredible and the energy on set was electric. Can't wait to share the final images! #ModelLife #Fashion #Photoshoot",
+        "images": ["https://via.placeholder.com/400x300", "https://via.placeholder.com/400x300"]
+      },
+      "timestamp": "2024-01-01T10:00:00Z",
+      "likes": 234,
+      "comments": 45,
+      "shares": 12
+    },
+    {
+      "id": "activity_2",
+      "type": "collaboration",
+      "user": {
+        "id": "user_2",
+        "name": "Marcus Chen",
+        "professionalType": "photographer",
+        "profileImage": "https://via.placeholder.com/50"
+      },
+      "content": {
+        "text": "Looking for talented models for an upcoming fashion editorial. The theme is 'Urban Elegance' and we'll be shooting in downtown locations. Interested? DM me your portfolio!",
+        "images": ["https://via.placeholder.com/400x300"]
+      },
+      "timestamp": "2024-01-01T09:30:00Z",
+      "likes": 156,
+      "comments": 78,
+      "shares": 23
+    },
+    {
+      "id": "activity_3",
+      "type": "achievement",
+      "user": {
+        "id": "user_3",
+        "name": "Elena Rodriguez",
+        "professionalType": "fashion-designer",
+        "profileImage": "https://via.placeholder.com/50"
+      },
+      "content": {
+        "text": "Thrilled to announce that my latest collection will be featured in Paris Fashion Week! This has been a dream of mine for years. Thank you to everyone who supported me on this journey! 🎉✨",
+        "images": ["https://via.placeholder.com/400x300", "https://via.placeholder.com/400x300", "https://via.placeholder.com/400x300"]
+      },
+      "timestamp": "2024-01-01T09:00:00Z",
+      "likes": 892,
+      "comments": 156,
+      "shares": 78
+    }
+  ]
+} 
