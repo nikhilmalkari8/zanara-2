@@ -1,4 +1,6 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const { ObjectId } = mongoose.Types;
 const Connection = require('../models/Connection');
 const IntroductionRequest = require('../models/IntroductionRequest');
 const User = require('../models/User');
@@ -574,6 +576,542 @@ router.get('/analytics/stats', auth, async (req, res) => {
       success: false,
       message: 'Server error fetching connection analytics'
     });
+  }
+});
+
+// Get connection suggestions (People you may know)
+router.get('/suggestions', auth, async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const userId = req.userId;
+    
+    // Get current user's info
+    const currentUser = await User.findById(userId).select('professionalType location skills workStatus');
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Get existing connections
+    const existingConnections = await Connection.find({
+      $or: [
+        { sender: userId },
+        { receiver: userId }
+      ]
+    }).select('sender receiver');
+    
+    const connectedUserIds = existingConnections.map(conn => 
+      conn.sender.toString() === userId ? conn.receiver : conn.sender
+    );
+    connectedUserIds.push(userId); // Exclude self
+    
+    // Get mutual connections for each potential suggestion
+    const acceptedConnections = await Connection.find({
+      $or: [
+        { sender: userId, status: 'accepted' },
+        { receiver: userId, status: 'accepted' }
+      ]
+    });
+    
+    const userConnections = acceptedConnections.map(conn => 
+      conn.sender.toString() === userId ? conn.receiver : conn.sender
+    );
+    
+    // Find potential suggestions
+    const suggestions = await User.aggregate([
+      {
+        $match: {
+          _id: { $nin: connectedUserIds.map(id => new ObjectId(id)) },
+          profileComplete: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'connections',
+          let: { userId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$status', 'accepted'] },
+                    {
+                      $or: [
+                        {
+                          $and: [
+                            { $in: ['$sender', userConnections.map(id => new ObjectId(id))] },
+                            { $eq: ['$receiver', '$$userId'] }
+                          ]
+                        },
+                        {
+                          $and: [
+                            { $in: ['$receiver', userConnections.map(id => new ObjectId(id))] },
+                            { $eq: ['$sender', '$$userId'] }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'mutualConnectionsData'
+        }
+      },
+      {
+        $addFields: {
+          mutualConnections: { $size: '$mutualConnectionsData' },
+          locationMatch: { $eq: ['$location', currentUser.location] },
+          professionMatch: { $eq: ['$professionalType', currentUser.professionalType] },
+          commonSkills: {
+            $size: {
+              $setIntersection: [
+                { $ifNull: [{ $map: { input: '$skills', as: 'skill', in: '$$skill.name' } }, []] },
+                { $ifNull: [{ $map: { input: currentUser.skills || [], as: 'skill', in: '$$skill.name' } }, []] }
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          suggestionScore: {
+            $add: [
+              { $multiply: ['$mutualConnections', 10] },
+              { $cond: ['$locationMatch', 20, 0] },
+              { $cond: ['$professionMatch', 15, 0] },
+              { $multiply: ['$commonSkills', 5] },
+              { $cond: [{ $ne: ['$verificationTier', 'none'] }, 10, 0] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          suggestionScore: { $gt: 0 }
+        }
+      },
+      {
+        $sort: { suggestionScore: -1, createdAt: -1 }
+      },
+      {
+        $limit: parseInt(limit)
+      },
+      {
+        $project: {
+          firstName: 1,
+          lastName: 1,
+          headline: 1,
+          professionalType: 1,
+          profilePicture: 1,
+          location: 1,
+          isVerified: 1,
+          verificationTier: 1,
+          mutualConnections: 1,
+          commonSkills: 1,
+          suggestionScore: 1,
+          createdAt: 1
+        }
+      }
+    ]);
+    
+    res.json({
+      success: true,
+      suggestions: suggestions.map(suggestion => ({
+        ...suggestion,
+        industryRelevance: suggestion.suggestionScore > 25
+      }))
+    });
+    
+  } catch (error) {
+    console.error('Get connection suggestions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching connection suggestions',
+      error: error.message
+    });
+  }
+});
+
+// WEEK 3: Get connection strength analytics for a user
+router.get('/analytics/:userId', auth, async (req, res) => {
+  try {
+    const analytics = await Connection.getConnectionAnalytics(req.params.userId);
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error getting connection analytics:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Get specific connection details with strength analysis
+router.get('/:connectionId', auth, async (req, res) => {
+  try {
+    const connection = await Connection.findById(req.params.connectionId)
+      .populate('requester', 'firstName lastName professionalType profilePicture')
+      .populate('recipient', 'firstName lastName professionalType profilePicture');
+
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    // Ensure user is part of this connection
+    const isRequester = connection.requester._id.toString() === req.user._id.toString();
+    const isRecipient = connection.recipient._id.toString() === req.user._id.toString();
+    
+    if (!isRequester && !isRecipient) {
+      return res.status(403).json({ message: 'Not authorized to view this connection' });
+    }
+
+    // Add other user info
+    const otherUser = isRequester ? connection.recipient : connection.requester;
+    const connectionData = {
+      ...connection.toObject(),
+      otherUser
+    };
+
+    res.json(connectionData);
+  } catch (error) {
+    console.error('Error getting connection details:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Recalculate connection strength manually
+router.post('/:connectionId/recalculate-strength', auth, async (req, res) => {
+  try {
+    const connection = await Connection.findById(req.params.connectionId);
+    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    // Ensure user is part of this connection
+    const isRequester = connection.requester.toString() === req.user._id.toString();
+    const isRecipient = connection.recipient.toString() === req.user._id.toString();
+    
+    if (!isRequester && !isRecipient) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const newStrength = await connection.calculateConnectionStrength();
+    
+    res.json({
+      message: 'Connection strength recalculated',
+      strength: newStrength,
+      factors: connection.connectionStrength.factors,
+      trend: connection.connectionStrength.trend
+    });
+  } catch (error) {
+    console.error('Error recalculating connection strength:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Add interaction to connection
+router.post('/:connectionId/interaction', auth, async (req, res) => {
+  try {
+    const { type, metadata } = req.body;
+    const connection = await Connection.findById(req.params.connectionId);
+    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    // Ensure user is part of this connection
+    const isRequester = connection.requester.toString() === req.user._id.toString();
+    const isRecipient = connection.recipient.toString() === req.user._id.toString();
+    
+    if (!isRequester && !isRecipient) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    await connection.addInteraction(type, req.user._id, metadata);
+    
+    res.json({
+      message: 'Interaction added',
+      connectionStrength: connection.connectionStrength.score
+    });
+  } catch (error) {
+    console.error('Error adding interaction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Get strongest connections for a user
+router.get('/strongest/:userId', auth, async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const strongestConnections = await Connection.getStrongestConnections(
+      req.params.userId, 
+      parseInt(limit)
+    );
+    
+    res.json(strongestConnections);
+  } catch (error) {
+    console.error('Error getting strongest connections:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Update connection preferences
+router.put('/:connectionId/preferences', auth, async (req, res) => {
+  try {
+    const { allowMessages, allowEndorsements, allowCollaborations, notificationFrequency } = req.body;
+    const connection = await Connection.findById(req.params.connectionId);
+    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    // Ensure user is part of this connection
+    const isRequester = connection.requester.toString() === req.user._id.toString();
+    const isRecipient = connection.recipient.toString() === req.user._id.toString();
+    
+    if (!isRequester && !isRecipient) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Update preferences
+    if (allowMessages !== undefined) connection.preferences.allowMessages = allowMessages;
+    if (allowEndorsements !== undefined) connection.preferences.allowEndorsements = allowEndorsements;
+    if (allowCollaborations !== undefined) connection.preferences.allowCollaborations = allowCollaborations;
+    if (notificationFrequency !== undefined) connection.preferences.notificationFrequency = notificationFrequency;
+
+    await connection.save();
+    
+    res.json({
+      message: 'Connection preferences updated',
+      preferences: connection.preferences
+    });
+  } catch (error) {
+    console.error('Error updating connection preferences:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Add connection notes
+router.put('/:connectionId/notes', auth, async (req, res) => {
+  try {
+    const { notes } = req.body;
+    const connection = await Connection.findById(req.params.connectionId);
+    
+    if (!connection) {
+      return res.status(404).json({ message: 'Connection not found' });
+    }
+
+    // Ensure user is part of this connection
+    const isRequester = connection.requester.toString() === req.user._id.toString();
+    const isRecipient = connection.recipient.toString() === req.user._id.toString();
+    
+    if (!isRequester && !isRecipient) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Update notes based on user role
+    if (isRequester) {
+      connection.notes.requesterNotes = notes;
+    } else {
+      connection.notes.recipientNotes = notes;
+    }
+
+    await connection.save();
+    
+    res.json({
+      message: 'Connection notes updated',
+      notes: isRequester ? connection.notes.requesterNotes : connection.notes.recipientNotes
+    });
+  } catch (error) {
+    console.error('Error updating connection notes:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Get connection strength between two users
+router.get('/strength/:user1Id/:user2Id', auth, async (req, res) => {
+  try {
+    const strength = await Connection.getConnectionStrength(
+      req.params.user1Id, 
+      req.params.user2Id
+    );
+    
+    res.json({ strength });
+  } catch (error) {
+    console.error('Error getting connection strength:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Bulk recalculate connection strengths for a user
+router.post('/bulk-recalculate/:userId', auth, async (req, res) => {
+  try {
+    // Only allow users to recalculate their own connections
+    if (req.params.userId !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const connections = await Connection.find({
+      $or: [
+        { requester: req.params.userId },
+        { recipient: req.params.userId }
+      ],
+      status: 'accepted'
+    });
+
+    const results = [];
+    for (const connection of connections) {
+      try {
+        const strength = await connection.calculateConnectionStrength();
+        results.push({
+          connectionId: connection._id,
+          strength,
+          success: true
+        });
+      } catch (error) {
+        results.push({
+          connectionId: connection._id,
+          error: error.message,
+          success: false
+        });
+      }
+    }
+
+    res.json({
+      message: 'Bulk recalculation completed',
+      totalConnections: connections.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results
+    });
+  } catch (error) {
+    console.error('Error bulk recalculating connection strengths:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// WEEK 3: Get connection trends and insights
+router.get('/insights/:userId', auth, async (req, res) => {
+  try {
+    const { period = '30d' } = req.query;
+    const userId = req.params.userId;
+    
+    // Calculate date range
+    const now = new Date();
+    const daysBack = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const startDate = new Date(now - daysBack * 24 * 60 * 60 * 1000);
+
+    // Get connections made in period
+    const newConnections = await Connection.find({
+      $or: [
+        { requester: userId },
+        { recipient: userId }
+      ],
+      status: 'accepted',
+      createdAt: { $gte: startDate }
+    }).populate('requester recipient', 'firstName lastName professionalType');
+
+    // Get strength changes
+    const allConnections = await Connection.find({
+      $or: [
+        { requester: userId },
+        { recipient: userId }
+      ],
+      status: 'accepted'
+    });
+
+    const strengthTrends = {
+      increasing: allConnections.filter(c => c.connectionStrength.trend === 'increasing').length,
+      stable: allConnections.filter(c => c.connectionStrength.trend === 'stable').length,
+      decreasing: allConnections.filter(c => c.connectionStrength.trend === 'decreasing').length
+    };
+
+    // Professional type distribution of new connections
+    const professionalTypes = {};
+    newConnections.forEach(conn => {
+      const otherUser = conn.requester._id.toString() === userId ? conn.recipient : conn.requester;
+      const type = otherUser.professionalType || 'unknown';
+      professionalTypes[type] = (professionalTypes[type] || 0) + 1;
+    });
+
+    // Get top growing connections
+    const topGrowingConnections = allConnections
+      .filter(c => c.connectionStrength.trend === 'increasing')
+      .sort((a, b) => b.connectionStrength.score - a.connectionStrength.score)
+      .slice(0, 5)
+      .map(conn => ({
+        connectionId: conn._id,
+        otherUser: conn.requester._id.toString() === userId ? conn.recipient : conn.requester,
+        strength: conn.connectionStrength.score,
+        trend: conn.connectionStrength.trend
+      }));
+
+    res.json({
+      period,
+      newConnections: newConnections.length,
+      strengthTrends,
+      professionalTypes,
+      topGrowingConnections,
+      totalConnections: allConnections.length,
+      avgStrength: allConnections.reduce((sum, c) => sum + c.connectionStrength.score, 0) / allConnections.length || 0
+    });
+  } catch (error) {
+    console.error('Error getting connection insights:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Existing routes...
+// Get all connections for a user
+router.get('/', auth, async (req, res) => {
+  try {
+    const { status = 'accepted', page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const connections = await Connection.find({
+      $or: [
+        { requester: req.user._id },
+        { recipient: req.user._id }
+      ],
+      status
+    })
+    .populate('requester', 'firstName lastName professionalType profilePicture location headline')
+    .populate('recipient', 'firstName lastName professionalType profilePicture location headline')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+    const totalConnections = await Connection.countDocuments({
+      $or: [
+        { requester: req.user._id },
+        { recipient: req.user._id }
+      ],
+      status
+    });
+
+    // Add connection strength and other user info
+    const connectionsWithDetails = connections.map(conn => {
+      const isRequester = conn.requester._id.toString() === req.user._id.toString();
+      const otherUser = isRequester ? conn.recipient : conn.requester;
+      
+      return {
+        ...conn.toObject(),
+        otherUser,
+        isRequester
+      };
+    });
+
+    res.json({
+      connections: connectionsWithDetails,
+      totalConnections,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalConnections / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching connections:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

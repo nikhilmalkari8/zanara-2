@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Quick Fix - Zanara</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+        .success {
+            background: #efe;
+            color: #393;
+            border: 1px solid #cfc;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+        }
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔧</div>
+        <h1>JWT Quick Fix</h1>
+        <p class="subtitle">One-click solution for JWT token errors</p>
+        
+        <div id="status" class="status warning">
+            Checking token status...
+        </div>
+        
+        <div id="actions" style="display: none;">
+            <button class="btn btn-danger" onclick="quickFix()">
+                🚀 Quick Fix - Clear All Tokens
+            </button>
+            <button class="btn" onclick="checkStatus()">
+                🔍 Check Status Again
+            </button>
+        </div>
+        
+        <div class="instructions">
+            <h3>What this tool does:</h3>
+            <div class="step">
+                <strong>Step 1:</strong> Analyzes your current JWT token
+            </div>
+            <div class="step">
+                <strong>Step 2:</strong> Removes any malformed or invalid tokens
+            </div>
+            <div class="step">
+                <strong>Step 3:</strong> Clears all authentication data
+            </div>
+            <div class="step">
+                <strong>Step 4:</strong> Redirects you to login with a fresh start
+            </div>
+        </div>
+        
+        <div id="results"></div>
+        
+        <div style="margin-top: 30px;">
+            <button class="btn btn-success" onclick="goToApp()">
+                ← Back to Zanara App
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function checkTokenStatus() {
+            const token = localStorage.getItem('token');
+            const statusDiv = document.getElementById('status');
+            const actionsDiv = document.getElementById('actions');
+            
+            if (!token) {
+                statusDiv.innerHTML = '✅ No token found - you\'re ready to login fresh!';
+                statusDiv.className = 'status success';
+                actionsDiv.style.display = 'none';
+                return 'clean';
+            }
+            
+            const parts = token.split('.');
+            
+            if (parts.length !== 3) {
+                statusDiv.innerHTML = `❌ Malformed JWT detected (${parts.length} parts instead of 3)`;
+                statusDiv.className = 'status error';
+                actionsDiv.style.display = 'block';
+                return 'malformed';
+            }
+            
+            if (parts.some(part => !part || part.trim() === '')) {
+                statusDiv.innerHTML = '❌ JWT has empty parts - needs cleanup';
+                statusDiv.className = 'status error';
+                actionsDiv.style.display = 'block';
+                return 'empty_parts';
+            }
+            
+            try {
+                // Try to decode payload
+                const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                
+                if (payload.exp && payload.exp < Date.now() / 1000) {
+                    statusDiv.innerHTML = '⏰ JWT token is expired - needs refresh';
+                    statusDiv.className = 'status warning';
+                    actionsDiv.style.display = 'block';
+                    return 'expired';
+                }
+                
+                statusDiv.innerHTML = '✅ JWT token appears valid - try logging in';
+                statusDiv.className = 'status success';
+                actionsDiv.style.display = 'none';
+                return 'valid';
+                
+            } catch (error) {
+                statusDiv.innerHTML = '❌ JWT payload is corrupted - needs cleanup';
+                statusDiv.className = 'status error';
+                actionsDiv.style.display = 'block';
+                return 'corrupted';
+            }
+        }
+        
+        function quickFix() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="status warning">🧹 Cleaning up tokens...</div>';
+            
+            // Remove all possible token-related items
+            const keysToRemove = [
+                'token', 'authToken', 'jwt', 'jwtToken', 'accessToken', 
+                'access_token', 'bearer_token', 'user', 'userData', 'currentUser'
+            ];
+            
+            let removedCount = 0;
+            keysToRemove.forEach(key => {
+                if (localStorage.getItem(key)) {
+                    localStorage.removeItem(key);
+                    removedCount++;
+                }
+            });
+            
+            setTimeout(() => {
+                resultsDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ Cleanup completed!<br>
+                        Removed ${removedCount} items from storage.<br>
+                        <strong>You can now login fresh!</strong>
+                    </div>
+                `;
+                
+                // Recheck status
+                setTimeout(() => {
+                    checkStatus();
+                }, 1000);
+            }, 1000);
+        }
+        
+        function checkStatus() {
+            document.getElementById('results').innerHTML = '';
+            checkTokenStatus();
+        }
+        
+        function goToApp() {
+            window.location.href = '/';
+        }
+        
+        // Initialize
+        checkTokenStatus();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(checkTokenStatus, 5000);
+    </script>
+</body>
+</html> 

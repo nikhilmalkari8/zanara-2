@@ -184,6 +184,7 @@ const Notifications = ({ user }) => {
 
   const renderNotificationCard = (notification) => {
     const isUnread = notification.status === 'unread';
+    const isBatched = notification.isBatched;
     
     return (
       <div
@@ -209,21 +210,81 @@ const Notifications = ({ user }) => {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-          {/* Notification Icon */}
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: `linear-gradient(45deg, ${getNotificationColor(notification.type, notification.priority)}, ${getNotificationColor(notification.type, notification.priority)}88)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '18px',
-              flexShrink: 0
-            }}
-          >
-            {getNotificationIcon(notification.type)}
+          {/* Notification Icon or Avatar Stack */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            {isBatched && notification.batchData?.actors?.length > 1 ? (
+              // Stacked avatars for batched notifications
+              <div style={{ position: 'relative', width: '50px', height: '40px' }}>
+                {notification.batchData.actors.slice(0, 3).map((actor, index) => (
+                  <img
+                    key={actor.user._id || index}
+                    src={actor.user.profilePicture || '/default-avatar.png'}
+                    alt={`${actor.user.firstName} ${actor.user.lastName}`}
+                    style={{
+                      position: 'absolute',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      border: '2px solid white',
+                      left: `${index * 8}px`,
+                      top: `${index * 4}px`,
+                      zIndex: 3 - index
+                    }}
+                  />
+                ))}
+                {notification.batchData.count > 3 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      bottom: 0,
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      background: '#4CAF50',
+                      color: 'white',
+                      fontSize: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold',
+                      border: '2px solid white'
+                    }}
+                  >
+                    +{notification.batchData.count - 3}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Single icon for regular notifications
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: `linear-gradient(45deg, ${getNotificationColor(notification.type, notification.priority)}, ${getNotificationColor(notification.type, notification.priority)}88)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px'
+                }}
+              >
+                {notification.sender?.profilePicture ? (
+                  <img
+                    src={notification.sender.profilePicture}
+                    alt={`${notification.sender.firstName} ${notification.sender.lastName}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  getNotificationIcon(notification.type)
+                )}
+              </div>
+            )}
           </div>
 
           {/* Notification Content */}
@@ -238,6 +299,20 @@ const Notifications = ({ user }) => {
                 {notification.title}
               </h4>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {isBatched && (
+                  <div
+                    style={{
+                      background: 'rgba(76, 175, 80, 0.2)',
+                      color: '#4CAF50',
+                      padding: '2px 6px',
+                      borderRadius: '8px',
+                      fontSize: '10px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {notification.batchData.count} ACTIONS
+                  </div>
+                )}
                 {isUnread && (
                   <div
                     style={{
@@ -276,31 +351,90 @@ const Notifications = ({ user }) => {
               {notification.message}
             </p>
 
+            {/* Batched notification details */}
+            {isBatched && notification.batchData?.actors?.length > 1 && (
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.05)', 
+                borderRadius: '8px', 
+                padding: '8px', 
+                marginBottom: '8px' 
+              }}>
+                <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '4px' }}>
+                  Recent activity:
+                </div>
+                {notification.batchData.actors.slice(0, 3).map((actor, index) => (
+                  <div key={index} style={{ 
+                    fontSize: '12px', 
+                    color: '#ccc', 
+                    marginBottom: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <img
+                      src={actor.user.profilePicture || '/default-avatar.png'}
+                      alt={`${actor.user.firstName} ${actor.user.lastName}`}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%'
+                      }}
+                    />
+                    <span>
+                      {actor.user.firstName} {actor.user.lastName} • {formatTimeAgo(actor.timestamp)}
+                    </span>
+                  </div>
+                ))}
+                {notification.batchData.count > 3 && (
+                  <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                    and {notification.batchData.count - 3} others
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#999', fontSize: '12px' }}>
-                {notification.sender && (
+                {!isBatched && notification.sender && (
                   <>
                     from {notification.sender.firstName} {notification.sender.lastName} • 
                   </>
                 )}
-                {formatTimeAgo(notification.createdAt)}
+                {formatTimeAgo(isBatched ? notification.batchData?.lastActivity || notification.createdAt : notification.createdAt)}
               </span>
               
-              {notification.priority !== 'normal' && (
-                <span
-                  style={{
-                    background: getNotificationColor(notification.type, notification.priority),
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  {notification.priority}
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {notification.priority !== 'normal' && (
+                  <span
+                    style={{
+                      background: getNotificationColor(notification.type, notification.priority),
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      textTransform: 'uppercase'
+                    }}
+                  >
+                    {notification.priority}
+                  </span>
+                )}
+                
+                {isBatched && (
+                  <span
+                    style={{
+                      background: 'rgba(33, 150, 243, 0.2)',
+                      color: '#2196F3',
+                      padding: '2px 6px',
+                      borderRadius: '8px',
+                      fontSize: '10px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    BATCHED
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

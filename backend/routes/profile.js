@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const ModelProfile = require('../models/ModelProfile');
 const User = require('../models/User');
 const Connection = require('../models/Connection');
+const ProfileView = require('../models/ProfileView');
 const ActivityService = require('../services/activityService');
 const auth = require('../middleware/auth');
 const { uploadMiddleware } = require('../middleware/upload');
@@ -243,7 +244,6 @@ router.get('/model/:id', auth, async (req, res) => {
 
     // Track profile view (don't wait for it to complete)
     if (viewerId !== id) {
-      const ProfileView = require('../models/ProfileView');
       ProfileView.recordView(viewerId, id, {
         viewType: 'profile',
         source: req.get('referer') ? 'browse-talent' : 'direct-link',
@@ -1075,6 +1075,524 @@ router.get('/all', async (req, res) => {
     res.json(profiles);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching profiles' });
+  }
+});
+
+// GET /api/profile/viewers - Get profile viewers
+router.get('/viewers', auth, async (req, res) => {
+  try {
+    const { period = '7d', type = 'all', page = 1, limit = 20 } = req.query;
+    const userId = req.user._id;
+    
+    // Calculate date range
+    const now = new Date();
+    const daysBack = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const startDate = new Date(now - daysBack * 24 * 60 * 60 * 1000);
+
+    // Build query
+    let query = {
+      profileOwner: userId,
+      viewedAt: { $gte: startDate }
+    };
+
+    // Filter by viewer type
+    if (type === 'identified') {
+      query.isAnonymous = false;
+    } else if (type === 'anonymous') {
+      query.isAnonymous = true;
+    }
+
+    // Get viewers with pagination
+    const skip = (page - 1) * limit;
+    const viewers = await ProfileView.find(query)
+      .populate('viewer', 'firstName lastName professionalType profilePicture location headline isVerified')
+      .sort({ viewedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Process viewers data
+    const processedViewers = viewers.map(view => {
+      if (view.isAnonymous || !view.viewer) {
+        return {
+          isAnonymous: true,
+          professionalType: view.anonymousData?.professionalType,
+          location: view.anonymousData?.location,
+          viewedAt: view.viewedAt,
+          viewCount: view.viewCount,
+          connectionStrength: 0
+        };
+      }
+
+      return {
+        ...view.viewer.toObject(),
+        isAnonymous: false,
+        viewedAt: view.viewedAt,
+        viewCount: view.viewCount,
+        connectionStrength: view.connectionStrength || 0,
+        isOnline: view.viewer.lastActive && (Date.now() - view.viewer.lastActive) < 15 * 60 * 1000 // 15 minutes
+      };
+    });
+
+    const totalViewers = await ProfileView.countDocuments(query);
+
+    res.json({
+      viewers: processedViewers,
+      totalViewers,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalViewers / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching profile viewers:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/profile/analytics - Get profile analytics
+router.get('/analytics', auth, async (req, res) => {
+  try {
+    const { period = '30d' } = req.query;
+    const userId = req.userId;
+    
+    let dateFilter = {};
+    let previousDateFilter = {};
+    const now = new Date();
+    
+    switch (period) {
+      case '7d':
+        dateFilter = { createdAt: { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
+        previousDateFilter = { 
+          createdAt: { 
+            $gte: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+            $lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          }
+        };
+        break;
+      case '30d':
+        dateFilter = { createdAt: { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+        previousDateFilter = { 
+          createdAt: { 
+            $gte: new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000),
+            $lt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          }
+        };
+        break;
+      case '90d':
+        dateFilter = { createdAt: { $gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) } };
+        previousDateFilter = { 
+          createdAt: { 
+            $gte: new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000),
+            $lt: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          }
+        };
+        break;
+    }
+    
+    const Activity = require('../models/Activity');
+    
+    // Get current period stats
+    const currentStats = await Activity.aggregate([
+      {
+        $match: {
+          type: 'profile_view',
+          'relatedObjects.user': new require('mongoose').Types.ObjectId(userId),
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: 1 },
+          uniqueViewers: { $addToSet: '$actor' }
+        }
+      }
+    ]);
+    
+    // Get previous period stats for comparison
+    const previousStats = await Activity.aggregate([
+      {
+        $match: {
+          type: 'profile_view',
+          'relatedObjects.user': new require('mongoose').Types.ObjectId(userId),
+          ...previousDateFilter
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: 1 },
+          uniqueViewers: { $addToSet: '$actor' }
+        }
+      }
+    ]);
+    
+    // Get top viewer types
+    const topViewerTypes = await Activity.aggregate([
+      {
+        $match: {
+          type: 'profile_view',
+          'relatedObjects.user': new require('mongoose').Types.ObjectId(userId),
+          ...dateFilter
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'actor',
+          foreignField: '_id',
+          as: 'actorData'
+        }
+      },
+      {
+        $unwind: '$actorData'
+      },
+      {
+        $group: {
+          _id: '$actorData.professionalType',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 5
+      }
+    ]);
+    
+    const current = currentStats[0] || { totalViews: 0, uniqueViewers: [] };
+    const previous = previousStats[0] || { totalViews: 0, uniqueViewers: [] };
+    
+    // Calculate percentage changes
+    const viewsChange = previous.totalViews > 0 
+      ? Math.round(((current.totalViews - previous.totalViews) / previous.totalViews) * 100)
+      : current.totalViews > 0 ? 100 : 0;
+      
+    const viewersChange = previous.uniqueViewers.length > 0 
+      ? Math.round(((current.uniqueViewers.length - previous.uniqueViewers.length) / previous.uniqueViewers.length) * 100)
+      : current.uniqueViewers.length > 0 ? 100 : 0;
+    
+    // Map professional types to display labels
+    const typeLabels = {
+      'fashion-designer': 'Fashion Designers',
+      'stylist': 'Stylists',
+      'photographer': 'Photographers',
+      'makeup-artist': 'Makeup Artists',
+      'model': 'Models',
+      'brand': 'Brands',
+      'agency': 'Agencies',
+      'fashion-student': 'Students'
+    };
+    
+    const formattedViewerTypes = topViewerTypes.map(type => ({
+      professionalType: type._id,
+      label: typeLabels[type._id] || type._id,
+      count: type.count
+    }));
+    
+    res.json({
+      success: true,
+      totalViews: current.totalViews,
+      uniqueViewers: current.uniqueViewers.length,
+      viewsChange,
+      viewersChange,
+      searchAppearances: Math.floor(Math.random() * 50) + 10, // Mock data
+      topViewerTypes: formattedViewerTypes
+    });
+    
+  } catch (error) {
+    console.error('Get profile analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching profile analytics',
+      error: error.message
+    });
+  }
+});
+
+// Get comprehensive viewer analytics
+router.get('/viewer-analytics', auth, async (req, res) => {
+  try {
+    const { period = '30d' } = req.query;
+    const userId = req.user._id;
+    
+    // Calculate date ranges
+    const now = new Date();
+    const daysBack = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const currentPeriodStart = new Date(now - daysBack * 24 * 60 * 60 * 1000);
+    const previousPeriodStart = new Date(currentPeriodStart - daysBack * 24 * 60 * 60 * 1000);
+
+    // Get current period views
+    const currentViews = await ProfileView.find({
+      profileOwner: userId,
+      viewedAt: { $gte: currentPeriodStart }
+    }).populate('viewer', 'professionalType location');
+
+    // Get previous period views for comparison
+    const previousViews = await ProfileView.find({
+      profileOwner: userId,
+      viewedAt: { $gte: previousPeriodStart, $lt: currentPeriodStart }
+    });
+
+    // Calculate basic metrics
+    const totalViews = currentViews.length;
+    const uniqueViewers = new Set(currentViews.map(v => v.viewer?._id?.toString() || 'anonymous')).size;
+    const returnViewers = currentViews.filter(v => v.viewCount > 1).length;
+    const avgDailyViews = Math.round(totalViews / daysBack);
+
+    // Calculate trends (comparison with previous period)
+    const previousTotalViews = previousViews.length;
+    const previousUniqueViewers = new Set(previousViews.map(v => v.viewer?._id?.toString() || 'anonymous')).size;
+    const previousAvgDaily = Math.round(previousTotalViews / daysBack);
+
+    const trends = {
+      totalViews: previousTotalViews > 0 ? Math.round(((totalViews - previousTotalViews) / previousTotalViews) * 100) : 0,
+      uniqueViewers: previousUniqueViewers > 0 ? Math.round(((uniqueViewers - previousUniqueViewers) / previousUniqueViewers) * 100) : 0,
+      avgDailyViews: previousAvgDaily > 0 ? Math.round(((avgDailyViews - previousAvgDaily) / previousAvgDaily) * 100) : 0
+    };
+
+    // Analyze viewer types
+    const viewerTypes = {};
+    currentViews.forEach(view => {
+      if (view.isAnonymous) {
+        const type = view.anonymousData?.professionalType || 'unknown';
+        viewerTypes[type] = (viewerTypes[type] || 0) + 1;
+      } else if (view.viewer?.professionalType) {
+        const type = view.viewer.professionalType;
+        viewerTypes[type] = (viewerTypes[type] || 0) + 1;
+      }
+    });
+
+    const viewerTypesArray = Object.entries(viewerTypes)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // Analyze geographic distribution
+    const locations = {};
+    currentViews.forEach(view => {
+      let location = 'Unknown';
+      if (view.isAnonymous && view.anonymousData?.location) {
+        location = view.anonymousData.location;
+      } else if (view.viewer?.location?.city) {
+        location = view.viewer.location.city;
+      }
+      locations[location] = (locations[location] || 0) + 1;
+    });
+
+    const topLocations = Object.entries(locations)
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Analyze viewing patterns by hour
+    const hourlyViews = new Array(24).fill(0);
+    currentViews.forEach(view => {
+      const hour = new Date(view.viewedAt).getHours();
+      hourlyViews[hour]++;
+    });
+
+    const peakHours = hourlyViews
+      .map((views, hour) => ({ hour, views }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 6);
+
+    // Analyze weekly patterns
+    const weeklyViews = new Array(7).fill(0);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    currentViews.forEach(view => {
+      const dayOfWeek = new Date(view.viewedAt).getDay();
+      weeklyViews[dayOfWeek]++;
+    });
+
+    const weeklyPattern = weeklyViews
+      .map((views, index) => ({ day: dayNames[index], views }))
+      .sort((a, b) => b.views - a.views);
+
+    // Engagement after profile views (mock data - would need actual tracking)
+    const engagementAfterView = {
+      connectionRequests: Math.round(totalViews * 0.15), // 15% conversion rate
+      messages: Math.round(totalViews * 0.08), // 8% message rate
+      activityLikes: Math.round(totalViews * 0.25), // 25% like activities
+      profileViews: Math.round(totalViews * 0.12) // 12% return views
+    };
+
+    res.json({
+      // Key metrics
+      totalViews,
+      uniqueViewers,
+      returnViewers,
+      avgDailyViews,
+      
+      // Trends
+      trends,
+      
+      // Demographics
+      viewerTypes: viewerTypesArray,
+      topLocations,
+      
+      // Patterns
+      peakHours,
+      weeklyPattern,
+      
+      // Engagement
+      engagementAfterView,
+      
+      // Meta
+      period,
+      dateRange: {
+        start: currentPeriodStart,
+        end: now
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching viewer analytics:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Track a profile view
+router.post('/track-view/:profileId', auth, async (req, res) => {
+  try {
+    const { profileId } = req.params;
+    const viewerId = req.user._id;
+    const { isAnonymous = false, source = 'direct' } = req.body;
+
+    // Don't track self-views
+    if (profileId === viewerId.toString()) {
+      return res.json({ message: 'Self-view not tracked' });
+    }
+
+    // Check if user exists
+    const profileOwner = await User.findById(profileId);
+    if (!profileOwner) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+
+    // Find existing view record
+    let profileView = await ProfileView.findOne({
+      profileOwner: profileId,
+      viewer: isAnonymous ? null : viewerId,
+      sessionId: req.sessionID
+    });
+
+    if (profileView) {
+      // Update existing view
+      profileView.viewCount += 1;
+      profileView.viewedAt = new Date();
+      profileView.source = source;
+    } else {
+      // Create new view record
+      const viewerData = await User.findById(viewerId);
+      
+      profileView = new ProfileView({
+        profileOwner: profileId,
+        viewer: isAnonymous ? null : viewerId,
+        sessionId: req.sessionID,
+        isAnonymous,
+        source,
+        anonymousData: isAnonymous ? {
+          professionalType: viewerData.professionalType,
+          location: viewerData.location?.city || 'Unknown'
+        } : null
+      });
+    }
+
+    // Calculate connection strength if not anonymous
+    if (!isAnonymous) {
+      const Connection = require('../models/Connection');
+      profileView.connectionStrength = await Connection.getConnectionStrength(viewerId, profileId);
+    }
+
+    await profileView.save();
+
+    res.json({ message: 'Profile view tracked' });
+  } catch (error) {
+    console.error('Error tracking profile view:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get profile view insights for profile owner
+router.get('/view-insights', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { period = '30d' } = req.query;
+    
+    const daysBack = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const startDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+
+    // Get views with source tracking
+    const views = await ProfileView.find({
+      profileOwner: userId,
+      viewedAt: { $gte: startDate }
+    });
+
+    // Analyze traffic sources
+    const sources = {};
+    views.forEach(view => {
+      const source = view.source || 'direct';
+      sources[source] = (sources[source] || 0) + 1;
+    });
+
+    const trafficSources = Object.entries(sources)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Analyze view duration patterns (mock data)
+    const viewDurations = {
+      quick: Math.round(views.length * 0.4), // < 30 seconds
+      medium: Math.round(views.length * 0.35), // 30s - 2min
+      long: Math.round(views.length * 0.25) // > 2min
+    };
+
+    // Device type analysis (mock data)
+    const deviceTypes = {
+      desktop: Math.round(views.length * 0.6),
+      mobile: Math.round(views.length * 0.35),
+      tablet: Math.round(views.length * 0.05)
+    };
+
+    // Referral analysis
+    const referralSources = {
+      search: Math.round(views.length * 0.3),
+      direct: Math.round(views.length * 0.25),
+      social: Math.round(views.length * 0.2),
+      connections: Math.round(views.length * 0.15),
+      recommendations: Math.round(views.length * 0.1)
+    };
+
+    res.json({
+      totalViews: views.length,
+      period,
+      trafficSources,
+      viewDurations,
+      deviceTypes,
+      referralSources,
+      insights: [
+        {
+          type: 'tip',
+          title: 'Peak Viewing Time',
+          description: 'Most of your profile views happen between 9-11 AM. Consider posting content during this time.',
+          priority: 'medium'
+        },
+        {
+          type: 'opportunity',
+          title: 'Mobile Optimization',
+          description: '35% of your views are from mobile devices. Ensure your profile looks great on mobile.',
+          priority: 'high'
+        },
+        {
+          type: 'success',
+          title: 'Search Visibility',
+          description: '30% of views come from search. Your profile SEO is working well!',
+          priority: 'low'
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('Error fetching view insights:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

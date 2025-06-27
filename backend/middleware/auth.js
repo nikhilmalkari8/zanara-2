@@ -19,10 +19,29 @@ const auth = async (req, res, next) => {
       token = token.slice(7, token.length).trimLeft();
     }
 
-    if (!token) {
+    if (!token || token.trim() === '') {
       return res.status(401).json({ 
         success: false,
         message: 'Token format invalid, authorization denied' 
+      });
+    }
+
+    // Basic JWT format validation
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error('JWT malformed: Token does not have 3 parts');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token format is invalid - malformed JWT' 
+      });
+    }
+
+    // Check if token parts are not empty
+    if (tokenParts.some(part => !part || part.trim() === '')) {
+      console.error('JWT malformed: One or more token parts are empty');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token format is invalid - empty token parts' 
       });
     }
 
@@ -35,9 +54,19 @@ const auth = async (req, res, next) => {
       
       // Get user from database (handle both 'id' and 'userId' properties from token)
       const userId = decoded.id || decoded.userId;
+      
+      if (!userId) {
+        console.error('JWT payload missing user ID');
+        return res.status(401).json({ 
+          success: false,
+          message: 'Token payload invalid - missing user ID' 
+        });
+      }
+
       const user = await User.findById(userId).select('-password');
       
       if (!user) {
+        console.error('User not found for token:', userId);
         return res.status(401).json({ 
           success: false,
           message: 'User not found, token invalid' 
@@ -51,16 +80,28 @@ const auth = async (req, res, next) => {
       next();
     } catch (jwtError) {
       console.error('JWT verification error:', jwtError.message);
+      console.error('Token that failed:', token.substring(0, 20) + '...');
       
       if (jwtError.name === 'JsonWebTokenError') {
+        if (jwtError.message.includes('malformed')) {
+          return res.status(401).json({ 
+            success: false,
+            message: 'Token is malformed - please login again' 
+          });
+        }
         return res.status(401).json({ 
           success: false,
-          message: 'Invalid token' 
+          message: 'Invalid token format' 
         });
       } else if (jwtError.name === 'TokenExpiredError') {
         return res.status(401).json({ 
           success: false,
-          message: 'Token expired' 
+          message: 'Token expired - please login again' 
+        });
+      } else if (jwtError.name === 'NotBeforeError') {
+        return res.status(401).json({ 
+          success: false,
+          message: 'Token not active yet' 
         });
       } else {
         return res.status(401).json({ 

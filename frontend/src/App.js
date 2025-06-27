@@ -8,6 +8,9 @@ import RegisterCompany from './components/auth/RegisterCompany';
 import UnifiedRegister from './components/auth/UnifiedRegister';
 import Login from './components/auth/Login';
 
+// Token Cleanup Utility
+import { validateAndCleanupToken, forceCleanupAllTokens, debugTokenInfo } from './components/shared/TokenCleanup';
+
 // Setup Components
 import ModelProfileSetup from './components/setup/ModelProfileSetup';
 import PhotographerProfileSetup from './components/setup/PhotographerProfileSetup';
@@ -46,9 +49,11 @@ import NetworkVisualization from './components/networking/NetworkVisualization';
 import MyConnections from './components/connections/MyConnections';
 
 // Shared Components
-import ActivityFeed from './components/shared/ActivityFeed';
 import Notifications from './components/shared/Notifications';
 import NavigationHeader from './components/shared/NavigationHeader';
+
+// NEW: Enhanced Activity Feed Components
+import ActivityHub from './components/activity/ActivityHub';
 
 // Content Components
 import ContentCreator from './components/content/ContentCreator';
@@ -180,28 +185,45 @@ function App() {
   // Check if user is already logged in when app starts
   useEffect(() => {
     const checkLoginStatus = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const userResponse = await fetch('http://localhost:8001/api/auth/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+      // AGGRESSIVE TOKEN CLEANUP - This will prevent any malformed tokens from being sent
+      console.log('🚀 Starting token validation and cleanup...');
+      
+      // First, debug what we have
+      debugTokenInfo();
+      
+      // Validate and cleanup token - this will remove any malformed tokens
+      const validToken = validateAndCleanupToken();
+      
+      if (!validToken) {
+        console.log('❌ No valid token found after cleanup, redirecting to home');
+        setCurrentPage('home');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('✅ Valid token found, proceeding with authentication check...');
 
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            console.log('User data loaded:', userData); // Debug log
-            setUser(userData);
-            await checkProfileCompletion(userData, token);
-          } else {
-            localStorage.removeItem('token');
-            setCurrentPage('home');
-          }
-        } catch (error) {
-          console.error('Error checking login status:', error);
-          localStorage.removeItem('token');
+      try {
+        const userResponse = await fetch('http://localhost:8001/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${validToken}` }
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          console.log('User data loaded:', userData); // Debug log
+          setUser(userData);
+          await checkProfileCompletion(userData, validToken);
+        } else {
+          console.warn('Token validation failed, clearing localStorage');
+          forceCleanupAllTokens();
           setCurrentPage('home');
         }
+      } catch (error) {
+        console.error('Error checking login status:', error);
+        forceCleanupAllTokens();
+        setCurrentPage('home');
       }
+      
       setIsLoading(false);
     };
 
@@ -511,7 +533,7 @@ function App() {
 
         {/* MAIN APP FEATURES */}
         {currentPage === 'activity-feed' && (
-          <ActivityFeed user={user} />
+          <ActivityHub user={user} onUserClick={handleViewProfile} />
         )}
 
         {currentPage === 'notifications' && (

@@ -188,7 +188,78 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionExpiresAt: {
     type: Date
-  }
+  },
+  // NEW: Profile Change Tracking
+  profileHistory: {
+    profilePicture: [{
+      url: String,
+      changedAt: { type: Date, default: Date.now },
+      previousUrl: String
+    }],
+    coverPhoto: [{
+      url: String,
+      changedAt: { type: Date, default: Date.now },
+      previousUrl: String
+    }],
+    headline: [{
+      value: String,
+      changedAt: { type: Date, default: Date.now },
+      previousValue: String
+    }],
+    bio: [{
+      value: String,
+      changedAt: { type: Date, default: Date.now },
+      previousValue: String
+    }],
+    location: [{
+      value: String,
+      changedAt: { type: Date, default: Date.now },
+      previousValue: String
+    }],
+    workStatus: [{
+      value: String,
+      changedAt: { type: Date, default: Date.now },
+      previousValue: String
+    }]
+  },
+  // NEW: Work Anniversary Tracking
+  workAnniversaries: [{
+    company: String,
+    position: String,
+    startDate: Date,
+    endDate: Date,
+    isCurrent: { type: Boolean, default: false }
+  }],
+  // NEW: Skills and Endorsements
+  skills: [{
+    name: String,
+    category: {
+      type: String,
+      enum: ['technical', 'creative', 'business', 'soft-skills'],
+      default: 'technical'
+    },
+    endorsements: [{
+      endorsedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      endorsedAt: { type: Date, default: Date.now },
+      note: String
+    }],
+    addedAt: { type: Date, default: Date.now }
+  }],
+  // NEW: Achievements and Certifications
+  achievements: [{
+    title: String,
+    description: String,
+    category: {
+      type: String,
+      enum: ['award', 'certification', 'milestone', 'recognition'],
+      default: 'milestone'
+    },
+    issuer: String,
+    achievedAt: Date,
+    imageUrl: String,
+    verificationUrl: String,
+    isPublic: { type: Boolean, default: true }
+  }]
 }, {
   timestamps: true
 });
@@ -263,6 +334,335 @@ userSchema.methods.getProfessionalInfo = function() {
   };
   
   return typeMap[this.professionalType] || { label: 'Professional', category: 'Fashion', icon: '👤' };
+};
+
+// NEW: Method to track profile picture change
+userSchema.methods.updateProfilePicture = async function(newUrl) {
+  const previousUrl = this.profilePicture;
+  
+  // Update the profile picture
+  this.profilePicture = newUrl;
+  this.lastProfileUpdate = new Date();
+  
+  // Track the change in history
+  if (!this.profileHistory) {
+    this.profileHistory = { profilePicture: [], coverPhoto: [], headline: [], bio: [], location: [], workStatus: [] };
+  }
+  if (!this.profileHistory.profilePicture) {
+    this.profileHistory.profilePicture = [];
+  }
+  
+  this.profileHistory.profilePicture.push({
+    url: newUrl,
+    changedAt: new Date(),
+    previousUrl: previousUrl
+  });
+  
+  // Keep only last 10 changes
+  if (this.profileHistory.profilePicture.length > 10) {
+    this.profileHistory.profilePicture = this.profileHistory.profilePicture.slice(-10);
+  }
+  
+  await this.save();
+  
+  // Create activity feed entry
+  const Activity = require('./Activity');
+  await Activity.createActivity({
+    actor: this._id,
+    type: 'profile_photo_changed',
+    title: `${this.fullName} updated their profile photo`,
+    description: 'New profile photo uploaded',
+    metadata: {
+      changeType: 'photo',
+      previousValue: previousUrl,
+      newValue: newUrl
+    },
+    visibility: 'public',
+    priority: 'normal'
+  });
+  
+  return this;
+};
+
+// NEW: Method to track cover photo change
+userSchema.methods.updateCoverPhoto = async function(newUrl) {
+  const previousUrl = this.coverPhoto;
+  
+  // Update the cover photo
+  this.coverPhoto = newUrl;
+  this.lastProfileUpdate = new Date();
+  
+  // Track the change in history
+  if (!this.profileHistory) {
+    this.profileHistory = { profilePicture: [], coverPhoto: [], headline: [], bio: [], location: [], workStatus: [] };
+  }
+  if (!this.profileHistory.coverPhoto) {
+    this.profileHistory.coverPhoto = [];
+  }
+  
+  this.profileHistory.coverPhoto.push({
+    url: newUrl,
+    changedAt: new Date(),
+    previousUrl: previousUrl
+  });
+  
+  // Keep only last 10 changes
+  if (this.profileHistory.coverPhoto.length > 10) {
+    this.profileHistory.coverPhoto = this.profileHistory.coverPhoto.slice(-10);
+  }
+  
+  await this.save();
+  
+  // Create activity feed entry
+  const Activity = require('./Activity');
+  await Activity.createActivity({
+    actor: this._id,
+    type: 'cover_photo_changed',
+    title: `${this.fullName} updated their cover photo`,
+    description: 'New cover photo uploaded',
+    metadata: {
+      changeType: 'cover',
+      previousValue: previousUrl,
+      newValue: newUrl
+    },
+    visibility: 'public',
+    priority: 'normal'
+  });
+  
+  return this;
+};
+
+// NEW: Method to track headline change
+userSchema.methods.updateHeadline = async function(newHeadline) {
+  const previousHeadline = this.headline;
+  
+  if (previousHeadline !== newHeadline) {
+    this.headline = newHeadline;
+    this.lastProfileUpdate = new Date();
+    
+    // Track the change in history
+    if (!this.profileHistory) {
+      this.profileHistory = { profilePicture: [], coverPhoto: [], headline: [], bio: [], location: [], workStatus: [] };
+    }
+    if (!this.profileHistory.headline) {
+      this.profileHistory.headline = [];
+    }
+    
+    this.profileHistory.headline.push({
+      value: newHeadline,
+      changedAt: new Date(),
+      previousValue: previousHeadline
+    });
+    
+    // Keep only last 10 changes
+    if (this.profileHistory.headline.length > 10) {
+      this.profileHistory.headline = this.profileHistory.headline.slice(-10);
+    }
+    
+    await this.save();
+    
+    // Create activity feed entry for significant headline changes
+    if (previousHeadline && previousHeadline.trim() !== '') {
+      const Activity = require('./Activity');
+      await Activity.createActivity({
+        actor: this._id,
+        type: 'profile_update',
+        title: `${this.fullName} updated their professional headline`,
+        description: `Changed from "${previousHeadline}" to "${newHeadline}"`,
+        metadata: {
+          changeType: 'headline',
+          previousValue: previousHeadline,
+          newValue: newHeadline
+        },
+        visibility: 'public',
+        priority: 'normal'
+      });
+    }
+  }
+  
+  return this;
+};
+
+// NEW: Method to add skill with activity tracking
+userSchema.methods.addSkill = async function(skillName, category = 'technical') {
+  if (!this.skills) {
+    this.skills = [];
+  }
+  
+  // Check if skill already exists
+  const existingSkill = this.skills.find(skill => 
+    skill.name.toLowerCase() === skillName.toLowerCase()
+  );
+  
+  if (!existingSkill) {
+    this.skills.push({
+      name: skillName,
+      category: category,
+      endorsements: [],
+      addedAt: new Date()
+    });
+    
+    this.lastProfileUpdate = new Date();
+    await this.save();
+    
+    // Create activity feed entry
+    const Activity = require('./Activity');
+    await Activity.createActivity({
+      actor: this._id,
+      type: 'skill_added',
+      title: `${this.fullName} added a new skill: ${skillName}`,
+      description: `Added ${skillName} to their skill set`,
+      metadata: {
+        skillName: skillName,
+        category: category
+      },
+      visibility: 'public',
+      priority: 'normal'
+    });
+  }
+  
+  return this;
+};
+
+// NEW: Method to endorse a skill
+userSchema.methods.endorseSkill = async function(skillName, endorserId, note = '') {
+  if (!this.skills) {
+    this.skills = [];
+  }
+  
+  const skill = this.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
+  
+  if (skill) {
+    // Check if already endorsed by this user
+    const existingEndorsement = skill.endorsements.find(e => 
+      e.endorsedBy.toString() === endorserId.toString()
+    );
+    
+    if (!existingEndorsement) {
+      skill.endorsements.push({
+        endorsedBy: endorserId,
+        endorsedAt: new Date(),
+        note: note
+      });
+      
+      await this.save();
+      
+      // Create activity feed entry
+      const Activity = require('./Activity');
+      const endorser = await mongoose.model('User').findById(endorserId);
+      
+      await Activity.createActivity({
+        actor: endorserId,
+        type: 'skill_endorsed',
+        title: `${endorser.fullName} endorsed ${this.fullName} for ${skillName}`,
+        description: note || `Endorsed ${skillName} skill`,
+        relatedObjects: {
+          user: this._id
+        },
+        metadata: {
+          skillName: skillName,
+          endorserCount: skill.endorsements.length
+        },
+        visibility: 'public',
+        priority: 'normal'
+      });
+    }
+  }
+  
+  return this;
+};
+
+// NEW: Method to add achievement
+userSchema.methods.addAchievement = async function(achievementData) {
+  if (!this.achievements) {
+    this.achievements = [];
+  }
+  
+  const achievement = {
+    title: achievementData.title,
+    description: achievementData.description,
+    category: achievementData.category || 'milestone',
+    issuer: achievementData.issuer,
+    achievedAt: achievementData.achievedAt || new Date(),
+    imageUrl: achievementData.imageUrl,
+    verificationUrl: achievementData.verificationUrl,
+    isPublic: achievementData.isPublic !== false
+  };
+  
+  this.achievements.push(achievement);
+  this.lastProfileUpdate = new Date();
+  await this.save();
+  
+  // Create activity feed entry
+  if (achievement.isPublic) {
+    const Activity = require('./Activity');
+    let activityType = 'achievement_added';
+    
+    if (achievement.category === 'award') {
+      activityType = 'award_received';
+    } else if (achievement.category === 'certification') {
+      activityType = 'certification_earned';
+    }
+    
+    await Activity.createActivity({
+      actor: this._id,
+      type: activityType,
+      title: `${this.fullName} ${achievement.category === 'award' ? 'received an award' : achievement.category === 'certification' ? 'earned a certification' : 'achieved a milestone'}: ${achievement.title}`,
+      description: achievement.description,
+      metadata: {
+        awardName: achievement.title,
+        certificationName: achievement.title,
+        issuer: achievement.issuer,
+        achievedAt: achievement.achievedAt
+      },
+      visibility: 'public',
+      priority: 'high'
+    });
+  }
+  
+  return this;
+};
+
+// NEW: Method to check work anniversaries
+userSchema.methods.checkWorkAnniversaries = async function() {
+  if (!this.workAnniversaries || this.workAnniversaries.length === 0) {
+    return;
+  }
+  
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+  
+  for (let work of this.workAnniversaries) {
+    if (work.startDate) {
+      const startDate = new Date(work.startDate);
+      const startMonth = startDate.getMonth();
+      const startDay = startDate.getDate();
+      
+      // Check if it's the anniversary
+      if (startMonth === currentMonth && startDay === currentDay) {
+        const yearsWorked = today.getFullYear() - startDate.getFullYear();
+        
+        if (yearsWorked > 0) {
+          // Create work anniversary activity
+          const Activity = require('./Activity');
+          await Activity.createActivity({
+            actor: this._id,
+            type: 'work_anniversary',
+            title: `${this.fullName} is celebrating ${yearsWorked} year${yearsWorked > 1 ? 's' : ''} at ${work.company}`,
+            description: `${yearsWorked} year work anniversary as ${work.position}`,
+            metadata: {
+              anniversaryYears: yearsWorked,
+              companyName: work.company,
+              jobTitle: work.position
+            },
+            visibility: 'public',
+            priority: 'high'
+          });
+        }
+      }
+    }
+  }
 };
 
 // NEW: Indexes for better performance
