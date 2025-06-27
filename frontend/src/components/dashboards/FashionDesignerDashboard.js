@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, TrendingUp, Users, Calendar, Star, Heart, MessageCircle, Eye, ArrowRight, Plus, Settings,
   Bell, Search, Filter, MapPin, Clock, DollarSign, Briefcase, Award, Target, Zap, Globe, Instagram,
-  Youtube, Music, User, ChevronDown, Activity, Flame, Crown, Diamond
+  Youtube, Music, User, ChevronDown, Activity, Flame, Crown, Diamond, Palette
 } from 'lucide-react';
 
 const FashionDesignerDashboard = ({ user = {}, onLogout, setCurrentPage, onViewProfile, setViewingProfileId }) => {
@@ -719,6 +719,14 @@ const FashionDesignerDashboard = ({ user = {}, onLogout, setCurrentPage, onViewP
                 <h3 className="text-lg font-light text-white/90 mb-6">Quick Actions</h3>
 
                 <div className="space-y-4">
+                  <button
+                    onClick={() => setCurrentPage && setCurrentPage('design-tools')}
+                    className="w-full p-4 glass-effect hover:bg-white/10 text-white rounded-xl font-light transition-all duration-300 flex items-center border border-white/5 hover:border-pink-500/20"
+                  >
+                    <Palette className="w-4 h-4 mr-3 text-white/60" />
+                    Design Tools
+                  </button>
+
                   <button
                     onClick={() => setCurrentPage && setCurrentPage('opportunities')}
                     className="w-full p-4 glass-effect hover:bg-white/10 text-white rounded-xl font-light transition-all duration-300 flex items-center border border-white/5 hover:border-yellow-500/20"

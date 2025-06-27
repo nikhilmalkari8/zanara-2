@@ -403,6 +403,12 @@ const FashionStudentDashboard = ({ user, onLogout, setCurrentPage, onViewProfile
                 View Profile
               </button>
               <button 
+                onClick={() => setCurrentPage('design-tools')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                🎨 Design Tools
+              </button>
+              <button 
                 onClick={() => setCurrentPage('browse-talent')}
                 className="text-gray-600 hover:text-gray-900"
               >

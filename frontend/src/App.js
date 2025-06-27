@@ -36,6 +36,8 @@ import Opportunities from './components/opportunities/Opportunities';
 import CreateOpportunity from './components/opportunities/CreateOpportunity';
 import OpportunityDetail from './components/opportunities/OpportunityDetail';
 import BrowseTalent from './components/opportunities/BrowseTalent';
+import JobBoard from './components/jobs/JobBoard';
+import BookingDashboard from './components/bookings/BookingDashboard';
 import TalentSearch from './components/search/TalentSearch';
 
 // Networking Components
@@ -59,6 +61,16 @@ import ProfileRouter from './components/profile/ProfileRouter';
 
 // Messaging Components
 import MessagingCenter from './components/messaging/MessagingCenter';
+
+// Collaboration Components
+import CollaborationHub from './components/collaboration/CollaborationHub';
+
+// Design Tools Components
+import DesignToolsHub from './components/design-tools/DesignToolsHub';
+import TechPackCreator from './components/design-tools/TechPackCreator';
+import FabricLibrary from './components/design-tools/FabricLibrary';
+import MoodboardCreator from './components/design-tools/MoodboardCreator';
+import ColorStudio from './components/design-tools/ColorStudio';
 
 // Payment Components
 import SubscriptionPlans from './components/payments/SubscriptionPlans';
@@ -524,6 +536,22 @@ function App() {
           />
         )}
 
+        {currentPage === 'job-board' && (
+          <JobBoard 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+          />
+        )}
+
+        {currentPage === 'booking-dashboard' && (
+          <BookingDashboard 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+          />
+        )}
+
         {currentPage === 'connections' && (
           <Connections user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
         )}
@@ -607,6 +635,152 @@ function App() {
 
         {currentPage === 'messages' && (
           <MessagingCenter user={user} />
+        )}
+
+        {currentPage === 'collaboration' && (
+          <CollaborationHub 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+          />
+        )}
+
+        {/* Design Tools Components */}
+        {currentPage === 'design-tools' && (
+          <DesignToolsHub 
+            user={user} 
+            onLogout={handleLogout} 
+            setCurrentPage={setCurrentPage}
+          />
+        )}
+
+        {currentPage === 'tech-pack-creator' && (
+          <TechPackCreator 
+            user={user} 
+            onBack={() => setCurrentPage('design-tools')}
+            onSave={() => setCurrentPage('design-tools')}
+          />
+        )}
+
+        {currentPage === 'fabric-library' && (
+          <FabricLibrary 
+            user={user} 
+            onBack={() => setCurrentPage('design-tools')}
+          />
+        )}
+
+        {currentPage === 'moodboard-creator' && (
+          <MoodboardCreator 
+            user={user} 
+            onBack={() => setCurrentPage('design-tools')}
+          />
+        )}
+
+        {currentPage === 'color-studio' && (
+          <ColorStudio 
+            user={user} 
+            onBack={() => setCurrentPage('design-tools')}
+          />
+        )}
+
+        {currentPage === 'pattern-maker' && (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div className="glass-effect rounded-2xl p-12 text-center max-w-2xl">
+              <div className="text-6xl mb-6">✂️</div>
+              <h1 className="text-3xl font-bold text-white mb-4">Pattern Maker</h1>
+              <p className="text-white/70 text-lg mb-8">
+                Digital pattern creation and grading tools coming soon!
+              </p>
+              <button
+                onClick={() => setCurrentPage('design-tools')}
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors"
+              >
+                Back to Design Tools
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'size-chart-builder' && (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div className="glass-effect rounded-2xl p-12 text-center max-w-2xl">
+              <div className="text-6xl mb-6">📏</div>
+              <h1 className="text-3xl font-bold text-white mb-4">Size Chart Builder</h1>
+              <p className="text-white/70 text-lg mb-8">
+                Create accurate size charts and measurement guides coming soon!
+              </p>
+              <button
+                onClick={() => setCurrentPage('design-tools')}
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors"
+              >
+                Back to Design Tools
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'fashion-sketcher' && (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div className="glass-effect rounded-2xl p-12 text-center max-w-2xl">
+              <div className="text-6xl mb-6">✏️</div>
+              <h1 className="text-3xl font-bold text-white mb-4">Fashion Sketcher</h1>
+              <p className="text-white/70 text-lg mb-8">
+                Digital fashion illustration and design sketching tool coming soon!
+              </p>
+              <button
+                onClick={() => setCurrentPage('design-tools')}
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors"
+              >
+                Back to Design Tools
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'collection-planner' && (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div className="glass-effect rounded-2xl p-12 text-center max-w-2xl">
+              <div className="text-6xl mb-6">📋</div>
+              <h1 className="text-3xl font-bold text-white mb-4">Collection Planner</h1>
+              <p className="text-white/70 text-lg mb-8">
+                Plan and organize fashion collections with timeline management coming soon!
+              </p>
+              <button
+                onClick={() => setCurrentPage('design-tools')}
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors"
+              >
+                Back to Design Tools
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Payment Components */}

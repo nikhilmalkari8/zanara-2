@@ -78,6 +78,12 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       label: '📚 Content',
       color: '#9C27B0'
     },
+    // Add Design Tools for fashion professionals
+    ...(user && ['fashion-designer', 'fashion-student', 'stylist'].includes(user.professionalType) ? [{
+      key: 'design-tools',
+      label: '🎨 Design Tools',
+      color: '#E91E63'
+    }] : []),
     {
       key: 'notifications',
       label: `🔔 Notifications ${unreadCount > 0 ? `(${unreadCount})` : ''}`,
@@ -88,6 +94,11 @@ const NavigationHeader = ({ user, currentPage, setCurrentPage, onLogout }) => {
       key: 'messages',
       label: '💬 Messages',
       color: '#00BCD4'
+    },
+    {
+      key: 'collaboration',
+      label: '🤝 Collaborate',
+      color: '#8BC34A'
     },
     {
       key: 'subscription-plans',

@@ -64,7 +64,9 @@ const uploadDirs = [
   'uploads/profiles',
   'uploads/portfolios',
   'uploads/messages',
-  'uploads/companies'
+  'uploads/companies',
+  'uploads/collaboration',
+  'uploads/design-tools'
 ];
 
 uploadDirs.forEach(dir => {
@@ -80,7 +82,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Import routes
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
-const companyRoutes = require('./routes/Company');
+const companyRoutes = require('./routes/company');
 const connectionsRoutes = require('./routes/connections');
 const introductionsRoutes = require('./routes/introductions');
 const opportunitiesRoutes = require('./routes/opportunities');
@@ -94,6 +96,9 @@ const availabilityRoutes = require('./routes/availability');
 const paymentsRoutes = require('./routes/payments');
 const messagesRoutes = require('./routes/messages');
 const analyticsRoutes = require('./routes/analytics');
+const jobsRoutes = require('./routes/jobs');
+const collaborationRoutes = require('./routes/collaboration');
+const designToolsRoutes = require('./routes/design-tools');
 
 // Route middleware
 app.use('/api/auth', authRoutes);
@@ -112,6 +117,9 @@ app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/jobs', jobsRoutes);
+app.use('/api/collaboration', collaborationRoutes);
+app.use('/api/design-tools', designToolsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -153,12 +161,16 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
+.then(async () => {
   console.log('✅ MongoDB connected successfully');
-  console.log('   Database:', mongoose.connection.name);
+  console.log(`   Database: ${mongoose.connection.name}`);
+  
+  // Seed mock fabric data
+  const { Fabric } = require('./models/DesignTool');
+  await Fabric.seedMockData();
 })
 .catch(err => {
-  console.error('❌ MongoDB connection error:', err.message);
+  console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
 
